@@ -5,6 +5,7 @@ import {
   childrenOf,
   flattenTaskTree,
   parentOf,
+  subtreeOf,
 } from './taskTree.js';
 
 function hierarchy(entries: readonly (readonly [number, number | null])[]): Map<number, number | null> {
@@ -91,6 +92,38 @@ describe('ancestorsOf', () => {
 
     expect(ancestorsOf(tree, 3)).toEqual([1, 2]);
     expect(ancestorsOf(tree, 1)).toEqual([]);
+  });
+});
+
+describe('subtreeOf', () => {
+  it('gives a task and all its descendants', () => {
+    const tree = buildTaskTree(
+      hierarchy([
+        [1, null],
+        [2, 1],
+        [3, 2],
+        [4, 1],
+        [5, null],
+      ]),
+    );
+
+    expect(subtreeOf(tree, 1).sort()).toEqual([1, 2, 3, 4]);
+    expect(subtreeOf(tree, 2).sort()).toEqual([2, 3]);
+    expect(subtreeOf(tree, 3)).toEqual([3]);
+    expect(subtreeOf(tree, 5)).toEqual([5]);
+    expect(subtreeOf(tree, 99)).toEqual([]);
+  });
+
+  it('never loops on a cycle', () => {
+    const cyclic = buildTaskTree(
+      hierarchy([
+        [1, 2],
+        [2, 3],
+        [3, 1],
+      ]),
+    );
+
+    expect(subtreeOf(cyclic, 1).length).toBeLessThanOrEqual(3);
   });
 });
 

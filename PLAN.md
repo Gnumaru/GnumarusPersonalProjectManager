@@ -120,6 +120,14 @@ Only the tasks of the **visible rows** are read (their file is read to get the
 title and the tags), so the memory holds the tree that is on the screen and
 nothing else.
 
+### Collapsing and expanding
+
+* A **simple click** on the twisty of a task only changes that task: the state
+  of its children is kept (a collapsed child stays collapsed, an expanded child
+  stays expanded).
+* A **ctrl+click** on the twisty collapses or expands the **whole branch**: the
+  task and every one of its descendants, at any depth.
+
 ### The pure part
 
 `src/core/taskTree.ts` builds the tree from the `id -> parent` mapping and

@@ -142,6 +142,35 @@ export function childrenOf(tree: TaskTree, id: number): readonly number[] {
   return tree.children.get(id) ?? [];
 }
 
+/**
+ * A task and all its descendants, from the task down to the deepest ones.
+ *
+ * The traversal keeps the ids it has already visited, so a cycle can never
+ * make it loop forever.
+ */
+export function subtreeOf(tree: TaskTree, id: number): number[] {
+  if (!tree.parents.has(id)) {
+    // The task is not part of the tree: it has no descendant.
+    return [];
+  }
+  const result: number[] = [];
+  const seen = new Set<number>();
+  const stack: number[] = [id];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === undefined || seen.has(current)) {
+      continue;
+    }
+    seen.add(current);
+    result.push(current);
+    for (const child of childrenOf(tree, current)) {
+      stack.push(child);
+    }
+  }
+  return result;
+}
+
 /** Id of the parent of a task, `null` for a root task. */
 export function parentOf(tree: TaskTree, id: number): number | null {
   return tree.parents.get(id) ?? null;

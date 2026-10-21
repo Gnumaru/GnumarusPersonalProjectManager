@@ -28,6 +28,7 @@ list or as a tree.
 | **List / Tree toggle** | Done | `src/ui/app.ts` |
 | **One row per task, with its name and its tags** | Done | `src/ui/taskTreeView.ts` |
 | **Collapse and expand the children of a task** | Done | `src/ui/taskTreeView.ts`, `src/core/taskTree.ts` |
+| **Ctrl+click collapses or expands the whole branch** | Done | `src/ui/app.ts`, `src/core/taskTree.ts` |
 | **Focus the tree on a task (it becomes the root of the tree)** | Done | `src/ui/app.ts` |
 | **Focus the general root (every task without a parent)** | Done | `src/ui/app.ts` |
 | **Breadcrumb of the focused task** | Done | `src/ui/app.ts` |

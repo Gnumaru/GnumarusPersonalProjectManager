@@ -127,6 +127,9 @@
 - [x] A **List / Tree** toggle in the toolbar
 - [x] A row per task with its name and its tags
 - [x] A twisty to collapse and to expand the children of a task
+- [x] A simple click keeps the state of the children of the task
+- [x] A ctrl+click collapses or expands the whole branch (the task and all its
+      descendants)
 - [x] An action to focus the tree on a task
 - [x] The breadcrumb of the focused task, with the **General root** button
 - [x] The view and the edit dialogs are opened from a row of the tree
@@ -135,9 +138,9 @@
 
 ### Tests
 - [x] `src/core/taskTree.test.ts` - the tree of the tasks (roots, children, cycles,
-      focus, search)
+      focus, search, subtree of a task)
 - [x] `src/ui/app.test.ts` - the tree in the application (expansion, focus,
-      breadcrumb, dialogs, search)
+      breadcrumb, dialogs, search, recursive expansion with a ctrl+click)
 - [x] `src/core/taskRepository.test.ts` - the hierarchy read from the live bridge
 - [x] `scripts/e2e-browser.mjs` - the tree driven by a real browser
 

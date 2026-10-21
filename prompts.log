@@ -8,7 +8,22 @@ eu subi o webservice de acesso low level com parametros pra nao exigir token. ag
 ====
 a interface grafica atual tem apenas um modo de exibicao em lista simples. este modo é bom, vamos manter como está. mas eu quero que exista um segundo modo de exibição em árvore, em que cada tarefa é exibida como uma linha, apenas mostrando o nome (talvez as tags tambem), e elas podem ser colapsadas ou expandidas para exibir as tarefas filhas. deve ser possível "focar" em uma tarefa para que ela seja a raiz da árvore (todas as outras que não fazem parte da hierarquia nao sao exibidas) ou focar na "raiz geral" para exibir todas as tarefas que nao tem pai. deve ser possivel a partir dessa visualizacao invocar as modais de visualizacao e edicao da tarefa.
 ====
+na visualizacao de arvore, eu quero que quando o usuario fizer um ctrl+clique para expandir ou colapsar os filhos de uma tarefa, essa acao seja feita recursivamente com todos os filhos. o comportamento atual está assim: se temos tres tarefas em cascata, A pai de B e B pai de C, e A esta expandida enquanto B esta colapsada, se eu colapso A e depois expando A, o estado de B continua como estava antes. isso está certo. Mas eu quero que seja implementado um novo comportamento adicional ao clique simples. se o usuario usar ctrl+clique pra colapsar ou expandir, todos os filhos serao recursivamente colapsados ou expandidos. Entao se A estiver expandida, independente do estado dos filhos, se o usuario usar ctrl+clique pra colapsar A, ela e todos os filhos serão colapsados. o mesmo vale na hora de expandir. se A estiver colapsada e o usuario usar ctrl+clique pra expandir A, todos os filhos serao expandidos
 ====
+na modal de selecionar o diretorio do projeto, quando eu clico e seleciono qualquer item na listagem o scroll da modal é resetado, o que torna muito dificil dar dois cliques no diretorio pra entrar nele. eu quero duas coisas: primeiro, que seja possivel teclar enter para entrar no diretorio selecionado. segundo, que o scroll da modal não resete apenas porque eu cliquei em algum item.
+====
+na visualizacao de arvore, quero que o usuario seja capaz de clicar, arrastar e soltar tarefas para "reparentar" ela. suponha que tenhamos a arvore de 5 tarefas abaixo:
+A
+-B
+--C
+-D
+--E
+nesta arvore, se o usuario clicar em cima de E e arrastar e solvar ela em cima de C, E deixara de ser filha de D e passara a ser filha de C, nos deixando com esta nova relacao de hierarquia
+A
+-B
+--C
+---E
+-D
 ====
 ====
 ====

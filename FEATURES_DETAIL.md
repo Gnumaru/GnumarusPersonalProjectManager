@@ -198,6 +198,15 @@ Every task is one row with:
 
 The indentation of a row is the depth of the task in the displayed tree.
 
+### Collapsing and expanding
+
+| Gesture | Effect |
+| ------- | ------ |
+| **Simple click** on the twisty | Only the task changes: a child that was collapsed stays collapsed, a child that was expanded stays expanded. The state of the branch is remembered. |
+| **Ctrl+click** on the twisty | The **whole branch** is collapsed or expanded: the task and every one of its descendants, at any depth. |
+
+The tooltip of the twisty tells which gesture does what.
+
 ### The focus
 
 The tree can be focused on a task: that task becomes the root of the displayed
@@ -345,7 +354,7 @@ A dialog that behaves like the file dialogs of an operating system:
 | ----- | -------------- |
 | `src/core/task.test.ts` | Format, parsing, serialization, round trip, tags. |
 | `src/core/pagination.test.ts` | Page count, clamping, slicing, page information. |
-| `src/core/taskTree.test.ts` | The tree of the tasks: roots, children, orphan tasks, cycles, focus, expansion and search. |
+| `src/core/taskTree.test.ts` | The tree of the tasks: roots, children, orphan tasks, cycles, focus, expansion, search and subtree of a task. |
 | `src/core/config.test.ts` | Configuration parsing and serialization. |
 | `src/api/client.test.ts` | Tagged values, headers, error handling, shell calls, authentication policy of the service (mocked `fetch`). |
 | `src/core/taskRepository.test.ts` | The repository against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |

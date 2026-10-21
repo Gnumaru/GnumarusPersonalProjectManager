@@ -12,8 +12,13 @@ import { el } from './dom.js';
 import { createIcon } from './icons.js';
 
 export interface TreeViewHandlers {
-  /** Collapses or expands the task. */
-  readonly onToggle: (id: number) => void;
+  /**
+   * Collapses or expands the task.
+   *
+   * `recursive` is `true` when the user held the control key: every child of
+   * the task is collapsed or expanded as well.
+   */
+  readonly onToggle: (id: number, recursive: boolean) => void;
   /** Makes the task the root of the displayed tree. */
   readonly onFocus: (id: number) => void;
   readonly onView: (task: Task) => void;
@@ -56,8 +61,8 @@ function renderTreeRow(
     class: 'tree-twisty',
     title: row.hasChildren
       ? row.expanded
-        ? 'Collapse the child tasks'
-        : 'Show the child tasks'
+        ? 'Collapse the child tasks (Ctrl+click collapses the whole branch)'
+        : 'Show the child tasks (Ctrl+click expands the whole branch)'
       : 'This task has no child task',
   });
   twisty.type = 'button';
@@ -67,8 +72,8 @@ function renderTreeRow(
     twisty.classList.add(row.expanded ? 'is-expanded' : 'is-collapsed');
     twisty.setAttribute('aria-expanded', row.expanded ? 'true' : 'false');
     twisty.setAttribute('aria-label', row.expanded ? 'Collapse the child tasks' : 'Show the child tasks');
-    twisty.addEventListener('click', () => {
-      handlers.onToggle(task.id);
+    twisty.addEventListener('click', (event) => {
+      handlers.onToggle(task.id, event.ctrlKey);
     });
   } else {
     twisty.disabled = true;

@@ -18,6 +18,7 @@ import {
   ancestorsOf,
   buildTaskTree,
   flattenTaskTree,
+  subtreeOf,
   type TaskTree,
   type TreeRow,
 } from '../core/taskTree.js';
@@ -724,8 +725,8 @@ export class App {
 
     clear(this.treeRowsElement);
     for (const row of renderTreeRows(this.doc, this.treeRows, this.treeTasks, {
-      onToggle: (id) => {
-        void this.toggleTreeNode(id);
+      onToggle: (id, recursive) => {
+        void this.toggleTreeNode(id, recursive);
       },
       onFocus: (id) => {
         void this.focusTree(id);
@@ -930,14 +931,38 @@ export class App {
     await this.updateTree();
   }
 
-  /** Collapses or expands the children of a task of the tree. */
-  private async toggleTreeNode(id: number): Promise<void> {
-    if (this.treeExpanded.has(id)) {
-      this.treeExpanded.delete(id);
-    } else {
+  /**
+   * Collapses or expands the children of a task of the tree.
+   *
+   * A simple click only changes the task itself: the state of its children is
+   * kept. With the control key the whole branch is collapsed or expanded, the
+   * task and every one of its descendants.
+   */
+  private async toggleTreeNode(id: number, recursive: boolean): Promise<void> {
+    const expanded = !this.treeExpanded.has(id);
+    if (recursive) {
+      this.setSubtreeExpanded(id, expanded);
+    } else if (expanded) {
       this.treeExpanded.add(id);
+    } else {
+      this.treeExpanded.delete(id);
     }
     await this.updateTree();
+  }
+
+  /** Collapses or expands a task and all its descendants. */
+  private setSubtreeExpanded(id: number, expanded: boolean): void {
+    const structure = this.treeStructure;
+    if (structure === null) {
+      return;
+    }
+    for (const descendant of subtreeOf(structure, id)) {
+      if (expanded) {
+        this.treeExpanded.add(descendant);
+      } else {
+        this.treeExpanded.delete(descendant);
+      }
+    }
   }
 
   /** Recomputes the tree and draws it again. */

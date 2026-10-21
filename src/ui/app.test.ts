@@ -115,6 +115,14 @@ function doubleClick(element: Element | null | undefined, dom: JSDOM): void {
   element.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true }));
 }
 
+/** Clicks an element while the control key is held down. */
+function ctrlClick(element: Element | null | undefined, dom: JSDOM): void {
+  if (element === null || element === undefined) {
+    return;
+  }
+  element.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, ctrlKey: true }));
+}
+
 function buttonByText(doc: Document, text: string): HTMLButtonElement | null {
   const buttons = [...doc.querySelectorAll('button')];
   return buttons.find((button) => button.textContent?.trim() === text) ?? null;
@@ -515,6 +523,77 @@ describe('App and the tree view', () => {
     click(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'));
     await flush();
     expect(treeRows(harness)).toHaveLength(2);
+
+    harness.app.dispose();
+  });
+
+  it('keeps the state of the children when a task is collapsed with a simple click', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    // Expand the first task and its first child.
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'));
+    await flush();
+    click(harness.root.querySelectorAll<HTMLButtonElement>('.tree-row .tree-twisty')[1]);
+    await flush();
+    expect(treeRows(harness)).toHaveLength(5);
+
+    // Collapsing the first task hides its children, but the child stays
+    // expanded: expanding the first task again shows them.
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'));
+    await flush();
+    expect(treeRows(harness)).toHaveLength(2);
+
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'));
+    await flush();
+    const rows = treeRows(harness);
+    expect(rows).toHaveLength(5);
+    expect(rows[2]?.querySelector('.tree-title')?.textContent).toBe('Task 4');
+
+    harness.app.dispose();
+  });
+
+  it('expands the whole branch with a ctrl+click', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    // Every task of the branch is expanded at once.
+    ctrlClick(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'), harness.dom);
+    await flush();
+
+    const rows = treeRows(harness);
+    expect(rows).toHaveLength(5);
+    expect(rows.map((row) => row.querySelector('.tree-title')?.textContent)).toEqual([
+      'Task 1',
+      'Task 2',
+      'Task 4',
+      'Task 3',
+      'Task 5',
+    ]);
+
+    harness.app.dispose();
+  });
+
+  it('collapses the whole branch with a ctrl+click', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    // Expand the first task and its first child.
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'));
+    await flush();
+    click(harness.root.querySelectorAll<HTMLButtonElement>('.tree-row .tree-twisty')[1]);
+    await flush();
+    expect(treeRows(harness)).toHaveLength(5);
+
+    // The ctrl+click collapses the task and all its descendants.
+    ctrlClick(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'), harness.dom);
+    await flush();
+    expect(treeRows(harness)).toHaveLength(2);
+
+    // Expanding it again with a ctrl+click brings the whole branch back.
+    ctrlClick(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'), harness.dom);
+    await flush();
+    expect(treeRows(harness)).toHaveLength(5);
 
     harness.app.dispose();
   });

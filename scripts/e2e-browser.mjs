@@ -543,6 +543,26 @@ async function runChecks() {
 
   // --- tree view ------------------------------------------------------------
 
+  // A grand child, to check the recursive expansion of a branch.
+  const grandChildPath = `${taskDirectory}/task_14.txt`;
+  await apiRequest(`/api/file?path=${encodeURIComponent(grandChildPath)}`, {
+    method: 'POST',
+    body: JSON.stringify({
+      content: [
+        'id=14',
+        'title=Grand child of the first task',
+        'status=todo',
+        'parent=13',
+        'tags=browser sample',
+        'created=2026-10-01T10:00:00.000Z',
+        'updated=2026-10-01T10:00:00.000Z',
+        '----',
+        'The grand child of the first task.',
+      ].join('\n'),
+      encoding: 'text',
+    }),
+  });
+
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Tree');
     button.click();
@@ -581,17 +601,47 @@ async function runChecks() {
   );
   check(childDepth === '1', 'the child task is shown under its parent', childDepth);
 
+  // A simple click keeps the state of the children: the grand child stays
+  // hidden because its parent is collapsed.
+  const grandChildHidden = await evaluate(
+    `document.querySelector('.tree-row[data-task-id="14"]') === null`,
+  );
+  check(grandChildHidden === true, 'a simple click keeps the state of the children');
+
+  // A ctrl+click collapses the task and all its descendants.
+  await evaluate(`(() => {
+    const row = document.querySelector('.tree-row[data-task-id="1"]');
+    row.querySelector('.tree-twisty')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.tree-row').length === 12`);
+  check(true, 'a ctrl+click collapses the whole branch');
+
+  // A ctrl+click expands the task and all its descendants.
+  await evaluate(`(() => {
+    const row = document.querySelector('.tree-row[data-task-id="1"]');
+    row.querySelector('.tree-twisty')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.tree-row[data-task-id="14"]') !== null`);
+  const grandChildDepth = await evaluate(
+    `document.querySelector('.tree-row[data-task-id="14"]')?.dataset['depth'] ?? ''`,
+  );
+  check(grandChildDepth === '2', 'a ctrl+click expands the whole branch', grandChildDepth);
+
   // Focusing a task makes it the root of the tree.
   await evaluate(`(() => {
     const row = document.querySelector('.tree-row[data-task-id="1"]');
     row.querySelectorAll('.tree-action')[0].click();
     return true;
   })()`);
-  await waitFor(`document.querySelectorAll('.tree-row').length === 2`);
+  await waitFor(`document.querySelectorAll('.tree-row').length === 3`);
   const focusedIds = await evaluate(
     `[...document.querySelectorAll('.tree-row')].map((node) => node.dataset['taskId']).join('|')`,
   );
-  check(focusedIds === '1|13', 'the focused task is the root of the tree', focusedIds);
+  check(focusedIds === '1|13|14', 'the focused task is the root of the tree', focusedIds);
 
   const breadcrumb = await evaluate(
     `[...document.querySelectorAll('.tree-crumb')].map((node) => node.textContent).join('|')`,
