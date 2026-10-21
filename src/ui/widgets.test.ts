@@ -1,8 +1,9 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vite-plus/test';
-import type { Task } from '../core/task.js';
+import type { Task, TaskStatus } from '../core/task.js';
 import { renderTaskRows } from './taskTable.js';
 import { renderPaginationBar } from './paginationBar.js';
+import { statusBadge } from './taskDialog.js';
 import { computePageInfo } from '../core/pagination.js';
 
 function createDocument(): Document {
@@ -42,7 +43,7 @@ describe('renderTaskRows', () => {
     expect(row?.querySelector('.cell-id')?.textContent).toBe('7');
     expect(row?.querySelector('.cell-title')?.textContent).toContain('Write the report');
     expect(row?.querySelectorAll('.cell-tags .tag')).toHaveLength(2);
-    expect(row?.querySelector('.cell-status .status-badge')?.textContent).toBe('In progress');
+    expect(row?.querySelector('.cell-status .status-badge')?.textContent).toBe('DOING');
     expect(row?.querySelector('.cell-parent')?.textContent).toBe('—');
   });
 
@@ -143,6 +144,27 @@ describe('renderTaskRows', () => {
       },
     );
     expect(rows[0]?.querySelector('.task-title-button')?.textContent).toBe('Untitled task');
+  });
+});
+
+describe('statusBadge', () => {
+  it('shows the name of every status', () => {
+    const doc = createDocument();
+    const expected: ReadonlyArray<readonly [TaskStatus, string]> = [
+      ['planning', 'PLANNING'],
+      ['next', 'NEXT'],
+      ['todo', 'TODO'],
+      ['doing', 'DOING'],
+      ['paused', 'PAUSED'],
+      ['done', 'DONE'],
+      ['canceled', 'CANCELED'],
+    ];
+
+    for (const [status, label] of expected) {
+      const badge = statusBadge(doc, status);
+      expect(badge.textContent).toBe(label);
+      expect(badge.classList.contains(`status-${status}`)).toBe(true);
+    }
   });
 });
 

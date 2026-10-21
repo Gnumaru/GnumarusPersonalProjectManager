@@ -19,7 +19,7 @@ list or as a tree.
 | Delete a task (with confirmation) | Done | `src/ui/taskDialog.ts`, `src/core/taskRepository.ts` |
 | Recursive search of the tasks (grep) | Done | `src/core/taskRepository.ts` |
 | Free form tags (add and remove) | Done | `src/core/task.ts` |
-| Task status (to do / in progress / done) | Done | `src/core/task.ts` |
+| Task status (planning, next, to do, doing, paused, done, canceled) | Done | `src/core/task.ts` |
 
 ## Tree view
 

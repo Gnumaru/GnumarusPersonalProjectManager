@@ -26,7 +26,15 @@ export const TASK_FILE_PREFIX = 'task_';
 export const TASK_FILE_SUFFIX = '.txt';
 export const TASK_FILE_PATTERN = /^task_(\d+)\.txt$/;
 
-export const TASK_STATUSES = ['todo', 'doing', 'done'] as const;
+export const TASK_STATUSES = [
+  'planning',
+  'next',
+  'todo',
+  'doing',
+  'paused',
+  'done',
+  'canceled',
+] as const;
 
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 

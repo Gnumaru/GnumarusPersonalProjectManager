@@ -3,12 +3,14 @@ import {
   applyTaskInput,
   buildTask,
   isTaskFileName,
+  isTaskStatus,
   isValidTag,
   METADATA_SEPARATOR,
   normalizeTags,
   parseTask,
   parseTaskIdFromFileName,
   serializeTask,
+  TASK_STATUSES,
   taskFileName,
   withParent,
 } from './task.js';
@@ -54,6 +56,28 @@ describe('tag handling', () => {
     expect(isValidTag('valid-tag')).toBe(true);
     expect(isValidTag('in valid')).toBe(false);
     expect(isValidTag('')).toBe(false);
+  });
+});
+
+describe('task statuses', () => {
+  it('knows every status of the application', () => {
+    expect([...TASK_STATUSES]).toEqual([
+      'planning',
+      'next',
+      'todo',
+      'doing',
+      'paused',
+      'done',
+      'canceled',
+    ]);
+  });
+
+  it('accepts only the known statuses', () => {
+    for (const status of TASK_STATUSES) {
+      expect(isTaskStatus(status)).toBe(true);
+    }
+    expect(isTaskStatus('whatever')).toBe(false);
+    expect(isTaskStatus('')).toBe(false);
   });
 });
 
@@ -105,6 +129,12 @@ describe('parseTask', () => {
 
   it('uses the todo status for unknown values', () => {
     expect(parseTask('id=1\nstatus=whatever\n----').status).toBe('todo');
+  });
+
+  it('reads every known status', () => {
+    for (const status of TASK_STATUSES) {
+      expect(parseTask(`id=1\nstatus=${status}\n----`).status).toBe(status);
+    }
   });
 
   it('keeps a description that contains the separator', () => {

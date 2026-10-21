@@ -30,7 +30,10 @@ Rules:
 
 * `id` - unique incremental integer, also encoded in the file name.
 * `title` - mandatory, single line (new lines are replaced by spaces on write).
-* `status` - one of `todo`, `doing`, `done`. Anything else falls back to `todo`.
+* `status` - one of `planning`, `next`, `todo`, `doing`, `paused`, `done`,
+  `canceled`. Anything else falls back to `todo`. The badge of the task shows
+  the name of the status in upper case (`PLANNING`, `NEXT`, `TODO`, `DOING`,
+  `PAUSED`, `DONE`, `CANCELED`), each one with its own colour.
 * `parent` - **absent for a root task**. Present only for a child task, holding
   the id of its parent. The parser and the writer already support it, the user
   interface does not expose it yet.
@@ -154,7 +157,7 @@ The repository refuses to create a child of a task that does not exist
 | ----- | ------------- |
 | The **Parent** column of the table | `#1` for a child task (a link that opens the parent, even when the parent is on another page), `—` for a root task. |
 | The **title of a task** | A badge with the amount of children it has. |
-| The **view of a task** | The list of its children (`#2 Write the migrations - To do`); clicking a child opens it. |
+| The **view of a task** | The list of its children (`#2 Write the migrations - TODO`); clicking a child opens it. |
 | The **view and the editor of a child** | A banner with the parent of the task. |
 
 The amount of children of every task is read with a single command that only

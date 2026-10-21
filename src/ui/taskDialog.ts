@@ -33,9 +33,13 @@ export interface TaskDialogOptions {
 }
 
 const STATUS_LABELS: Readonly<Record<TaskStatus, string>> = {
-  todo: 'To do',
-  doing: 'In progress',
-  done: 'Done',
+  planning: 'PLANNING',
+  next: 'NEXT',
+  todo: 'TODO',
+  doing: 'DOING',
+  paused: 'PAUSED',
+  done: 'DONE',
+  canceled: 'CANCELED',
 };
 
 export class TaskDialog {

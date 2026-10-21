@@ -43,6 +43,8 @@ Free text description of the task.
 * The metadata block ends with a line containing exactly `----`.
 * Everything after that line is the description (free text, may contain anything).
 * Root tasks have **no** `parent` key. Child tasks would carry `parent=<id>`.
+* `status` is one of `planning`, `next`, `todo`, `doing`, `paused`, `done` or
+  `canceled` (the badge shows the name in upper case).
 * `tags` is a whitespace separated list (a tag can never contain whitespace).
 * File name is `task_<id>.txt`, `<id>` being a unique incremental integer.
 
@@ -183,6 +185,8 @@ flattens it into the rows to display:
     list is not reset when an item is selected.
 15. [x] Drag and drop in the tree view: a task dropped on another one becomes
     its child.
+16. [x] Task statuses: `PLANNING`, `NEXT`, `TODO`, `DOING`, `PAUSED`, `DONE`
+    and `CANCELED`.
 
 ## Verification commands
 

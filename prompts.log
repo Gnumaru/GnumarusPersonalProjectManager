@@ -29,12 +29,12 @@ deve tambem ser possivel arrastar a tarefa para transformar ela em tarefa raiz (
 ====
 nos status de tarefas, mude "To do" para "TODO", "In progress" para "DOING" e "done" para "DONE". adicione tambem os status "PLANNING" "NEXT", "PAUSED" e "CANCELED"
 ====
-PLANNING, TODO, NEXT, PAUSED, DOING, DONE, CANCELED
-====
-====
-====
-====
 crie uma terceira visualizacao, de kanban, que permitira visualizar tarefas em colunas agrupadas por status. apenas tarefas sem filho irão aparecer lá. deve ser possível arrastar e soltar as tarefas entre as colunas para alterar o status dela. a ordem das colunas deve ser PLANNING, TODO, NEXT, PAUSED, DOING, DONE, CANCELED
+====
+====
+====
+====
+
 ====
 ====
 ====

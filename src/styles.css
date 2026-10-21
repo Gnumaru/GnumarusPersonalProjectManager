@@ -20,6 +20,10 @@
   --warning-soft: #fdefd6;
   --danger: #b42318;
   --danger-soft: #fde4e2;
+  --info: #0b6a9e;
+  --info-soft: #ddf0fb;
+  --paused: #55607a;
+  --paused-soft: #e6e9f1;
   --shadow: 0 10px 30px rgba(23, 32, 56, 0.12);
   --radius: 10px;
   --radius-sm: 7px;
@@ -48,6 +52,10 @@
     --warning-soft: #33290f;
     --danger: #fb7185;
     --danger-soft: #3a1a20;
+    --info: #56b6f0;
+    --info-soft: #10293a;
+    --paused: #9aa5bd;
+    --paused-soft: #262c3a;
     --shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
   }
 }
@@ -622,14 +630,34 @@ button[hidden] {
   border-color: var(--border);
 }
 
+.status-planning {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.status-next {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .status-doing {
   background: var(--warning-soft);
   color: var(--warning);
 }
 
+.status-paused {
+  background: var(--paused-soft);
+  color: var(--paused);
+}
+
 .status-done {
   background: var(--success-soft);
   color: var(--success);
+}
+
+.status-canceled {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 /* ------------------------------------------------------------ tree view -- */

@@ -10,6 +10,8 @@
 
 ### Core (pure, unit tested)
 - [x] `src/core/task.ts` - task file format (parse, serialize, file name helpers)
+- [x] `src/core/task.ts` - the seven statuses: `planning`, `next`, `todo`,
+      `doing`, `paused`, `done`, `canceled`
 - [x] `src/core/pagination.ts` - page count, clamping, slicing
 - [x] `src/core/config.ts` - `~/.config/GnumarusProjectManager/config.json`
 
@@ -38,6 +40,7 @@
 - [x] `src/api/client.test.ts` - client against a mocked `fetch`
 - [x] `src/core/taskRepository.test.ts` - integration against the live bridge
 - [x] `src/ui/widgets.test.ts` - task table and pagination bar (jsdom)
+- [x] `src/ui/widgets.test.ts` - the badge of every status
 - [x] `src/ui/app.test.ts` - the whole application against a fake bridge (jsdom)
 - [x] `src/ui/fileDialog.test.ts` - path helpers and file list sorting
 - [x] `src/ui/fileDialog.test.ts` - the picker: the list is not rebuilt when an
