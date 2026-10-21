@@ -2,12 +2,15 @@
 
 ## Goal
 
-Initial version of a frontend-only web application for project management, where every
-task is a plain text file on the local disk, accessed exclusively through the
+Frontend only web application for project management, where every task is a
+plain text file on the local disk, accessed exclusively through the
 `GnumarusOSBridge` low-level REST API (`http://127.0.0.1:1423`).
 
-This first batch delivers **root tasks only** (tasks that have no parent): create, edit,
+Batch 1 delivered the **root tasks** (tasks that have no parent): create, edit,
 view, delete, search and a paginated listing (10 tasks per page).
+
+Batch 2 adds the **child tasks**: a task can be created from an existing parent
+task, the relations are visible in the listing and in the task view.
 
 ## Architecture
 
@@ -54,6 +57,8 @@ Free text description of the task.
 | list a directory | `GET /api/dir?path=` |
 | recursive listing | `POST /api/shell` -> `find . -type f -name 'task_*.txt'` |
 | recursive search | `POST /api/shell` -> `grep -rIl --fixed-strings --ignore-case --include='task_*.txt' -f - .` (pattern through stdin, never through the command line) |
+| amount of children | `POST /api/shell` -> `grep -rh ... '^parent=' . \| cut -d= -f2 \| sort \| uniq -c` |
+| children of one task | `POST /api/shell` -> `grep -rl ... -e '^parent=<id>$' .` |
 
 The API token is entered by the user in the app and kept in `localStorage`
 (ephemeral, same lifetime as the token of the running service). The last selected
@@ -78,6 +83,8 @@ them and only then reads those 10 files. Switching pages discards the previous p
 8. [x] Implement token handling, service availability banner and periodic ping.
 9. [x] Write the tests (unit, integration against the live bridge, headless Chrome smoke test).
 10. [x] Build, run every test and deploy to `/var/www/html/GnumarusProjectManager`.
+11. [x] Child tasks: create a task from an existing parent, show the parent of a
+    task, count and list the children of a task.
 
 ## Verification commands
 
@@ -97,5 +104,5 @@ not running.
 
 ## Out of scope for this batch
 
-* Child tasks (tasks with a parent) - the format already supports `parent=<id>`.
+* Grand children in the user interface (the format supports them).
 * Multi project management, task ordering by hand, due dates, attachments.

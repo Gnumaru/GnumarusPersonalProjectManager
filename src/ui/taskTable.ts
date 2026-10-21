@@ -1,14 +1,16 @@
 /** Rows of the task table. */
 
 import type { Task } from '../core/task.js';
-import { formatTimestamp } from './dom.js';
+import { el, formatTimestamp } from './dom.js';
 import { createIcon } from './icons.js';
 import { statusBadge } from './taskDialog.js';
 
 export interface TaskTableHandlers {
   readonly onView: (task: Task) => void;
   readonly onEdit: (task: Task) => void;
+  readonly onAddChild: (task: Task) => void;
   readonly onDelete: (task: Task) => void;
+  readonly onOpenParent: (parentId: number) => void;
 }
 
 /** Builds one table row per task. */
@@ -16,11 +18,17 @@ export function renderTaskRows(
   doc: Document,
   tasks: readonly Task[],
   handlers: TaskTableHandlers,
+  childCounts: ReadonlyMap<number, number> = new Map<number, number>(),
 ): HTMLElement[] {
-  return tasks.map((task) => renderTaskRow(doc, task, handlers));
+  return tasks.map((task) => renderTaskRow(doc, task, handlers, childCounts));
 }
 
-function renderTaskRow(doc: Document, task: Task, handlers: TaskTableHandlers): HTMLElement {
+function renderTaskRow(
+  doc: Document,
+  task: Task,
+  handlers: TaskTableHandlers,
+  childCounts: ReadonlyMap<number, number>,
+): HTMLElement {
   const titleCell = doc.createElement('td');
   titleCell.className = 'cell-title';
   const titleButton = doc.createElement('button');
@@ -30,7 +38,23 @@ function renderTaskRow(doc: Document, task: Task, handlers: TaskTableHandlers): 
   titleButton.addEventListener('click', () => {
     handlers.onView(task);
   });
-  titleCell.append(titleButton);
+
+  const titleLine = doc.createElement('div');
+  titleLine.className = 'task-title-line';
+  titleLine.append(titleButton);
+
+  const childCount = childCounts.get(task.id) ?? 0;
+  if (childCount > 0) {
+    const badge = el(doc, 'span', {
+      class: 'child-count',
+      title: `${childCount} child task${childCount === 1 ? '' : 's'}`,
+    });
+    badge.append(createIcon(doc, 'child'));
+    badge.append(el(doc, 'span', { text: String(childCount) }));
+    titleLine.append(badge);
+  }
+
+  titleCell.append(titleLine);
 
   if (task.description.length > 0) {
     const preview = doc.createElement('span');
@@ -42,6 +66,22 @@ function renderTaskRow(doc: Document, task: Task, handlers: TaskTableHandlers): 
   const idCell = doc.createElement('td');
   idCell.className = 'cell-id';
   idCell.textContent = String(task.id);
+
+  const parentCell = doc.createElement('td');
+  parentCell.className = 'cell-parent';
+  if (task.parentId === null) {
+    parentCell.append(el(doc, 'span', { class: 'no-parent', text: '—' }));
+  } else {
+    const parentButton = doc.createElement('button');
+    parentButton.type = 'button';
+    parentButton.className = 'parent-link';
+    parentButton.textContent = `#${task.parentId}`;
+    parentButton.title = `Open the parent task #${task.parentId}`;
+    parentButton.addEventListener('click', () => {
+      handlers.onOpenParent(task.parentId as number);
+    });
+    parentCell.append(parentButton);
+  }
 
   const tagsCell = doc.createElement('td');
   tagsCell.className = 'cell-tags';
@@ -69,6 +109,9 @@ function renderTaskRow(doc: Document, task: Task, handlers: TaskTableHandlers): 
     actionButton(doc, 'pencil', 'Edit task', () => {
       handlers.onEdit(task);
     }),
+    actionButton(doc, 'child', 'Add a child task', () => {
+      handlers.onAddChild(task);
+    }),
     actionButton(doc, 'trash', 'Delete task', () => {
       handlers.onDelete(task);
     }),
@@ -76,7 +119,11 @@ function renderTaskRow(doc: Document, task: Task, handlers: TaskTableHandlers): 
 
   const row = doc.createElement('tr');
   row.dataset['taskId'] = String(task.id);
-  row.append(idCell, titleCell, tagsCell, statusCell, updatedCell, actionsCell);
+  if (task.parentId !== null) {
+    row.dataset['parentId'] = String(task.parentId);
+    row.classList.add('task-row-child');
+  }
+  row.append(idCell, titleCell, parentCell, tagsCell, statusCell, updatedCell, actionsCell);
   return row;
 }
 

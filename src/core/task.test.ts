@@ -232,6 +232,18 @@ describe('buildTask and applyTaskInput', () => {
     expect(task.parentId).toBeNull();
   });
 
+  it('builds a child task that points to its parent', () => {
+    const task = buildTask(
+      { title: 'Child', description: '', status: 'todo', tags: [] },
+      4,
+      new Date('2026-05-05T10:00:00.000Z'),
+      3,
+    );
+    expect(task.parentId).toBe(3);
+    expect(serializeTask(task)).toContain('parent=3');
+    expect(parseTask(serializeTask(task)).parentId).toBe(3);
+  });
+
   it('keeps the id and the creation time when editing', () => {
     const now = new Date('2026-05-05T10:00:00.000Z');
     const original = buildTask(

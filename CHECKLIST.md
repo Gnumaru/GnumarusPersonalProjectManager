@@ -1,7 +1,6 @@
 # Checklist
 
 ## Batch 1 - Root tasks (CRUD + search + pagination)
-
 ### Scaffold
 - [x] `package.json` with `dev`, `build`, `preview`, `test`, `e2e`, `deploy` scripts
 - [x] `tsconfig.json` with `strict` and the strictest extra flags
@@ -48,4 +47,34 @@
 - [x] `npm run build`
 - [x] `npm run e2e`
 - [x] `npm run e2e:browser`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
+## Batch 2 - Child tasks
+
+### Data layer
+- [x] `parent=<id>` written in the file of a child task (`src/core/task.ts`)
+- [x] `buildTask` accepts a parent id
+- [x] `createTask` accepts a parent id and checks that the parent exists
+- [x] `childCounts` reads the amount of children of every task with one `grep`
+- [x] `findChildren` lists the children of a task
+
+### User interface
+- [x] Child button in every row of the table
+- [x] "Add child task" button in the view of a task
+- [x] The creation dialog announces the parent task
+- [x] New "Parent" column: the parent of a task (clickable) or a dash
+- [x] Badge with the amount of children next to the title of a task
+- [x] Section with the children in the view of a task (clickable)
+- [x] Banner with the parent in the view and in the editor of a child task
+- [x] Editing a child keeps its parent
+
+### Tests
+- [x] `src/core/task.test.ts` - a child task is built and parsed back
+- [x] `src/core/taskRepository.test.ts` - creation, counting and listing of the children (live bridge)
+- [x] `src/ui/widgets.test.ts` - parent column, children badge and action buttons
+- [x] `src/ui/app.test.ts` - creation of a child from the interface and navigation between the parent and its children
+- [x] `scripts/e2e-browser.mjs` - creation of a child in a real browser, checked against the file on the disk
+
+### Build / deploy
+- [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`

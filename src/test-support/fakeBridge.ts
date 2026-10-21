@@ -149,6 +149,31 @@ export class FakeBridge {
       if (stdout.length > 0) {
         stdout = `${stdout}\n`;
       }
+    } else if (command.includes("'^parent='")) {
+      // Counting the children of every task.
+      const counts = new Map<string, number>();
+      for (const content of this.files.values()) {
+        const match = /^parent=(\d+)$/mu.exec(content);
+        if (match === null) {
+          continue;
+        }
+        const parentId = match[1] ?? '';
+        counts.set(parentId, (counts.get(parentId) ?? 0) + 1);
+      }
+      stdout = [...counts.entries()]
+        .sort((left, right) => Number.parseInt(left[0], 10) - Number.parseInt(right[0], 10))
+        .map(([parentId, count]) => `${String(count).padStart(7, ' ')} ${parentId}\n`)
+        .join('');
+    } else if (command.includes("-e '^parent=")) {
+      // Listing the children of one task.
+      const match = /-e '\^parent=(\d+)\$'/u.exec(command);
+      const parentId = match?.[1] ?? '';
+      const prefix = cwd === '/' ? '/' : `${cwd}/`;
+      const matches = [...this.files.entries()]
+        .filter(([filePath]) => filePath.startsWith(prefix) && filePath.endsWith('.txt'))
+        .filter(([, content]) => new RegExp(`^parent=${parentId}$`, 'mu').test(content))
+        .map(([filePath]) => `./${filePath.slice(prefix.length)}`);
+      stdout = matches.length > 0 ? `${matches.join('\n')}\n` : '';
     } else if (command.startsWith('grep ')) {
       const pattern = stdin.split('\n')[0] ?? '';
       const lower = pattern.toLowerCase();

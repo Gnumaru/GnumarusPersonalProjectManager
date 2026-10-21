@@ -60,6 +60,7 @@ export class App {
   private pageSize = DEFAULT_PAGE_SIZE;
   private tasks: Task[] = [];
   private info: PageInfo = computePageInfo(1, DEFAULT_PAGE_SIZE, 0);
+  private childCounts = new Map<number, number>();
   private serviceState: ServiceState = 'checking';
 
   private projectPathElement!: HTMLElement;
@@ -225,6 +226,7 @@ export class App {
         el(this.doc, 'tr', {}, [
           el(this.doc, 'th', { class: 'cell-id', text: 'ID' }),
           el(this.doc, 'th', { class: 'cell-title', text: 'Title' }),
+          el(this.doc, 'th', { class: 'cell-parent', text: 'Parent' }),
           el(this.doc, 'th', { class: 'cell-tags', text: 'Tags' }),
           el(this.doc, 'th', { class: 'cell-status', text: 'Status' }),
           el(this.doc, 'th', { class: 'cell-updated', text: 'Updated' }),
@@ -373,14 +375,18 @@ export class App {
 
     this.setBusy(true);
     try {
-      const page = await this.repository.getPage(projectDir, {
-        page: this.page,
-        pageSize: this.pageSize,
-        query: this.query,
-      });
+      const [page, childCounts] = await Promise.all([
+        this.repository.getPage(projectDir, {
+          page: this.page,
+          pageSize: this.pageSize,
+          query: this.query,
+        }),
+        this.repository.childCounts(projectDir).catch(() => new Map<number, number>()),
+      ]);
       this.tasks = [...page.tasks];
       this.info = page.info;
       this.page = page.info.page;
+      this.childCounts = childCounts;
       this.setServiceState('online');
       this.renderTasks();
     } catch (error) {
@@ -411,15 +417,21 @@ export class App {
     clear(this.rowsElement);
     for (const row of renderTaskRows(this.doc, this.tasks, {
       onView: (task) => {
-        this.openViewDialog(task);
+        void this.openViewDialog(task);
       },
       onEdit: (task) => {
         this.openEditDialog(task);
       },
+      onAddChild: (task) => {
+        this.openCreateDialog(task);
+      },
       onDelete: (task) => {
         this.openDeleteDialog(task);
       },
-    })) {
+      onOpenParent: (parentId) => {
+        void this.openTaskById(parentId);
+      },
+    }, this.childCounts)) {
       this.rowsElement.append(row);
     }
 
@@ -553,7 +565,7 @@ export class App {
     showToast({ doc: this.doc, message: `Tasks folder set to ${path}`, kind: 'success' });
   }
 
-  private openCreateDialog(): void {
+  private openCreateDialog(parent?: Task): void {
     if (this.config.projectDir === null) {
       showToast({ doc: this.doc, message: 'Choose a project folder first.', kind: 'error' });
       return;
@@ -561,18 +573,21 @@ export class App {
     const dialog = new TaskDialog({
       doc: this.doc,
       mode: 'create',
+      parent,
       onSave: async (taskInput: TaskInput) => {
-        await this.createTask(taskInput);
+        await this.createTask(taskInput, parent?.id ?? null);
       },
     });
     dialog.open();
   }
 
-  private openViewDialog(task: Task): void {
+  private async openViewDialog(task: Task): Promise<void> {
+    const children = await this.loadChildren(task.id);
     const dialog = new TaskDialog({
       doc: this.doc,
       mode: 'view',
       task,
+      children,
       onSave: async () => {
         // The read only view never saves.
       },
@@ -581,6 +596,12 @@ export class App {
       },
       onEdit: () => {
         this.openEditDialog(task);
+      },
+      onAddChild: () => {
+        this.openCreateDialog(task);
+      },
+      onOpenChild: (child) => {
+        void this.openViewDialog(child);
       },
     });
     dialog.open();
@@ -616,13 +637,48 @@ export class App {
     dialog.open();
   }
 
-  private async createTask(taskInput: TaskInput): Promise<void> {
+  /** Opens the task with the given id, even when it is not on the current page. */
+  private async openTaskById(id: number): Promise<void> {
+    const projectDir = this.config.projectDir;
+    if (projectDir === null) {
+      return;
+    }
+    try {
+      const path = this.repository.taskPath(projectDir, id);
+      const task = await this.repository.loadTask(path);
+      await this.openViewDialog(task);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  /** The children of a task, loaded from the disk. */
+  private async loadChildren(parentId: number): Promise<Task[]> {
+    const projectDir = this.config.projectDir;
+    if (projectDir === null) {
+      return [];
+    }
+    try {
+      return await this.repository.findChildren(projectDir, parentId);
+    } catch {
+      return [];
+    }
+  }
+
+  private async createTask(taskInput: TaskInput, parentId: number | null): Promise<void> {
     const projectDir = this.config.projectDir;
     if (projectDir === null) {
       throw new Error('No project folder selected');
     }
-    const task = await this.repository.createTask(projectDir, taskInput);
-    showToast({ doc: this.doc, message: `Task #${task.id} created.`, kind: 'success' });
+    const task = await this.repository.createTask(projectDir, taskInput, parentId);
+    showToast({
+      doc: this.doc,
+      message:
+        parentId === null
+          ? `Task #${task.id} created.`
+          : `Task #${task.id} created as a child of task #${parentId}.`,
+      kind: 'success',
+    });
     await this.refresh();
   }
 

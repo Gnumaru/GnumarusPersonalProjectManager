@@ -205,13 +205,18 @@ export function serializeTask(task: Task): string {
 }
 
 /** Builds a task out of the user input, stamping the creation/update time. */
-export function buildTask(input: TaskInput, id: number, now: Date): Task {
+export function buildTask(
+  input: TaskInput,
+  id: number,
+  now: Date,
+  parentId: number | null = null,
+): Task {
   const timestamp = now.toISOString();
   return {
     id,
     title: input.title.trim(),
     status: input.status,
-    parentId: null,
+    parentId,
     tags: normalizeTags(input.tags),
     created: timestamp,
     updated: timestamp,

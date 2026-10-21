@@ -131,4 +131,85 @@ describeLive('TaskRepository against the live service', () => {
     const next = await repository.nextTaskId(testDirectory);
     expect(next).toBeGreaterThan(1);
   });
+
+  it('creates a child task that points to its parent', async () => {
+    const parent = await repository.createTask(testDirectory, {
+      title: 'The parent',
+      description: '',
+      status: 'todo',
+      tags: [],
+    });
+
+    const child = await repository.createTask(
+      testDirectory,
+      {
+        title: 'The child',
+        description: 'The body of the child',
+        status: 'doing',
+        tags: ['child'],
+      },
+      parent.id,
+    );
+
+    expect(child.parentId).toBe(parent.id);
+
+    const file = await api.readFile(`${testDirectory}/task_${child.id}.txt`);
+    expect(file.content).toContain(`parent=${parent.id}`);
+    expect(file.content).toContain('title=The child');
+
+    const reloaded = await repository.loadTask(`${testDirectory}/task_${child.id}.txt`);
+    expect(reloaded.parentId).toBe(parent.id);
+  });
+
+  it('refuses to create a child of a task that does not exist', async () => {
+    await expect(
+      repository.createTask(
+        testDirectory,
+        { title: 'Orphan', description: '', status: 'todo', tags: [] },
+        9999,
+      ),
+    ).rejects.toThrow('does not exist');
+  });
+
+  it('counts the children of every task', async () => {
+    const parent = await repository.createTask(testDirectory, {
+      title: 'Counted parent',
+      description: '',
+      status: 'todo',
+      tags: [],
+    });
+    await repository.createTask(
+      testDirectory,
+      { title: 'Counted child', description: '', status: 'todo', tags: [] },
+      parent.id,
+    );
+
+    const counts = await repository.childCounts(testDirectory);
+    expect(counts.get(parent.id)).toBe(1);
+  });
+
+  it('lists the children of a task', async () => {
+    const parent = await repository.createTask(testDirectory, {
+      title: 'Father',
+      description: '',
+      status: 'todo',
+      tags: [],
+    });
+    const first = await repository.createTask(
+      testDirectory,
+      { title: 'Son', description: '', status: 'todo', tags: [] },
+      parent.id,
+    );
+    const second = await repository.createTask(
+      testDirectory,
+      { title: 'Daughter', description: '', status: 'todo', tags: [] },
+      parent.id,
+    );
+
+    const children = await repository.findChildren(testDirectory, parent.id);
+    const ids = children.map((child) => child.id);
+    expect(ids).toContain(first.id);
+    expect(ids).toContain(second.id);
+    expect(children.every((child) => child.parentId === parent.id)).toBe(true);
+  });
 });

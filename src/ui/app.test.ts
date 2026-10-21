@@ -238,7 +238,7 @@ describe('App', () => {
 
     // Delete
     const deleteButtons = harness.root.querySelectorAll<HTMLButtonElement>('.row-action');
-    click(deleteButtons[2]);
+    click(deleteButtons[3]);
     await flush();
     click(buttonByText(harness.doc, 'Delete'));
     await flush();
@@ -247,6 +247,79 @@ describe('App', () => {
 
     expect(harness.bridge.files.has('/home/user/projects/task_1.txt')).toBe(false);
     expect(harness.root.querySelectorAll('.task-table tbody tr')).toHaveLength(3);
+    harness.app.dispose();
+  });
+
+  it('creates a child task from a parent task', async () => {
+    const harness = await createHarness(3);
+    await selectFolder(harness);
+
+    // The third action button of a row adds a child task.
+    const rowActions = harness.root.querySelectorAll<HTMLButtonElement>('.row-action');
+    click(rowActions[2]);
+    await flush();
+
+    const banner = harness.doc.querySelector('.task-parent-banner');
+    expect(banner?.textContent).toContain('New child of task #1');
+
+    const titleInput = harness.doc.querySelector<HTMLInputElement>('#task-title');
+    expect(titleInput).not.toBeNull();
+    if (titleInput === null) {
+      return;
+    }
+    titleInput.value = 'A child task';
+    click(buttonByText(harness.doc, 'Create task'));
+    await flush();
+
+    const created = harness.bridge.files.get('/home/user/projects/task_4.txt');
+    expect(created).toBeDefined();
+    expect(created).toContain('title=A child task');
+    expect(created).toContain('parent=1');
+
+    // The listing shows the parent of the new task.
+    const childRow = harness.root.querySelector('tr[data-task-id="4"]');
+    expect(childRow?.querySelector('.parent-link')?.textContent).toBe('#1');
+    expect(childRow?.classList.contains('task-row-child')).toBe(true);
+
+    // The parent shows the amount of children it has.
+    const parentRow = harness.root.querySelector('tr[data-task-id="1"]');
+    expect(parentRow?.querySelector('.child-count')?.textContent).toContain('1');
+    harness.app.dispose();
+  });
+
+  it('lists the children of a task and opens them', async () => {
+    const harness = await createHarness(3);
+    await selectFolder(harness);
+
+    // The third action button of the first row adds a child task.
+    const rowActions = harness.root.querySelectorAll<HTMLButtonElement>('.row-action');
+    click(rowActions[2]);
+    await flush();
+    const titleInput = harness.doc.querySelector<HTMLInputElement>('#task-title');
+    if (titleInput === null) {
+      return;
+    }
+    titleInput.value = 'The only child';
+    click(buttonByText(harness.doc, 'Create task'));
+    await flush();
+
+    // Open the parent task and look at its children.
+    const titleButton = harness.root.querySelector<HTMLButtonElement>(
+      'tr[data-task-id="1"] .task-title-button',
+    );
+    click(titleButton);
+    await flush();
+
+    const children = harness.doc.querySelectorAll('.child-item');
+    expect(children).toHaveLength(1);
+    expect(children[0]?.querySelector('.child-id')?.textContent).toBe('#4');
+    expect(children[0]?.querySelector('.child-title')?.textContent).toBe('The only child');
+
+    // Clicking the child opens it.
+    click(harness.doc.querySelector<HTMLButtonElement>('.child-title'));
+    await flush();
+    const openedTitle = harness.doc.querySelector('.modal-title')?.textContent;
+    expect(openedTitle).toContain('Task #4 - The only child');
     harness.app.dispose();
   });
 });

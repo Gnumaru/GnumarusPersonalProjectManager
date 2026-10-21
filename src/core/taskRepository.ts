@@ -33,6 +33,20 @@ export const FIND_TASK_FILES_COMMAND =
 export const GREP_TASK_FILES_COMMAND =
   "grep -rIl --fixed-strings --ignore-case --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -f - .";
 
+/**
+ * Command used to count the children of every task.
+ *
+ * Only the `parent=` keys are read (the content of the files never reaches the
+ * browser), so the answer stays small even for a big project.
+ */
+export const COUNT_CHILDREN_COMMAND =
+  "grep -rh --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg '^parent=' . | cut -d= -f2 | sort | uniq -c";
+
+/** Command used to list the task files that are children of a given task. */
+export function childrenCommand(parentId: number): string {
+  return `grep -rl --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^parent=${parentId}$' .`;
+}
+
 export interface TaskPage {
   readonly tasks: readonly Task[];
   readonly info: PageInfo;
@@ -163,14 +177,25 @@ export class TaskRepository {
     return ids.length === 0 ? 1 : Math.max(...ids) + 1;
   }
 
-  /** Creates a new root task file. */
-  async createTask(projectDir: string, input: TaskInput): Promise<Task> {
+  /** Creates a new task file, optionally as a child of another task. */
+  async createTask(
+    projectDir: string,
+    input: TaskInput,
+    parentId: number | null = null,
+  ): Promise<Task> {
+    if (parentId !== null) {
+      const parentPath = joinPath(projectDir, taskFileName(parentId));
+      if (!(await this.api.fileExists(parentPath))) {
+        throw new Error(`The parent task #${parentId} does not exist in "${projectDir}".`);
+      }
+    }
+
     let id = await this.nextTaskId(projectDir);
 
     // The id must be unique: retry with the next one when the file already exists.
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const path = joinPath(projectDir, taskFileName(id));
-      const task = buildTask(input, id, new Date());
+      const task = buildTask(input, id, new Date(), parentId);
       try {
         await this.api.createFile(path, serializeTask(task));
         return task;
@@ -183,6 +208,65 @@ export class TaskRepository {
       }
     }
     throw new Error('Unable to allocate a free task id');
+  }
+
+  /** Amount of children of every task, indexed by the id of the parent. */
+  async childCounts(projectDir: string): Promise<Map<number, number>> {
+    const counts = new Map<number, number>();
+    const result = await this.api.execShell({
+      command: COUNT_CHILDREN_COMMAND,
+      cwd: projectDir,
+      timeout: 60,
+    });
+    if (result.returncode !== 0 && result.returncode !== 1) {
+      throw new Error(
+        `Unable to count the children of "${projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
+      );
+    }
+    for (const line of result.stdout.split('\n')) {
+      const match = /^\s*(\d+)\s+(\d+)\s*$/.exec(line);
+      if (match === null) {
+        continue;
+      }
+      const count = Number.parseInt(match[1] ?? '', 10);
+      const parentId = Number.parseInt(match[2] ?? '', 10);
+      if (Number.isSafeInteger(count) && Number.isSafeInteger(parentId)) {
+        counts.set(parentId, count);
+      }
+    }
+    return counts;
+  }
+
+  /** Paths of the task files that are children of the given task. */
+  async findChildrenPaths(projectDir: string, parentId: number): Promise<string[]> {
+    const result = await this.api.execShell({
+      command: childrenCommand(parentId),
+      cwd: projectDir,
+      timeout: 60,
+    });
+    if (result.returncode !== 0 && result.returncode !== 1) {
+      throw new Error(
+        `Unable to list the children of the task #${parentId}: ${result.stderr.trim() || `exit code ${result.returncode}`}`,
+      );
+    }
+    return this.parsePaths(result.stdout, projectDir);
+  }
+
+  /** The tasks that are children of the given task. */
+  async findChildren(projectDir: string, parentId: number): Promise<Task[]> {
+    const paths = await this.findChildrenPaths(projectDir, parentId);
+    const children: Task[] = [];
+    for (const path of paths) {
+      try {
+        children.push(await this.loadTask(path));
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    return children;
   }
 
   /** Updates an existing task file, keeping its id and creation time. */

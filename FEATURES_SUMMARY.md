@@ -1,18 +1,21 @@
 # Features Summary
 
-Gnumarus Project Manager - first batch: **root tasks** (tasks without a parent).
+Gnumarus Project Manager - **root tasks and child tasks**.
 
 ## Task management
 
 | Feature | Status | Where |
 | ------- | ------ | ----- |
-| List the root tasks of the selected folder | Done | `src/ui/taskTable.ts` |
+| List the tasks of the selected folder | Done | `src/ui/taskTable.ts` |
 | Paginated listing, 10 tasks per page | Done | `src/core/pagination.ts`, `src/ui/paginationBar.ts` |
 | First / previous / next / last page buttons | Done | `src/ui/paginationBar.ts` |
 | Create a root task | Done | `src/ui/taskDialog.ts`, `src/core/taskRepository.ts` |
-| Edit a root task | Done | `src/ui/taskDialog.ts`, `src/core/taskRepository.ts` |
-| View a root task | Done | `src/ui/taskDialog.ts` |
-| Delete a root task (with confirmation) | Done | `src/ui/taskDialog.ts`, `src/core/taskRepository.ts` |
+| **Create a child task from an existing parent task** | Done | `src/ui/taskTable.ts`, `src/ui/taskDialog.ts` |
+| **List the children of a task and open them** | Done | `src/ui/taskDialog.ts` |
+| **Show the parent of a task and the amount of children of a task** | Done | `src/ui/taskTable.ts` |
+| Edit a task | Done | `src/ui/taskDialog.ts`, `src/core/taskRepository.ts` |
+| View a task | Done | `src/ui/taskDialog.ts` |
+| Delete a task (with confirmation) | Done | `src/ui/taskDialog.ts`, `src/core/taskRepository.ts` |
 | Recursive search of the tasks (grep) | Done | `src/core/taskRepository.ts` |
 | Free form tags (add and remove) | Done | `src/core/task.ts` |
 | Task status (to do / in progress / done) | Done | `src/core/task.ts` |
@@ -26,6 +29,8 @@ Gnumarus Project Manager - first batch: **root tasks** (tasks without a parent).
 | Description as free text after the separator | Done | `src/core/task.ts` |
 | Unique incremental task id | Done | `src/core/taskRepository.ts` |
 | Automatic id allocation, collision safe | Done | `src/core/taskRepository.ts` |
+| `parent=<id>` key written and read for the child tasks | Done | `src/core/task.ts` |
+| Amount of children per task (read with `grep`) | Done | `src/core/taskRepository.ts` |
 
 ## Bridge integration
 
@@ -60,6 +65,7 @@ Gnumarus Project Manager - first batch: **root tasks** (tasks without a parent).
 
 ## Not implemented yet (planned for the next batches)
 
-* Child tasks (the `parent=<id>` key is already written and read by the format).
+* Grand children (a task whose parent is itself a child): the format already
+  supports it, but the user interface only offers one level of children.
 * Multi project management, task dependencies, due dates, priorities.
 * Import and export of a project.

@@ -103,9 +103,9 @@ find . -type f -name 'task_*.txt' -not -path '*/.git/*' ... -print
 
 | Action | What happens |
 | ------ | ------------ |
-| Create | The next free id is computed from the highest existing `task_<id>.txt`, the file is written with `POST /api/file`. If the file already exists the id is increased and the write is retried. |
-| Edit | The file is read, the user input is applied (id and creation time are kept), the update timestamp is refreshed and the file is overwritten with `PUT /api/file`. |
-| View | A read only dialog shows the status, the tags, the timestamps and the description. |
+| Create | The next free id is computed from the highest existing `task_<id>.txt`, the file is written with `POST /api/file`. If the file already exists the id is increased and the write is retried. A child task also receives the `parent=<id>` key. |
+| Edit | The file is read, the user input is applied (id, parent and creation time are kept), the update timestamp is refreshed and the file is overwritten with `PUT /api/file`. |
+| View | A read only dialog shows the status, the tags, the timestamps, the description and the children of the task. |
 | Delete | The file is removed with `DELETE /api/file` after an explicit confirmation ("Delete this task permanently? Yes, delete / Keep it"). |
 
 The dialog works in three modes (`view`, `edit`, `create`) and validates the
@@ -114,7 +114,72 @@ instead of closing it.
 
 ---
 
-## 5. The bridge service
+## 5. Child tasks
+
+**Files:** `src/core/taskRepository.ts`, `src/ui/taskTable.ts`, `src/ui/taskDialog.ts`
+
+A task can have **0 or 1 parent**. The link is stored in the metadata of the
+child file:
+
+```
+id=13
+title=Write the migrations
+status=todo
+parent=1
+tags=backend
+created=2026-10-20T10:00:00.000Z
+updated=2026-10-20T10:00:00.000Z
+----
+Create the migration files.
+```
+
+### Creating a child
+
+Two entry points, both open the same dialog:
+
+* the **child button** of every row of the table (the third action button);
+* the **Add child task** button of the read only view of a task.
+
+The dialog shows a banner with the parent (`New child of task #1 - Design the
+database schema`), so it is impossible to create a child without knowing which
+task it belongs to. When the file is written, the `parent=<id>` key is added
+and the id is allocated exactly like for a root task.
+
+The repository refuses to create a child of a task that does not exist
+(`The parent task #9999 does not exist in "<folder>".`).
+
+### Seeing the relations
+
+| Where | What is shown |
+| ----- | ------------- |
+| The **Parent** column of the table | `#1` for a child task (a link that opens the parent, even when the parent is on another page), `—` for a root task. |
+| The **title of a task** | A badge with the amount of children it has. |
+| The **view of a task** | The list of its children (`#2 Write the migrations - To do`); clicking a child opens it. |
+| The **view and the editor of a child** | A banner with the parent of the task. |
+
+The amount of children of every task is read with a single command that only
+looks at the `parent=` keys, so the content of the files never reaches the
+browser:
+
+```
+grep -rh --include='task_*.txt' ... '^parent=' . | cut -d= -f2 | sort | uniq -c
+```
+
+The children of one task are listed with:
+
+```
+grep -rl --include='task_*.txt' ... -e '^parent=<id>$' .
+```
+
+Both commands are executed by the bridge service, in the project folder.
+
+The hierarchy is one level deep in the user interface (the format would allow
+more), and the search, the pagination and the listing treat the children like
+any other task.
+
+---
+
+## 6. The bridge service
 
 **Files:** `src/api/client.ts`, `src/ui/app.ts`
 
@@ -133,7 +198,7 @@ instead of closing it.
 
 ---
 
-## 6. Configuration file
+## 7. Configuration file
 
 **Files:** `src/core/config.ts`
 
@@ -145,7 +210,7 @@ the service restarts.
 
 ---
 
-## 7. The folder picker
+## 8. The folder picker
 
 **Files:** `src/ui/fileDialog.ts`
 
@@ -163,7 +228,7 @@ A dialog that behaves like the file dialogs of an operating system:
 
 ---
 
-## 8. Layout and responsiveness
+## 9. Layout and responsiveness
 
 **Files:** `src/styles.css`, `src/ui/app.ts`
 
@@ -179,7 +244,7 @@ A dialog that behaves like the file dialogs of an operating system:
 
 ---
 
-## 9. Tests
+## 10. Tests
 
 | Suite | What it covers |
 | ----- | -------------- |
@@ -187,9 +252,9 @@ A dialog that behaves like the file dialogs of an operating system:
 | `src/core/pagination.test.ts` | Page count, clamping, slicing, page information. |
 | `src/core/config.test.ts` | Configuration parsing and serialization. |
 | `src/api/client.test.ts` | Tagged values, headers, error handling, shell calls (mocked `fetch`). |
-| `src/core/taskRepository.test.ts` | The repository against the **running bridge**: creation, listing, pagination, recursive search, update, deletion. Skipped when `GNUMARUS_API_TOKEN` is not set. |
-| `src/ui/widgets.test.ts` | The task table and the pagination bar (jsdom). |
-| `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom). |
+| `src/core/taskRepository.test.ts` | The repository against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children. Skipped when `GNUMARUS_API_TOKEN` is not set. |
+| `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons) and the pagination bar (jsdom). |
+| `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task and the navigation between the parent and its children. |
 | `src/ui/fileDialog.test.ts` | Path helpers and sorting of the file list. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
 | `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition and deletion, checked against the files on disk. |
@@ -205,7 +270,7 @@ npm run verify      # everything, in order
 
 ---
 
-## 10. Deployment
+## 11. Deployment
 
 **File:** `scripts/deploy.mjs`
 

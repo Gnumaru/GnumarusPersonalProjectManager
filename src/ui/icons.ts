@@ -7,6 +7,8 @@ const ICON_PATHS: Readonly<Record<string, string>> = {
   search:
     '<path d="M10.5 3a7.5 7.5 0 1 0 4.6 13.4l4.2 4.2 1.4-1.4-4.2-4.2A7.5 7.5 0 0 0 10.5 3Zm0 2a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Z"/>',
   plus: '<path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/>',
+  child:
+    '<path d="M6 2.5a2.75 2.75 0 1 1 0 5.5 2.75 2.75 0 0 1 0-5.5Zm11 9a2.75 2.75 0 1 1 0 5.5 2.75 2.75 0 0 1 0-5.5ZM7.4 7.3v3.4c0 1.5 1.2 2.7 2.7 2.7h4.1V11h-4.1a.7.7 0 0 1-.7-.7V7.3h-2Z"/>',
   trash:
     '<path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-3 6h12l-1 12H7L6 9Z"/>',
   pencil:

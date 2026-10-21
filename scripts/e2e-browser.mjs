@@ -398,7 +398,7 @@ async function runChecks() {
 
   await evaluate(`(() => {
     const row = document.querySelector('tr[data-task-id="13"]');
-    row.querySelectorAll('.row-action')[2].click();
+    row.querySelectorAll('.row-action')[3].click();
     return true;
   })()`);
   await waitFor(
@@ -424,6 +424,99 @@ async function runChecks() {
     stillExists = false;
   }
   check(stillExists === false, 'the deleted task file is gone');
+
+  // --- child tasks ----------------------------------------------------------
+
+  await evaluate(`document.querySelector('[data-page-action="first"]').click()`);
+  await waitFor(`document.querySelector('.page-current')?.textContent === '1'`);
+
+  await evaluate(`(() => {
+    const row = document.querySelector('tr[data-task-id="1"]');
+    row.querySelectorAll('.row-action')[2].click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('#task-title') !== null`);
+  const childBanner = await evaluate(
+    `document.querySelector('.task-parent-banner')?.textContent ?? ''`,
+  );
+  check(childBanner.includes('New child of task #1'), 'the dialog announces the parent task', childBanner);
+
+  await evaluate(`(() => {
+    document.querySelector('#task-title').value = 'Child of the first task';
+    document.querySelector('#task-description').value = 'Created from the parent task.';
+    return true;
+  })()`);
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Create task');
+    button.click();
+    return true;
+  })()`);
+  await delay(1500);
+
+  const childPath = `${taskDirectory}/task_13.txt`;
+  const childContent = await apiRequest(`/api/file?path=${encodeURIComponent(childPath)}`);
+  check(
+    childContent.content.includes('title=Child of the first task'),
+    'the child task file was created with its title',
+  );
+  check(childContent.content.includes('parent=1'), 'the child task file points to its parent');
+
+  await evaluate(`document.querySelector('[data-page-action="last"]').click()`);
+  await waitFor(`document.querySelector('.page-current')?.textContent === '2'`);
+  const parentLink = await evaluate(`(() => {
+    const rows = [...document.querySelectorAll('.task-table tbody tr')];
+    const row = rows.find((candidate) => candidate.dataset['taskId'] === '13');
+    return row?.querySelector('.parent-link')?.textContent ?? '';
+  })()`);
+  check(parentLink === '#1', 'the listing shows the parent of the child task', parentLink);
+
+  await evaluate(`document.querySelector('[data-page-action="first"]').click()`);
+  await waitFor(`document.querySelector('.page-current')?.textContent === '1'`);
+
+  const childBadge = await evaluate(
+    `document.querySelector('tr[data-task-id="1"] .child-count')?.textContent ?? ''`,
+  );
+  check(childBadge.includes('1'), 'the parent task shows how many children it has', childBadge);
+
+  await evaluate(`(() => {
+    const row = document.querySelector('tr[data-task-id="1"]');
+    row.querySelector('.task-title-button').click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.child-item') !== null`);
+  const childTitles = await evaluate(
+    `[...document.querySelectorAll('.child-item .child-title')].map((node) => node.textContent).join('|')`,
+  );
+  check(
+    childTitles.includes('Child of the first task'),
+    'the parent task lists its children',
+    childTitles,
+  );
+  await evaluate(`document.querySelector('.modal-close').click()`);
+
+  await evaluate(`document.querySelector('[data-page-action="last"]').click()`);
+  await waitFor(`document.querySelector('.page-current')?.textContent === '2'`);
+  await evaluate(`(() => {
+    const rows = [...document.querySelectorAll('.task-table tbody tr')];
+    const row = rows.find((candidate) => candidate.dataset['taskId'] === '13');
+    row.querySelectorAll('.row-action')[3].click();
+    return true;
+  })()`);
+  await waitFor(
+    `[...document.querySelectorAll('button')].some((node) => node.textContent.trim() === 'Delete')`,
+  );
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Delete');
+    button.click();
+    return true;
+  })()`);
+  await delay(300);
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Yes, delete');
+    button.click();
+    return true;
+  })()`);
+  await delay(1200);
 
   // --- screenshots ----------------------------------------------------------
 
