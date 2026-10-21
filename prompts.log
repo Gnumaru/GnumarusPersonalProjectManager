@@ -40,17 +40,19 @@ crie um novo modo de visualizacao das tarefas, de grafico gantt. ele será simil
 ====
 a modal de edicao de tarefas ainda nao tem campos que permitam editar as datas de inicio e fim. adicione datepickers para o usuario poder escolher datas de inicio e fim para as tarefas
 ====
+no modo gantt o ctrl+click para expandir e colapsar recursivamente não está funcionando. quando eu faço ctrl+click no icone de colapsar/expandir ele não faz nada, nem colapsa nem expande, nem na tarefa clicada nem nas filhas. mas se eu usar clique normal ele funciona como esperado.
+além disso, quero que a semana seja contada a partir do domingo, não da segunda.
 ====
 ====
 ====
 ====
 
 ====
-permita que o usuario possa escolher abrir a raiz do sistema OPFS do navegador ao invez de um diretorio nativo pela api do webservice de baixo nivel. escolhendo OPFS todos os arquivos serão salvos dentro do OPFS ao inves de fazer chamadas a api do webservice. admito que isso é uma mudança grande de paradigma e muito do nosso codigo vai ter de ser generalizado em uma fachada generica/abstrata para funcionar tanto em opfs quanto acessando o webservice já que não podemos usar comandos shell dentro do opfs pra facilitar consulta
+	permita que o usuario possa escolher abrir a raiz do sistema OPFS do navegador ao invez de um diretorio nativo pela api do webservice de baixo nivel. escolhendo OPFS todos os arquivos serão salvos dentro do OPFS ao inves de fazer chamadas a api do webservice. admito que isso é uma mudança grande de paradigma e muito do nosso codigo vai ter de ser generalizado em uma fachada generica/abstrata para funcionar tanto em opfs quanto acessando o webservice já que não podemos usar comandos shell dentro do opfs pra facilitar consulta
 ====
 crie nos arquivos de tarefas um metadado para guardar ids de outras tarefas que bloqueiam esta tarefa. uma tarefa pode ter 0 ou mais tarefas bloqueadoras que impedem o cumprimento desta. crie também nos arquivos de tarefas um metadado para guardar ids de tarefas relacionadas. uma tarefa relacionada é uma tarefa que o usuário quer explicitar que tenha relação com esta, mas não é nem uma relação de bloqueio nem uma relacao de pai ou filho.
 ====
-crie um novo modo de visualização de tarefas, de calendario.
+	crie um novo modo de visualização de tarefas, de calendario. o usuario pode escolher visualizar apenas uma semana especifica
 ====
 crie um novo modo de visualização de tarefas, de grafo de relacionamento.
 linhas conectando filhos a pais. linhas de bloqueio e linhas de "outro relacionamento"

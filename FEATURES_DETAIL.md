@@ -386,16 +386,17 @@ weeks by **month**, with three rows of headers:
 ```
 +-----------+--------------------------------------------------+
 | Task      | 1 August            | 2 September                |
-|           | 1 Aug 31 | 2 Sep 7  | 3 Sep 14 | 4 Sep 21     |
-|           | 31 1 2 3 | 4 5 6 7  | 8 9 10 11 | 12 13 14 15  |
+|           | 1 Aug 30 | 2 Sep 6  | 3 Sep 13 | 4 Sep 20     |
+|           | 30 31 1 2 | 3 4 5 6 7 | 8 9 10 11 | 12 13 14 15  |
 +-----------+--------------------------------------------------+
 | Plan the  | [=================]                              |
 | release   |                                                 |
 +-----------+--------------------------------------------------+
 ```
 
-The weeks and the months are **numbered and named**, counting from one: the
-first month of the schedule is `1`, the first week is `1`.
+The weeks start on **Sunday** and end on Saturday. The weeks and the months
+are **numbered and named**, counting from one: the first month of the schedule
+is `1`, the first week is `1`.
 
 ### The bars
 

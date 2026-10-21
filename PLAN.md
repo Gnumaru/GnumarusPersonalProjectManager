@@ -190,9 +190,9 @@ title and the tags of every task, so the whole board costs two round trips
 The fourth display mode is a **Gantt chart**. The window is split in two: the
 rows of the tasks on the left, the chart on the right.
 
-The chart has **one column per day**; the days are grouped by **week** and the
-weeks by **month**. The weeks and the months are **numbered and named**,
-counting from one (`1 October`, `2 November`, `1 · Oct 5`...).
+The chart has **one column per day**; the days are grouped by **week** (from
+Sunday to Saturday) and the weeks by **month**. The weeks and the months are
+**numbered and named**, counting from one (`1 October`, `2 November`, `1 · Oct 5`...).
 
 A **bar** is drawn for every task, from the day of its `start=` date to the day
 of its `end=` date. A week (or a month) can be **collapsed**: its days are not

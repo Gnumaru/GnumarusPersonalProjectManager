@@ -632,7 +632,20 @@ export class App {
    * every task: the chart needs all of them.
    */
   private async refreshGantt(projectDir: string): Promise<void> {
-    this.ganttMetadata = await this.repository.readTaskMetadata(projectDir);
+    const metadata = await this.repository.readTaskMetadata(projectDir);
+    this.ganttMetadata = metadata;
+
+    // The chart shows the same tree as the tree view: the structure, the focus
+    // and the expansion are shared, so a branch expanded in one view is
+    // expanded in the other one.
+    const parents = new Map<number, number | null>();
+    const paths = new Map<number, string>();
+    for (const task of metadata.values()) {
+      parents.set(task.id, task.parentId);
+      paths.set(task.id, task.path);
+    }
+    this.treeHierarchy = { parents, paths };
+    this.treeStructure = buildTaskTree(parents);
   }
 
   /** Recomputes the rows of the tree and loads the tasks that are shown. */
@@ -932,11 +945,10 @@ export class App {
 
   /** The rows of the Gantt chart: the visible rows of the tree. */
   private ganttRows(): TreeRow[] {
-    const parents = new Map<number, number | null>();
-    for (const task of this.ganttMetadata.values()) {
-      parents.set(task.id, task.parentId);
+    const structure = this.treeStructure;
+    if (structure === null) {
+      return [];
     }
-    const structure = buildTaskTree(parents);
     return flattenTaskTree(structure, {
       focusId: this.treeFocusId,
       expanded: this.treeExpanded,
@@ -1249,7 +1261,11 @@ export class App {
   private async updateTree(): Promise<void> {
     this.setBusy(true);
     try {
-      await this.updateTreeRows();
+      if (this.viewMode !== 'gantt') {
+        // The Gantt chart reads the titles of the tasks with the metadata, it
+        // does not need the files of the visible rows.
+        await this.updateTreeRows();
+      }
       this.renderCurrentView();
     } catch (error) {
       this.handleError(error);

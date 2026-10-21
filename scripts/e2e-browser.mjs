@@ -875,6 +875,51 @@ async function runChecks() {
   const ganttRows = await evaluate(`document.querySelectorAll('.gantt-row').length`);
   check(ganttRows > 0, 'the Gantt chart shows the tasks on the left', `${ganttRows}`);
 
+  // A ctrl+click on the twisty expands or collapses the whole branch of the
+  // task, the task and all its descendants.
+  const twisty = await evaluate(`(() => {
+    const node = document.querySelector('.gantt-row .gantt-twisty');
+    const box = node.getBoundingClientRect();
+    return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  })()`);
+  const ctrlClick = async () => {
+    await session.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: twisty.x,
+      y: twisty.y,
+      button: 'left',
+      buttons: 1,
+      clickCount: 1,
+      modifiers: 2,
+    });
+    await session.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x: twisty.x,
+      y: twisty.y,
+      button: 'left',
+      buttons: 0,
+      clickCount: 1,
+      modifiers: 2,
+    });
+    await delay(700);
+    return evaluate(`document.querySelectorAll('.gantt-row').length`);
+  };
+
+  const rowsBefore = await evaluate(`document.querySelectorAll('.gantt-row').length`);
+  const rowsCollapsed = await ctrlClick();
+  check(
+    rowsCollapsed !== rowsBefore,
+    'a ctrl+click collapses the whole branch of a task in the Gantt chart',
+    `${rowsBefore} -> ${rowsCollapsed}`,
+  );
+
+  const rowsExpanded = await ctrlClick();
+  check(
+    rowsExpanded === rowsBefore,
+    'a ctrl+click expands the whole branch of a task in the Gantt chart',
+    `${rowsCollapsed} -> ${rowsExpanded}`,
+  );
+
   // A week can be collapsed: its days are not drawn any more.
   const daysBefore = await evaluate(`document.querySelectorAll('.gantt-day').length`);
   await evaluate(`document.querySelector('.gantt-week').click()`);

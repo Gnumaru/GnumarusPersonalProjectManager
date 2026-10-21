@@ -27,13 +27,15 @@ describe('the date helpers', () => {
     expect(day.getMinutes()).toBe(0);
   });
 
-  it('finds the Monday of the week', () => {
+  it('finds the Sunday of the week', () => {
     // The 21st of October 2026 is a Wednesday.
-    expect(isoDate(startOfWeek(new Date(2026, 9, 21)))).toBe('2026-10-19');
-    // A Sunday belongs to the week that starts on the Monday before.
-    expect(isoDate(startOfWeek(new Date(2026, 9, 25)))).toBe('2026-10-19');
-    // A Monday is its own week.
-    expect(isoDate(startOfWeek(new Date(2026, 9, 19)))).toBe('2026-10-19');
+    expect(isoDate(startOfWeek(new Date(2026, 9, 21)))).toBe('2026-10-18');
+    // A Sunday is its own week.
+    expect(isoDate(startOfWeek(new Date(2026, 9, 25)))).toBe('2026-10-25');
+    // A Monday belongs to the week that starts on the Sunday before.
+    expect(isoDate(startOfWeek(new Date(2026, 9, 19)))).toBe('2026-10-18');
+    // A Saturday too.
+    expect(isoDate(startOfWeek(new Date(2026, 9, 24)))).toBe('2026-10-18');
   });
 
   it('finds the first day of the month', () => {
@@ -61,8 +63,9 @@ describe('buildSchedule', () => {
   it('widens the range to whole weeks', () => {
     const schedule = buildSchedule(new Date(2026, 9, 21), new Date(2026, 9, 30));
 
-    expect(isoDate(schedule.start)).toBe('2026-10-19');
-    expect(isoDate(schedule.end)).toBe('2026-11-01');
+    // The week starts on Sunday and ends on Saturday.
+    expect(isoDate(schedule.start)).toBe('2026-10-18');
+    expect(isoDate(schedule.end)).toBe('2026-10-31');
     expect(schedule.days).toHaveLength(14);
   });
 
@@ -83,8 +86,10 @@ describe('buildSchedule', () => {
     const schedule = buildSchedule(new Date(2026, 9, 19), new Date(2026, 9, 25));
     const weekends = schedule.days.filter((day) => day.weekend);
 
-    expect(weekends).toHaveLength(2);
-    expect(isoDate(weekends[0]?.date ?? new Date())).toBe('2026-10-24');
+    // The schedule covers two whole weeks: two Sundays and two Saturdays.
+    expect(weekends).toHaveLength(4);
+    expect(isoDate(weekends[0]?.date ?? new Date())).toBe('2026-10-18');
+    expect(isoDate(weekends[1]?.date ?? new Date())).toBe('2026-10-24');
   });
 });
 

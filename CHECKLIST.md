@@ -226,6 +226,7 @@
 
 ### Core (pure, unit tested)
 - [x] `src/core/gantt.ts` - the days, the weeks and the months of a schedule
+- [x] The weeks start on **Sunday** and end on Saturday
 - [x] The weeks and the months are numbered and named, counting from one
 - [x] `buildLayout` - the columns of the chart and the headers
 - [x] A collapsed week or month becomes a single column
@@ -245,6 +246,7 @@
 - [x] The bars carry the colour of the status
 - [x] The weeks and the months are collapsed and expanded by clicking them
 - [x] The rows of the left panel collapse and expand the children of a task
+- [x] A ctrl+click collapses or expands the whole branch of a task
 
 ### Tests
 - [x] `src/core/gantt.test.ts` - the schedule, the columns and the bars

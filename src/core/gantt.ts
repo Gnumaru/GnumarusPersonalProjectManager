@@ -67,11 +67,14 @@ export function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-/** The Monday of the week of the given date. */
+/**
+ * The Sunday of the week of the given date.
+ *
+ * The week of the chart starts on Sunday and ends on Saturday.
+ */
 export function startOfWeek(date: Date): Date {
   const day = startOfDay(date);
-  const weekday = day.getDay();
-  return addDays(day, weekday === 0 ? -6 : 1 - weekday);
+  return addDays(day, -day.getDay());
 }
 
 /** The first day of the month of the given date. */
@@ -153,9 +156,9 @@ export interface GanttMonth {
 
 /** The days, the weeks and the months of the schedule. */
 export interface GanttSchedule {
-  /** The first day of the schedule: the Monday of the first week. */
+  /** The first day of the schedule: the Sunday of the first week. */
   readonly start: Date;
-  /** The last day of the schedule: the Sunday of the last week. */
+  /** The last day of the schedule: the Saturday of the last week. */
   readonly end: Date;
   readonly days: readonly GanttDay[];
   readonly weeks: readonly GanttWeek[];

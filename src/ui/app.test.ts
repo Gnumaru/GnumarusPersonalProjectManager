@@ -1069,11 +1069,12 @@ describe('App and the Gantt chart', () => {
     setDates(harness, 2, '20261021100000000', '20261022120000000');
     await switchToGantt(harness);
 
-    // The task 1 goes from the 19th to the 23rd of October: five days.
+    // The task 1 goes from the 19th to the 23rd of October: five days. The
+    // week starts on Sunday, so the bar starts on the second column.
     const bars = [...harness.root.querySelectorAll<HTMLElement>('.gantt-bar')];
     expect(bars).toHaveLength(1);
     expect(bars[0]?.style.width).toBe('138px');
-    expect(bars[0]?.style.left).toBe('0px');
+    expect(bars[0]?.style.left).toBe('28px');
 
     harness.app.dispose();
   });
@@ -1113,6 +1114,27 @@ describe('App and the Gantt chart', () => {
     click(harness.root.querySelector<HTMLButtonElement>('.gantt-week'));
     await flush();
     expect(harness.root.querySelectorAll('.gantt-day')).toHaveLength(daysBefore);
+
+    harness.app.dispose();
+  });
+
+  it('expands the whole branch of a task with a ctrl+click', async () => {
+    const harness = await createGanttHarness();
+    setDates(harness, 1, '20261019100000000', '20261023180000000');
+    await switchToGantt(harness);
+
+    // The task 1 is collapsed: only it is shown.
+    expect(harness.root.querySelectorAll('.gantt-row')).toHaveLength(1);
+
+    // A ctrl+click expands the task and all its children.
+    ctrlClick(harness.root.querySelector<HTMLButtonElement>('.gantt-twisty'), harness.dom);
+    await flush();
+    expect(harness.root.querySelectorAll('.gantt-row')).toHaveLength(3);
+
+    // A ctrl+click collapses them again.
+    ctrlClick(harness.root.querySelector<HTMLButtonElement>('.gantt-twisty'), harness.dom);
+    await flush();
+    expect(harness.root.querySelectorAll('.gantt-row')).toHaveLength(1);
 
     harness.app.dispose();
   });
