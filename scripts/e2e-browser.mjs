@@ -719,6 +719,43 @@ async function runChecks() {
     movedContent.content,
   );
 
+  // The task is dragged on the general root: it becomes a root task again.
+  await evaluate(`(() => {
+    const row = document.querySelector('.tree-row[data-task-id="2"]');
+    row.querySelector('.tree-twisty').click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.tree-row[data-task-id="14"]') !== null`);
+
+  const rootPoints = await evaluate(`(() => {
+    const source = document.querySelector('.tree-row[data-task-id="14"] .tree-title').getBoundingClientRect();
+    const target = document.querySelector('.tree-root-target').getBoundingClientRect();
+    return {
+      sx: source.left + 12,
+      sy: source.top + source.height / 2,
+      tx: target.left + 12,
+      ty: target.top + target.height / 2,
+    };
+  })()`);
+
+  await dispatchMouse('mousePressed', rootPoints.sx, rootPoints.sy);
+  await delay(150);
+  await dispatchMouse('mouseMoved', rootPoints.sx + 20, rootPoints.sy - 20);
+  await delay(150);
+  await dispatchMouse('mouseMoved', rootPoints.tx, rootPoints.ty);
+  await delay(400);
+  await dispatchMouse('mouseReleased', rootPoints.tx, rootPoints.ty);
+  await delay(1500);
+
+  const detachedContent = await apiRequest(
+    `/api/file?path=${encodeURIComponent(`${taskDirectory}/task_14.txt`)}`,
+  );
+  check(
+    !detachedContent.content.includes('parent='),
+    'the task dropped on the general root becomes a root task',
+    detachedContent.content,
+  );
+
   // Back to the flat list for the rest of the test.
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'List');

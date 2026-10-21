@@ -32,7 +32,7 @@ import { renderPaginationBar } from './paginationBar.js';
 import { TaskDialog } from './taskDialog.js';
 import { renderTaskRows } from './taskTable.js';
 import { renderTreeRows } from './taskTreeView.js';
-import { TreeDragController } from './treeDrag.js';
+import { TreeDragController, ROOT_TARGET_CLASS } from './treeDrag.js';
 import { showToast } from './toast.js';
 
 export const TOKEN_STORAGE_KEY = 'gnumarus-project-manager.token';
@@ -336,6 +336,9 @@ export class App {
       container: this.treeRowsElement,
       onDrop: (draggedId, targetId) => {
         void this.reparentTask(draggedId, targetId);
+      },
+      onDetach: (draggedId) => {
+        void this.reparentTask(draggedId, null);
       },
     });
 
@@ -769,9 +772,9 @@ export class App {
     clear(this.treeHeaderElement);
 
     const generalRoot = el(this.doc, 'button', {
-      class: 'tree-crumb',
+      class: `tree-crumb ${ROOT_TARGET_CLASS}`,
       text: 'General root',
-      title: 'Show every task that has no parent',
+      title: 'Show every task that has no parent (drop a task here to make it a root task)',
     });
     generalRoot.type = 'button';
     if (this.treeFocusId === null) {
@@ -997,14 +1000,14 @@ export class App {
    * its previous parent. A task can never become a child of one of its own
    * descendants, that would build a cycle.
    */
-  private async reparentTask(taskId: number, targetId: number): Promise<void> {
+  private async reparentTask(taskId: number, targetId: number | null): Promise<void> {
     const projectDir = this.config.projectDir;
     if (projectDir === null) {
       return;
     }
     const structure = this.treeStructure;
     if (structure !== null) {
-      if (subtreeOf(structure, taskId).includes(targetId)) {
+      if (targetId !== null && subtreeOf(structure, taskId).includes(targetId)) {
         showToast({
           doc: this.doc,
           message: `The task #${taskId} cannot become a child of the task #${targetId}: it is one of its own descendants.`,
@@ -1024,7 +1027,10 @@ export class App {
       await this.repository.setParent(path, targetId);
       showToast({
         doc: this.doc,
-        message: `The task #${taskId} is now a child of the task #${targetId}.`,
+        message:
+          targetId === null
+            ? `The task #${taskId} is now a root task.`
+            : `The task #${taskId} is now a child of the task #${targetId}.`,
         kind: 'success',
       });
       await this.refresh();

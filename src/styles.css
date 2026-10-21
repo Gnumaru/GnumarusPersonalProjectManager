@@ -835,6 +835,17 @@ button[hidden] {
   color: var(--accent);
 }
 
+/* The empty space of the list detaches a task from its parent. */
+.tree-rows.tree-drop-root {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.tree-crumb.tree-drop-target {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
 .tree-drag-chip {
   position: fixed;
   z-index: 100;

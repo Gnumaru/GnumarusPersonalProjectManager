@@ -8,6 +8,7 @@ interface Harness {
   readonly container: HTMLElement;
   readonly controller: TreeDragController;
   readonly onDrop: ReturnType<typeof vi.fn>;
+  readonly onDetach: ReturnType<typeof vi.fn>;
 }
 
 function createHarness(): Harness {
@@ -35,8 +36,9 @@ function createHarness(): Harness {
   }
 
   const onDrop = vi.fn();
-  const controller = new TreeDragController({ doc, container, onDrop });
-  return { dom, doc, container, controller, onDrop };
+  const onDetach = vi.fn();
+  const controller = new TreeDragController({ doc, container, onDrop, onDetach });
+  return { dom, doc, container, controller, onDrop, onDetach };
 }
 
 function rowOf(harness: Harness, id: number): HTMLElement {
@@ -148,6 +150,44 @@ describe('TreeDragController', () => {
     mouse(harness, 'mousemove', rowOf(harness, 1), 40, 40);
     mouse(harness, 'mouseup', rowOf(harness, 1), 40, 40);
 
+    expect(harness.onDrop).not.toHaveBeenCalled();
+  });
+
+  it('detaches the task when it is dropped on the empty space of the list', () => {
+    const harness = createHarness();
+
+    mouse(harness, 'mousedown', rowOf(harness, 3).querySelector('.tree-title') as HTMLElement, 10, 10);
+    mouse(harness, 'mousemove', harness.container, 40, 400);
+    mouse(harness, 'mouseup', harness.container, 40, 400);
+
+    expect(harness.onDetach).toHaveBeenCalledWith(3);
+    expect(harness.onDrop).not.toHaveBeenCalled();
+  });
+
+  it('detaches the task when it is dropped on the general root', () => {
+    const harness = createHarness();
+    const generalRoot = harness.doc.createElement('button');
+    generalRoot.className = 'tree-crumb tree-root-target';
+    harness.doc.body.append(generalRoot);
+
+    mouse(harness, 'mousedown', rowOf(harness, 3).querySelector('.tree-title') as HTMLElement, 10, 10);
+    mouse(harness, 'mousemove', generalRoot, 40, 40);
+    expect(generalRoot.classList.contains('tree-drop-target')).toBe(true);
+    mouse(harness, 'mouseup', generalRoot, 40, 40);
+
+    expect(harness.onDetach).toHaveBeenCalledWith(3);
+    expect(harness.onDrop).not.toHaveBeenCalled();
+    expect(generalRoot.classList.contains('tree-drop-target')).toBe(false);
+  });
+
+  it('does nothing when the task is dropped outside of the tree', () => {
+    const harness = createHarness();
+
+    mouse(harness, 'mousedown', rowOf(harness, 3).querySelector('.tree-title') as HTMLElement, 10, 10);
+    mouse(harness, 'mousemove', harness.doc.body, 40, 40);
+    mouse(harness, 'mouseup', harness.doc.body, 40, 40);
+
+    expect(harness.onDetach).not.toHaveBeenCalled();
     expect(harness.onDrop).not.toHaveBeenCalled();
   });
 });

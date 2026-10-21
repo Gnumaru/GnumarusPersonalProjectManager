@@ -137,6 +137,8 @@
 - [x] A ctrl+click collapses or expands the whole branch (the task and all its
       descendants)
 - [x] Drag and drop: a task dropped on another one becomes its child
+- [x] Drag and drop: a task dropped on the **general root** or on the empty
+      space of the list becomes a root task again
 - [x] The dragged row is dimmed, the drop target is highlighted and a chip
       follows the pointer
 - [x] A task is never moved under one of its own descendants

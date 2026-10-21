@@ -125,14 +125,19 @@ function ctrlClick(element: Element | null | undefined, dom: JSDOM): void {
 
 /** Drags a row of the tree onto another one, as the mouse would do. */
 function dragTask(harness: Harness, draggedId: number, targetId: number): void {
+  const target = harness.root.querySelector<HTMLElement>(`.tree-row[data-task-id="${targetId}"]`);
+  dragTaskTo(harness, draggedId, target);
+}
+
+/** Drags a row of the tree onto the given element, as the mouse would do. */
+function dragTaskTo(harness: Harness, draggedId: number, target: Element | null): void {
   const source = harness.root.querySelector<HTMLElement>(
     `.tree-row[data-task-id="${draggedId}"] .tree-title`,
   );
-  const target = harness.root.querySelector<HTMLElement>(`.tree-row[data-task-id="${targetId}"]`);
   if (source === null || target === null) {
     return;
   }
-  const event = (type: string, node: HTMLElement, x: number, y: number): void => {
+  const event = (type: string, node: Element, x: number, y: number): void => {
     node.dispatchEvent(
       new harness.dom.window.MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 }),
     );
@@ -710,6 +715,53 @@ describe('App and the tree view', () => {
     expect(file).not.toContain('parent=4');
     const toast = harness.doc.querySelector('.toast-error');
     expect(toast?.textContent).toContain('descendant');
+
+    harness.app.dispose();
+  });
+
+  it('makes a task a root task when it is dropped on the general root', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    // The branch is expanded so that the task 4 can be dragged.
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'));
+    await flush();
+    click(harness.root.querySelectorAll<HTMLButtonElement>('.tree-row .tree-twisty')[1]);
+    await flush();
+
+    // The task 4 is dropped on the general root.
+    dragTaskTo(harness, 4, harness.root.querySelector('.tree-root-target'));
+    await flush();
+
+    // The file does not carry a parent any more.
+    const file = harness.bridge.files.get('/home/user/projects/task_4.txt');
+    expect(file).not.toContain('parent=');
+
+    // The task 4 is now a root task: it shows up next to the other ones.
+    const rows = treeRows(harness);
+    expect(rows.map((row) => row.dataset['taskId'])).toEqual(['1', '2', '3', '4', '5']);
+    expect(treeRow(harness, 4)?.dataset['depth']).toBe('0');
+    expect(treeRow(harness, 2)?.dataset['depth']).toBe('1');
+
+    harness.app.dispose();
+  });
+
+  it('makes a task a root task when it is dropped on the empty space of the list', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'));
+    await flush();
+    click(harness.root.querySelectorAll<HTMLButtonElement>('.tree-row .tree-twisty')[1]);
+    await flush();
+
+    // The task 4 is dropped below the last row.
+    dragTaskTo(harness, 4, harness.root.querySelector('.tree-rows'));
+    await flush();
+
+    const file = harness.bridge.files.get('/home/user/projects/task_4.txt');
+    expect(file).not.toContain('parent=');
+    expect(treeRow(harness, 4)?.dataset['depth']).toBe('0');
 
     harness.app.dispose();
   });

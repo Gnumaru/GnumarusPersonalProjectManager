@@ -256,11 +256,19 @@ A          A
 --E        -D
 ```
 
+A task can also be **detached from its parent**, to become a root task again.
+It is enough to drop it on:
+
+* the **general root** (the first item of the breadcrumb, above the list);
+* the **empty space** below the last row of the list.
+
 The drag is driven by the mouse (and not by the native HTML5 drag and drop) so
 that the application controls the whole feedback:
 
 * the dragged row is **dimmed**;
-* the row under the pointer is **highlighted** (it is the drop target);
+* the row under the pointer is **highlighted** (it is the drop target), the
+  general root is highlighted the same way;
+* the empty space of the list is highlighted when the task would be detached;
 * a **chip** with the name of the task follows the pointer;
 * the click that ends the drag is swallowed, so no dialog opens by accident.
 
@@ -396,7 +404,7 @@ be entered with a double click.
 | `src/core/taskRepository.test.ts` | The repository against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
 | `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons) and the pagination bar (jsdom). |
 | `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token and the tree view. |
-| `src/ui/treeDrag.test.ts` | The drag and drop of the rows of the tree: the drop target, the thresholds, the buttons that never start a drag and the click that ends the drag. |
+| `src/ui/treeDrag.test.ts` | The drag and drop of the rows of the tree: the drop target, the thresholds, the buttons that never start a drag, the click that ends the drag and the detachment of a task. |
 | `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
 | `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. |

@@ -133,6 +133,12 @@ nothing else.
 A task can be **dragged onto another task** to become its child: the `parent=`
 key of its file is rewritten and the task leaves its previous parent.
 
+A task can also be **detached from its parent** to become a root task again. It
+is enough to drop it:
+
+* on the **general root** (the first item of the breadcrumb, above the list);
+* on the **empty space** below the last row of the list.
+
 The drag is driven by the mouse (not by the native HTML5 drag and drop) so the
 application controls the feedback: the dragged row is dimmed, the row under the
 pointer is highlighted and a chip with the name of the task follows the pointer.

@@ -30,6 +30,7 @@ list or as a tree.
 | **Collapse and expand the children of a task** | Done | `src/ui/taskTreeView.ts`, `src/core/taskTree.ts` |
 | **Ctrl+click collapses or expands the whole branch** | Done | `src/ui/app.ts`, `src/core/taskTree.ts` |
 | **Drag and drop: a task dropped on another one becomes its child** | Done | `src/ui/treeDrag.ts`, `src/ui/app.ts` |
+| **Drag and drop: a task dropped on the general root becomes a root task** | Done | `src/ui/treeDrag.ts`, `src/ui/app.ts` |
 | **Focus the tree on a task (it becomes the root of the tree)** | Done | `src/ui/app.ts` |
 | **Focus the general root (every task without a parent)** | Done | `src/ui/app.ts` |
 | **Breadcrumb of the focused task** | Done | `src/ui/app.ts` |

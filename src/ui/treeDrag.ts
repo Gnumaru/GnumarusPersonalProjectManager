@@ -1,11 +1,14 @@
 /**
  * Drag and drop of the rows of the tree view.
  *
- * A task can be dragged onto another one to become its child. The drag is
- * driven by the mouse (and not by the native HTML5 drag and drop) so that the
- * application controls the whole feedback: the dragged row is dimmed, the row
- * under the pointer is highlighted and a small chip follows the pointer with
- * the name of the dragged task.
+ * A task can be dragged onto another one to become its child. It can also be
+ * dropped on the **general root** (the first item of the breadcrumb) or on the
+ * empty space of the list to become a root task again.
+ *
+ * The drag is driven by the mouse (and not by the native HTML5 drag and drop)
+ * so that the application controls the whole feedback: the dragged row is
+ * dimmed, the row under the pointer is highlighted and a small chip follows
+ * the pointer with the name of the dragged task.
  *
  * A simple click is not a drag: the pointer has to move by a few pixels
  * before the drag starts, so the buttons of the row keep working.
@@ -25,22 +28,37 @@ export const DRAG_THRESHOLD_PX = 5;
  */
 const DRAG_EXCLUDED_CLASSES = ['tree-twisty', 'tree-action'] as const;
 
+/**
+ * The class of the element that detaches a task from its parent when it is
+ * dropped on it (the **general root** of the breadcrumb).
+ */
+export const ROOT_TARGET_CLASS = 'tree-root-target';
+
 export interface TreeDragOptions {
   readonly doc: Document;
   /** The element that holds the rows of the tree. */
   readonly container: HTMLElement;
-  /** Called when a task is dropped on another one. */
+  /** Called when a task is dropped on another task. */
   readonly onDrop: (draggedId: number, targetId: number) => void;
+  /** Called when a task is dropped on the general root: it becomes a root task. */
+  readonly onDetach: (draggedId: number) => void;
 }
+
+/** What is under the pointer while a task is dragged. */
+type DropKind = 'task' | 'root' | 'none';
 
 export class TreeDragController {
   private readonly doc: Document;
   private readonly container: HTMLElement;
   private readonly onDrop: (draggedId: number, targetId: number) => void;
+  private readonly onDetach: (draggedId: number) => void;
 
   private draggedId: number | null = null;
   private draggedRow: HTMLElement | null = null;
-  private targetRow: HTMLElement | null = null;
+  /** What is under the pointer: a task, the general root or nothing. */
+  private targetKind: DropKind = 'none';
+  private targetElement: HTMLElement | null = null;
+  private targetId: number | null = null;
   private originX = 0;
   private originY = 0;
   private dragging = false;
@@ -52,6 +70,7 @@ export class TreeDragController {
     this.doc = options.doc;
     this.container = options.container;
     this.onDrop = options.onDrop;
+    this.onDetach = options.onDetach;
     this.container.addEventListener('mousedown', this.handleMouseDown);
   }
 
@@ -106,18 +125,23 @@ export class TreeDragController {
 
   private readonly handleMouseUp = (): void => {
     const draggedId = this.draggedId;
-    const targetRow = this.targetRow;
+    const kind = this.targetKind;
+    const targetId = this.targetId;
     const wasDragging = this.dragging;
     this.stopListening();
     this.endDragging();
-    if (!wasDragging || draggedId === null || targetRow === null) {
+    if (!wasDragging || draggedId === null) {
       return;
     }
-    const targetId = taskIdOf(targetRow);
-    if (targetId === null || targetId === draggedId) {
+    if (kind === 'task' && targetId !== null) {
+      if (targetId !== draggedId) {
+        this.onDrop(draggedId, targetId);
+      }
       return;
     }
-    this.onDrop(draggedId, targetId);
+    if (kind === 'root') {
+      this.onDetach(draggedId);
+    }
   };
 
   /** Swallows the click that follows a drag, so that no dialog opens. */
@@ -159,8 +183,11 @@ export class TreeDragController {
     this.draggedRow?.classList.remove('tree-dragging');
     this.draggedRow = null;
     this.container.classList.remove('tree-dragging');
-    this.targetRow?.classList.remove('tree-drop-target');
-    this.targetRow = null;
+    this.targetElement?.classList.remove('tree-drop-target');
+    this.container.classList.remove('tree-drop-root');
+    this.targetKind = 'none';
+    this.targetElement = null;
+    this.targetId = null;
     this.removeChip();
     if (!this.suppressClick) {
       return;
@@ -173,16 +200,59 @@ export class TreeDragController {
     }, 0);
   }
 
-  /** Highlights the row the pointer is over. */
-  private updateTarget(event: MouseEvent): void {
-    const row = findRow(event.target);
-    const target = row === null || row === this.draggedRow ? null : row;
-    if (target !== this.targetRow) {
-      this.targetRow?.classList.remove('tree-drop-target');
-      this.targetRow = target;
-      this.targetRow?.classList.add('tree-drop-target');
+  /**
+   * Finds out what is under the pointer.
+   *
+   * A row of the list is a task, the **general root** and the empty space of
+   * the list detach the task from its parent.
+   */
+  private resolveTarget(target: EventTarget | null): void {
+    const row = findRow(target);
+    if (row !== null) {
+      if (row === this.draggedRow) {
+        this.setTarget('none', null, null);
+        return;
+      }
+      const id = taskIdOf(row);
+      if (id === null) {
+        this.setTarget('none', null, null);
+        return;
+      }
+      this.setTarget('task', row, id);
+      return;
     }
+
+    const rootButton = findByClass(target, ROOT_TARGET_CLASS);
+    if (rootButton !== null) {
+      this.setTarget('root', rootButton, null);
+      return;
+    }
+
+    if (isInside(target, this.container)) {
+      // The empty space below the last row.
+      this.setTarget('root', null, null);
+      return;
+    }
+
+    this.setTarget('none', null, null);
+  }
+
+  /** Highlights the row (or the general root) the pointer is over. */
+  private updateTarget(event: MouseEvent): void {
+    this.resolveTarget(event.target);
+    this.container.classList.toggle('tree-drop-root', this.targetKind === 'root');
     this.updateChip(event);
+  }
+
+  /** Keeps the state of the drop target and updates the highlight. */
+  private setTarget(kind: DropKind, element: HTMLElement | null, id: number | null): void {
+    if (element !== this.targetElement) {
+      this.targetElement?.classList.remove('tree-drop-target');
+      this.targetElement = element;
+      this.targetElement?.classList.add('tree-drop-target');
+    }
+    this.targetKind = kind;
+    this.targetId = id;
   }
 
   /** The chip that follows the pointer with the name of the dragged task. */
@@ -208,19 +278,40 @@ export class TreeDragController {
 
 /** The row of the tree that holds the event target, `null` when there is none. */
 function findRow(target: EventTarget | null): HTMLElement | null {
+  const element = findByClass(target, 'tree-row');
+  return element === null ? null : (element as HTMLElement);
+}
+
+/**
+ * The closest element with the given class that holds the event target.
+ *
+ * The element itself is checked first, then its ancestors.
+ */
+function findByClass(target: EventTarget | null, className: string): HTMLElement | null {
   let current: unknown = target;
   while (current !== null && typeof current === 'object') {
     const element = current as {
       classList?: { contains(value: string): boolean };
-      dataset?: { taskId?: string };
       parentNode?: unknown;
     };
-    if (element.classList?.contains('tree-row') === true) {
+    if (element.classList?.contains(className) === true) {
       return element as HTMLElement;
     }
     current = element.parentNode;
   }
   return null;
+}
+
+/** True when the event target is inside the given element. */
+function isInside(target: EventTarget | null, container: HTMLElement): boolean {
+  let current: unknown = target;
+  while (current !== null && typeof current === 'object') {
+    if (current === container) {
+      return true;
+    }
+    current = (current as { parentNode?: unknown }).parentNode;
+  }
+  return false;
 }
 
 /** The id of the task of a row, `null` when the row carries none. */
