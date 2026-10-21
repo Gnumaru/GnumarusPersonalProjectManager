@@ -292,6 +292,46 @@ expanded, so a match is never hidden behind a collapsed task.
 
 ---
 
+## 5 ter. The board of the tasks
+
+**Files:** `src/core/task.ts`, `src/core/taskRepository.ts`, `src/ui/kanbanBoard.ts`, `src/ui/kanbanDrag.ts`, `src/ui/app.ts`
+
+The third display mode is a **board**: one column per status, with the cards
+of the tasks that have **no child**. A task that has children is represented by
+its children, the board shows the leaves of the tree.
+
+The columns are always in the same order (`BOARD_STATUSES`):
+
+```
+PLANNING | TODO | NEXT | PAUSED | DOING | DONE | CANCELED
+```
+
+Each column carries the colour of its status and the amount of cards it holds.
+A card shows the name and the tags of the task; clicking it opens the task and
+the pencil opens its editor.
+
+### Changing the status
+
+A card is **dragged from one column to another one**: the `status=` key of its
+file is rewritten and the card moves to its new column. The column under the
+pointer is highlighted, the dragged card is dimmed and a chip with the name of
+the task follows the pointer.
+
+### Where the data comes from
+
+The whole board costs **two** round trips and reads no file at all:
+
+```
+GET  (find)      every task file below the project folder  -> the ids
+POST /api/shell  grep -rH -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' .
+```
+
+The command returns the parent, the status, the title and the tags of every
+task. The tasks that are the parent of another task are left out: they are not
+cards of the board.
+
+---
+
 ## 6. The bridge service
 
 **Files:** `src/api/client.ts`, `src/ui/app.ts`
@@ -406,7 +446,9 @@ be entered with a double click.
 | `src/api/client.test.ts` | Tagged values, headers, error handling, shell calls, authentication policy of the service (mocked `fetch`). |
 | `src/core/taskRepository.test.ts` | The repository against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
 | `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons) and the pagination bar (jsdom). |
-| `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token and the tree view. |
+| `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token, the tree view and the board. |
+| `src/ui/kanbanBoard.test.ts` | The board: the columns and their order, the cards, their tags and their actions. |
+| `src/ui/kanbanDrag.test.ts` | The drag and drop of the cards of the board between the columns. |
 | `src/ui/treeDrag.test.ts` | The drag and drop of the rows of the tree: the drop target, the thresholds, the buttons that never start a drag, the click that ends the drag and the detachment of a task. |
 | `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |

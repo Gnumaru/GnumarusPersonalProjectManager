@@ -31,11 +31,18 @@ nos status de tarefas, mude "To do" para "TODO", "In progress" para "DOING" e "d
 ====
 crie uma terceira visualizacao, de kanban, que permitira visualizar tarefas em colunas agrupadas por status. apenas tarefas sem filho irão aparecer lá. deve ser possível arrastar e soltar as tarefas entre as colunas para alterar o status dela. a ordem das colunas deve ser PLANNING, TODO, NEXT, PAUSED, DOING, DONE, CANCELED
 ====
+estamos guardando a datahora de criacao e atualizacao usando o formato abaixo
+created=2026-10-21T02:45:29.365Z
+updated=2026-10-21T02:45:29.365Z
+eu quero que, ao invez disso, passemos a guardar apenas no formato YYYYMMDDHHNNSSIII (Y ano, M mes, D dia, H hora, N minuto, S segundo, I milisegundo), sem guardar informacao de timezone. alem disso as tarefas devem ter, alem de data de criacao e atualizacao, a data de inicio e de fim, que serao utilizadas futuramente.
 ====
 ====
 ====
 
+calendario
 ====
+crie um novo modo de visualizacao das tarefas, de grafico gantt. ele devera ter uma linha para cada tarefa
+gantt
 ====
 ====
 ====

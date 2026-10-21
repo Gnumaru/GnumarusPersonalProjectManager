@@ -23,10 +23,18 @@ import {
   type TaskTree,
   type TreeRow,
 } from '../core/taskTree.js';
-import type { Task, TaskInput } from '../core/task.js';
+import {
+  STATUS_LABELS,
+  type Task,
+  type TaskCard,
+  type TaskInput,
+  type TaskStatus,
+} from '../core/task.js';
 import { button, clear, el, input, type Child } from './dom.js';
 import { FileDialog } from './fileDialog.js';
 import { createIcon } from './icons.js';
+import { KanbanDragController } from './kanbanDrag.js';
+import { renderKanbanBoard } from './kanbanBoard.js';
 import { Modal } from './modal.js';
 import { renderPaginationBar } from './paginationBar.js';
 import { TaskDialog } from './taskDialog.js';
@@ -50,8 +58,8 @@ export interface TokenStorage {
 
 export type ServiceState = 'checking' | 'online' | 'offline' | 'unauthorized';
 
-/** The two ways the tasks can be displayed. */
-export type ViewMode = 'list' | 'tree';
+/** The three ways the tasks can be displayed. */
+export type ViewMode = 'list' | 'tree' | 'kanban';
 
 export interface AppOptions {
   readonly doc: Document;
@@ -108,6 +116,8 @@ export class App {
   private treeStructure: TaskTree | null = null;
   /** The tasks matching the current search, `null` when there is no search. */
   private treeMatches: Set<number> | null = null;
+  /** The cards of the board: the tasks that have no child. */
+  private kanbanCards: TaskCard[] = [];
 
   private projectPathElement!: HTMLElement;
   private serviceTextElement!: HTMLElement;
@@ -119,11 +129,14 @@ export class App {
   private newTaskButton!: HTMLButtonElement;
   private listViewButton!: HTMLButtonElement;
   private treeViewButton!: HTMLButtonElement;
+  private kanbanViewButton!: HTMLButtonElement;
   private tableWrapElement!: HTMLElement;
   private treeWrapElement!: HTMLElement;
   private treeHeaderElement!: HTMLElement;
   private treeRowsElement!: HTMLElement;
+  private kanbanElement!: HTMLElement;
   private treeDrag: TreeDragController | null = null;
+  private kanbanDrag: KanbanDragController | null = null;
   private rowsElement!: HTMLTableSectionElement;
   private emptyStateElement!: HTMLElement;
   private paginationElement!: HTMLElement;
@@ -288,11 +301,20 @@ export class App {
     });
     this.treeViewButton.dataset['viewMode'] = 'tree';
 
+    this.kanbanViewButton = button(this.doc, 'Kanban', {
+      class: 'view-toggle-button',
+      title: 'Show the tasks as a board of columns, one per status',
+      onClick: () => {
+        void this.setViewMode('kanban');
+      },
+    });
+    this.kanbanViewButton.dataset['viewMode'] = 'kanban';
+
     const viewToggle = el(
       this.doc,
       'div',
       { class: 'view-toggle', attrs: { role: 'group', 'aria-label': 'The way the tasks are displayed' } },
-      [this.listViewButton, this.treeViewButton],
+      [this.listViewButton, this.treeViewButton, this.kanbanViewButton],
     );
 
     const toolbar = el(this.doc, 'div', { class: 'toolbar' }, [
@@ -342,9 +364,20 @@ export class App {
       },
     });
 
+    this.kanbanElement = el(this.doc, 'div', { class: 'kanban-wrap', attrs: { hidden: 'hidden' } });
+    this.kanbanDrag?.dispose();
+    this.kanbanDrag = new KanbanDragController({
+      doc: this.doc,
+      container: this.kanbanElement,
+      onDrop: (taskId, status) => {
+        void this.changeTaskStatus(taskId, status);
+      },
+    });
+
     const content = el(this.doc, 'main', { class: 'content' }, [
       this.tableWrapElement,
       this.treeWrapElement,
+      this.kanbanElement,
       this.emptyStateElement,
     ]);
 
@@ -501,6 +534,8 @@ export class App {
     try {
       if (this.viewMode === 'tree') {
         await this.refreshTree(projectDir);
+      } else if (this.viewMode === 'kanban') {
+        await this.refreshKanban(projectDir);
       } else {
         await this.refreshList(projectDir);
       }
@@ -548,6 +583,16 @@ export class App {
     }
 
     await this.updateTreeRows();
+  }
+
+  /**
+   * Reads the cards of the board.
+   *
+   * Only the tasks that have **no child** belong to the board: one command
+   * reads the parent, the status, the title and the tags of every task.
+   */
+  private async refreshKanban(projectDir: string): Promise<void> {
+    this.kanbanCards = await this.repository.readLeafTasks(projectDir);
   }
 
   /** Recomputes the rows of the tree and loads the tasks that are shown. */
@@ -683,12 +728,15 @@ export class App {
 
   /** Draws the view mode that is in use. */
   private renderCurrentView(): void {
-    const isTree = this.viewMode === 'tree';
-    this.tableWrapElement.toggleAttribute('hidden', isTree);
-    this.treeWrapElement.toggleAttribute('hidden', !isTree);
-    this.paginationElement.toggleAttribute('hidden', isTree);
-    if (isTree) {
+    const mode = this.viewMode;
+    this.tableWrapElement.toggleAttribute('hidden', mode !== 'list');
+    this.treeWrapElement.toggleAttribute('hidden', mode !== 'tree');
+    this.kanbanElement.toggleAttribute('hidden', mode !== 'kanban');
+    this.paginationElement.toggleAttribute('hidden', mode !== 'list');
+    if (mode === 'tree') {
       this.renderTree();
+    } else if (mode === 'kanban') {
+      this.renderKanban();
     } else {
       this.renderList();
     }
@@ -760,6 +808,28 @@ export class App {
     }
 
     this.updateEmptyState(this.treeRows.length === 0);
+    this.resultCountElement.textContent = this.buildResultCount();
+    this.updateToolbarState();
+  }
+
+  /** Draws the board of the tasks: one column per status. */
+  private renderKanban(): void {
+    clear(this.kanbanElement);
+    this.kanbanElement.append(
+      renderKanbanBoard(this.doc, this.kanbanCards, {
+        onDrop: (taskId, status) => {
+          void this.changeTaskStatus(taskId, status);
+        },
+        onOpen: (taskId) => {
+          void this.openTaskById(taskId);
+        },
+        onEdit: (taskId) => {
+          void this.openEditTaskById(taskId);
+        },
+      }),
+    );
+
+    this.updateEmptyState(this.kanbanCards.length === 0);
     this.resultCountElement.textContent = this.buildResultCount();
     this.updateToolbarState();
   }
@@ -866,6 +936,10 @@ export class App {
     if (this.config.projectDir === null) {
       return '';
     }
+    if (this.viewMode === 'kanban') {
+      const count = this.kanbanCards.length;
+      return `${count} card${count === 1 ? '' : 's'}`;
+    }
     if (this.viewMode === 'tree') {
       const total = this.treeHierarchy?.parents.size ?? 0;
       const shown = this.treeRows.length;
@@ -925,8 +999,10 @@ export class App {
   private updateViewToggle(): void {
     this.listViewButton.classList.toggle('is-active', this.viewMode === 'list');
     this.treeViewButton.classList.toggle('is-active', this.viewMode === 'tree');
+    this.kanbanViewButton.classList.toggle('is-active', this.viewMode === 'kanban');
     this.listViewButton.setAttribute('aria-pressed', this.viewMode === 'list' ? 'true' : 'false');
     this.treeViewButton.setAttribute('aria-pressed', this.viewMode === 'tree' ? 'true' : 'false');
+    this.kanbanViewButton.setAttribute('aria-pressed', this.viewMode === 'kanban' ? 'true' : 'false');
   }
 
   /**
@@ -1038,6 +1114,64 @@ export class App {
       this.handleError(error);
     } finally {
       this.setBusy(false);
+    }
+  }
+
+  /**
+   * Changes the status of a task.
+   *
+   * The card is dropped on the column of another status: the `status=` key of
+   * its file is rewritten.
+   */
+  private async changeTaskStatus(taskId: number, status: TaskStatus): Promise<void> {
+    const projectDir = this.config.projectDir;
+    if (projectDir === null) {
+      return;
+    }
+    const card = this.kanbanCards.find((candidate) => candidate.id === taskId);
+    if (card === undefined || card.status === status) {
+      // The task is not on the board any more, or it is already there.
+      return;
+    }
+    this.setBusy(true);
+    try {
+      await this.repository.setStatus(card.path, status);
+      showToast({
+        doc: this.doc,
+        message: `The task #${taskId} is now ${STATUS_LABELS[status]}.`,
+        kind: 'success',
+      });
+      await this.refresh();
+    } catch (error) {
+      this.handleError(error);
+    } finally {
+      this.setBusy(false);
+    }
+  }
+
+  /** Opens the editor of a task that is only known by its id. */
+  private async openEditTaskById(id: number): Promise<void> {
+    const task = await this.loadTaskById(id);
+    if (task === null) {
+      return;
+    }
+    this.openEditDialog(task);
+  }
+
+  /** Reads a task from the disk, `null` when it cannot be read. */
+  private async loadTaskById(id: number): Promise<Task | null> {
+    const projectDir = this.config.projectDir;
+    if (projectDir === null) {
+      return null;
+    }
+    const card = this.kanbanCards.find((candidate) => candidate.id === id);
+    const path =
+      card?.path ?? this.treeHierarchy?.paths.get(id) ?? this.repository.taskPath(projectDir, id);
+    try {
+      return await this.repository.loadTask(path);
+    } catch (error) {
+      this.handleError(error);
+      return null;
     }
   }
 
@@ -1157,17 +1291,11 @@ export class App {
 
   /** Opens the task with the given id, even when it is not on the current page. */
   private async openTaskById(id: number): Promise<void> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
+    const task = await this.loadTaskById(id);
+    if (task === null) {
       return;
     }
-    try {
-      const path = this.repository.taskPath(projectDir, id);
-      const task = await this.repository.loadTask(path);
-      await this.openViewDialog(task);
-    } catch (error) {
-      this.handleError(error);
-    }
+    await this.openViewDialog(task);
   }
 
   /** The children of a task, loaded from the disk. */

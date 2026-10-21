@@ -1,6 +1,7 @@
 /** Task editor: create, view, edit and delete a task (root or child). */
 
 import {
+  STATUS_LABELS,
   TASK_STATUSES,
   normalizeTags,
   type Task,
@@ -31,16 +32,6 @@ export interface TaskDialogOptions {
   readonly onOpenChild?: ((child: Task) => void) | undefined;
   readonly onCancel?: (() => void) | undefined;
 }
-
-const STATUS_LABELS: Readonly<Record<TaskStatus, string>> = {
-  planning: 'PLANNING',
-  next: 'NEXT',
-  todo: 'TODO',
-  doing: 'DOING',
-  paused: 'PAUSED',
-  done: 'DONE',
-  canceled: 'CANCELED',
-};
 
 export class TaskDialog {
   private readonly doc: Document;

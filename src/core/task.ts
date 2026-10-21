@@ -38,6 +38,45 @@ export const TASK_STATUSES = [
 
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
+/** The name of every status, as it is shown to the user. */
+export const STATUS_LABELS: Readonly<Record<TaskStatus, string>> = {
+  planning: 'PLANNING',
+  next: 'NEXT',
+  todo: 'TODO',
+  doing: 'DOING',
+  paused: 'PAUSED',
+  done: 'DONE',
+  canceled: 'CANCELED',
+};
+
+/**
+ * The columns of the board, in the order they are shown.
+ *
+ * It is not the order of the statuses in the editor: the board starts with
+ * the tasks that are not started yet.
+ */
+export const BOARD_STATUSES: readonly TaskStatus[] = [
+  'planning',
+  'todo',
+  'next',
+  'paused',
+  'doing',
+  'done',
+  'canceled',
+];
+
+/** A task of the board: everything a card needs, and nothing more. */
+export interface TaskCard {
+  readonly id: number;
+  readonly title: string;
+  readonly status: TaskStatus;
+  /** `null` for a task without parent. */
+  readonly parentId: number | null;
+  readonly tags: readonly string[];
+  /** Path of the file of the task. */
+  readonly path: string;
+}
+
 export interface Task {
   /** Unique incremental integer, also encoded in the file name. */
   readonly id: number;
@@ -254,6 +293,15 @@ export function withParent(task: Task, parentId: number | null, now: Date): Task
   return {
     ...task,
     parentId,
+    updated: now.toISOString(),
+  };
+}
+
+/** Returns a copy of the task with another status. */
+export function withStatus(task: Task, status: TaskStatus, now: Date): Task {
+  return {
+    ...task,
+    status,
     updated: now.toISOString(),
   };
 }

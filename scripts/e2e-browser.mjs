@@ -756,6 +756,66 @@ async function runChecks() {
     detachedContent.content,
   );
 
+  // --- board ----------------------------------------------------------------
+
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Kanban');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.kanban-column') !== null`);
+
+  const boardColumns = await evaluate(
+    `[...document.querySelectorAll('.kanban-column')].map((node) => node.dataset['status']).join('|')`,
+  );
+  check(
+    boardColumns === 'planning|todo|next|paused|doing|done|canceled',
+    'the board has one column per status, in the expected order',
+    boardColumns,
+  );
+
+  // The task 1 has a child: it is not on the board.
+  const parentOnBoard = await evaluate(
+    `document.querySelector('.kanban-card[data-task-id="1"]') !== null`,
+  );
+  check(parentOnBoard === false, 'the tasks that have a child are not on the board');
+
+  // The card of the second task is dragged on the DOING column.
+  const boardPoints = await evaluate(`(() => {
+    const source = document.querySelector('.kanban-card[data-task-id="2"] .kanban-card-title').getBoundingClientRect();
+    const target = document.querySelector('.kanban-column[data-status="doing"] .kanban-cards').getBoundingClientRect();
+    return {
+      sx: source.left + 12,
+      sy: source.top + source.height / 2,
+      tx: target.left + 60,
+      ty: target.top + 30,
+    };
+  })()`);
+
+  await dispatchMouse('mousePressed', boardPoints.sx, boardPoints.sy);
+  await delay(150);
+  await dispatchMouse('mouseMoved', boardPoints.sx + 30, boardPoints.sy - 20);
+  await delay(150);
+  await dispatchMouse('mouseMoved', boardPoints.tx, boardPoints.ty);
+  await delay(400);
+
+  const highlightedColumn = await evaluate(
+    `document.querySelector('.kanban-column.tree-drop-target')?.dataset['status'] ?? ''`,
+  );
+  check(highlightedColumn === 'doing', 'the column under the pointer is the drop target', highlightedColumn);
+
+  await dispatchMouse('mouseReleased', boardPoints.tx, boardPoints.ty);
+  await delay(1500);
+
+  const movedStatus = await apiRequest(
+    `/api/file?path=${encodeURIComponent(`${taskDirectory}/task_2.txt`)}`,
+  );
+  check(
+    movedStatus.content.includes('status=doing'),
+    'the card dropped on a column changes the status of the task',
+    movedStatus.content,
+  );
+
   // Back to the flat list for the rest of the test.
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'List');

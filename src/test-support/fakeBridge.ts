@@ -202,6 +202,25 @@ export class FakeBridge {
       if (stdout.length > 0) {
         stdout = `${stdout}\n`;
       }
+    } else if (command.includes('-rH') && command.includes("-e '^id='")) {
+      // Reading the cards of the board: the metadata of every task.
+      const prefix = cwd === '/' ? '/' : `${cwd}/`;
+      const lines: string[] = [];
+      for (const [filePath, content] of this.files) {
+        if (!filePath.startsWith(prefix) || !filePath.endsWith('.txt')) {
+          continue;
+        }
+        const relative = `./${filePath.slice(prefix.length)}`;
+        for (const line of content.split('\n')) {
+          if (line.trim() === '----') {
+            break;
+          }
+          if (/^(id|parent|status|title|tags)=/u.test(line)) {
+            lines.push(`${relative}:${line}`);
+          }
+        }
+      }
+      stdout = lines.length > 0 ? `${lines.join('\n')}\n` : '';
     } else if (command.includes('-rH') && command.includes("'^parent='")) {
       // Reading the hierarchy: one line per task that has a parent.
       const prefix = cwd === '/' ? '/' : `${cwd}/`;

@@ -164,3 +164,31 @@
 ### Build / deploy
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
+## Batch 5 - Board of the tasks
+
+### Data layer
+- [x] `TaskRepository.readLeafTasks` reads the cards with one command
+      (`id`, `parent`, `status`, `title` and `tags` of every task)
+- [x] `TaskRepository.setStatus` rewrites the `status=` key of a task
+- [x] `BOARD_STATUSES` - the order of the columns of the board
+- [x] `withStatus` changes the status of a task (`src/core/task.ts`)
+
+### User interface
+- [x] A third view mode: **List / Tree / Kanban**
+- [x] One column per status, with the colour of the status and the amount of
+      cards
+- [x] Only the tasks that have no child are on the board
+- [x] A card shows the name and the tags of the task
+- [x] The card opens the task and its editor
+- [x] Drag and drop between the columns changes the status of the task
+
+### Tests
+- [x] `src/ui/kanbanBoard.test.ts` - the columns, the cards and their actions
+- [x] `src/ui/kanbanDrag.test.ts` - the drag and drop between the columns
+- [x] `src/ui/app.test.ts` - the board in the application and the status change
+- [x] `scripts/e2e-browser.mjs` - the board driven by a real browser
+
+### Build / deploy
+- [x] `npm run verify`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`

@@ -662,6 +662,191 @@ button[hidden] {
 
 /* ------------------------------------------------------------ tree view -- */
 
+.kanban-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.kanban-wrap[hidden] {
+  display: none;
+}
+
+.kanban-board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+}
+
+.kanban-column {
+  flex: none;
+  width: 236px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.kanban-column-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+}
+
+.kanban-column-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex: none;
+}
+
+.kanban-column-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-column-count {
+  font-size: 11.5px;
+  font-family: var(--mono);
+  color: var(--text-faint);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 7px;
+}
+
+/* The dot of a column carries the colour of the status. */
+.kanban-column[data-status='planning'] .kanban-column-dot {
+  background: var(--info);
+}
+
+.kanban-column[data-status='todo'] .kanban-column-dot {
+  background: var(--text-faint);
+}
+
+.kanban-column[data-status='next'] .kanban-column-dot {
+  background: var(--accent);
+}
+
+.kanban-column[data-status='paused'] .kanban-column-dot {
+  background: var(--paused);
+}
+
+.kanban-column[data-status='doing'] .kanban-column-dot {
+  background: var(--warning);
+}
+
+.kanban-column[data-status='done'] .kanban-column-dot {
+  background: var(--success);
+}
+
+.kanban-column[data-status='canceled'] .kanban-column-dot {
+  background: var(--danger);
+}
+
+.kanban-cards {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kanban-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: grab;
+  user-select: none;
+}
+
+.kanban-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-subtle);
+}
+
+.kanban-card.tree-dragging {
+  opacity: 0.4;
+}
+
+.kanban-card-title {
+  padding: 0;
+  font-size: 13px;
+  font-weight: 550;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.kanban-card-title:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.kanban-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.kanban-card-tags:empty {
+  display: none;
+}
+
+.kanban-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.kanban-card:hover .kanban-card-actions,
+.kanban-card:focus-within .kanban-card-actions {
+  opacity: 1;
+}
+
+.kanban-card-action {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
+.kanban-column.tree-drop-target {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
 .tree-wrap {
   flex: 1;
   min-height: 0;

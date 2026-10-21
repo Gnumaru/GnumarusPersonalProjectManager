@@ -11,13 +11,18 @@ import { ApiClient, ApiError } from '../api/client.js';
 import {
   applyTaskInput,
   buildTask,
+  isTaskStatus,
+  normalizeTags,
   parseTask,
   parseTaskIdFromFileName,
   serializeTask,
   taskFileName,
   withParent,
+  withStatus,
   type Task,
+  type TaskCard,
   type TaskInput,
+  type TaskStatus,
 } from './task.js';
 import { clampPage, computePageInfo, totalPages, type PageInfo } from './pagination.js';
 
@@ -53,6 +58,15 @@ export const COUNT_CHILDREN_COMMAND =
 export const READ_PARENTS_COMMAND =
   "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^parent=' .";
 
+/**
+ * Command used to read the cards of the board.
+ *
+ * Everything the board needs is read in one command: the parent of every task
+ * (to know the tasks that have no child), its status, its title and its tags.
+ */
+export const READ_CARDS_COMMAND =
+  "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' .";
+
 /** Command used to list the task files that are children of a given task. */
 export function childrenCommand(parentId: number): string {
   return `grep -rl --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^parent=${parentId}$' .`;
@@ -64,6 +78,14 @@ export interface TaskHierarchy {
   readonly parents: ReadonlyMap<number, number | null>;
   /** Path of the file of every task. */
   readonly paths: ReadonlyMap<number, string>;
+}
+
+/** The metadata of a task, as it is read for the board. */
+interface CardMetadata {
+  title: string;
+  status: TaskStatus;
+  parentId: number | null;
+  tags: string[];
 }
 
 export interface TaskPage {
@@ -336,6 +358,63 @@ export class TaskRepository {
   }
 
   /**
+   * Reads the cards of the board: the tasks that have **no child**.
+   *
+   * Two commands are needed: the listing of the task files (the id of a task
+   * is encoded in its file name) and a `grep` of the metadata of the tasks.
+   * The content of the files never reaches the browser here, only the status,
+   * the title and the tags of the tasks that have no child.
+   */
+  async readLeafTasks(projectDir: string): Promise<TaskCard[]> {
+    const [paths, result] = await Promise.all([
+      this.listTaskFilePaths(projectDir),
+      this.api.execShell({
+        command: READ_CARDS_COMMAND,
+        cwd: projectDir,
+        timeout: 60,
+      }),
+    ]);
+    if (result.returncode !== 0 && result.returncode !== 1) {
+      throw new Error(
+        `Unable to read the tasks of "${projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
+      );
+    }
+
+    const metadata = this.parseCardMetadata(result.stdout, projectDir);
+    const parents = new Set<number>();
+    for (const values of metadata.values()) {
+      if (values.parentId !== null) {
+        parents.add(values.parentId);
+      }
+    }
+
+    const cards: TaskCard[] = [];
+    for (const path of paths) {
+      const id = parseTaskIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
+      if (id === null) {
+        continue;
+      }
+      if (parents.has(id)) {
+        // The task has a child: it does not belong to the board.
+        continue;
+      }
+      const values = metadata.get(path);
+      if (values === undefined) {
+        continue;
+      }
+      cards.push({
+        id,
+        title: values.title,
+        status: values.status,
+        parentId: values.parentId,
+        tags: values.tags,
+        path,
+      });
+    }
+    return cards;
+  }
+
+  /**
    * Moves a task under another parent.
    *
    * A `null` parent makes the task a root task again. Only the `parent=` key of
@@ -344,6 +423,14 @@ export class TaskRepository {
   async setParent(path: string, parentId: number | null): Promise<Task> {
     const current = await this.loadTask(path);
     const updated = withParent(current, parentId, new Date());
+    await this.api.overwriteFile(path, serializeTask(updated));
+    return updated;
+  }
+
+  /** Changes the status of a task. */
+  async setStatus(path: string, status: TaskStatus): Promise<Task> {
+    const current = await this.loadTask(path);
+    const updated = withStatus(current, status, new Date());
     await this.api.overwriteFile(path, serializeTask(updated));
     return updated;
   }
@@ -366,6 +453,47 @@ export class TaskRepository {
   /** Clamps a page number to the available range. */
   safePage(page: number, totalItems: number, pageSize: number): number {
     return clampPage(page, totalPages(totalItems, pageSize));
+  }
+
+  /**
+   * Parses the output of the command that reads the cards of the board.
+   *
+   * Every line looks like `./task_5.txt:title=The task`. The path may contain
+   * a colon, so the last colon that is followed by a known key is the
+   * separator.
+   */
+  private parseCardMetadata(stdout: string, projectDir: string): Map<string, CardMetadata> {
+    const metadata = new Map<string, CardMetadata>();
+    for (const line of stdout.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) {
+        continue;
+      }
+      const match = /^(.*):(id|parent|status|title|tags)=(.*)$/u.exec(trimmed);
+      if (match === null) {
+        continue;
+      }
+      const relative = match[1] ?? '';
+      const key = match[2] ?? '';
+      const value = match[3] ?? '';
+      if (relative.length === 0) {
+        continue;
+      }
+      const path = joinPath(projectDir, relative);
+      const current = metadata.get(path) ?? { title: '', status: 'todo', parentId: null, tags: [] };
+      if (key === 'title') {
+        current.title = value;
+      } else if (key === 'status') {
+        current.status = isTaskStatus(value) ? value : 'todo';
+      } else if (key === 'parent') {
+        const parentId = Number.parseInt(value, 10);
+        current.parentId = Number.isSafeInteger(parentId) ? parentId : null;
+      } else if (key === 'tags') {
+        current.tags = normalizeTags(value);
+      }
+      metadata.set(path, current);
+    }
+    return metadata;
   }
 
   /**

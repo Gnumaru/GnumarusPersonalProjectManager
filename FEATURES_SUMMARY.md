@@ -25,7 +25,7 @@ list or as a tree.
 
 | Feature | Status | Where |
 | ------- | ------ | ----- |
-| **List / Tree toggle** | Done | `src/ui/app.ts` |
+| **List / Tree / Kanban toggle** | Done | `src/ui/app.ts` |
 | **One row per task, with its name and its tags** | Done | `src/ui/taskTreeView.ts` |
 | **Collapse and expand the children of a task** | Done | `src/ui/taskTreeView.ts`, `src/core/taskTree.ts` |
 | **Ctrl+click collapses or expands the whole branch** | Done | `src/ui/app.ts`, `src/core/taskTree.ts` |
@@ -62,6 +62,16 @@ list or as a tree.
 | **Token button hidden when the token is useless** | Done | `src/ui/app.ts` |
 | Service availability banner and periodic ping | Done | `src/ui/app.ts` |
 | Configuration file in `~/.config/GnumarusProjectManager/config.json` | Done | `src/core/config.ts` |
+
+## Board of the tasks
+
+| Feature | Status | Where |
+| ------- | ------ | ----- |
+| **Kanban board: one column per status** | Done | `src/ui/kanbanBoard.ts` |
+| **Columns in the order PLANNING, TODO, NEXT, PAUSED, DOING, DONE, CANCELED** | Done | `src/core/task.ts` |
+| **Only the tasks that have no child are on the board** | Done | `src/core/taskRepository.ts` |
+| **Drag and drop between the columns changes the status** | Done | `src/ui/kanbanDrag.ts` |
+| **A card opens the task and its editor** | Done | `src/ui/kanbanBoard.ts` |
 
 ## User interface
 

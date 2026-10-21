@@ -162,6 +162,25 @@ flattens it into the rows to display:
 * the traversal keeps the ids of the current path, so a cycle can never loop
   forever.
 
+## Batch 5 - Board of the tasks
+
+The third display mode is a **board** (Kanban): one column per status, the
+cards of the tasks that have **no child** (a task with children is represented
+by its children on the board).
+
+The columns are always in the same order:
+
+```
+PLANNING | TODO | NEXT | PAUSED | DOING | DONE | CANCELED
+```
+
+A card can be **dragged from one column to another one** to change the status
+of the task: the `status=` key of its file is rewritten.
+
+The data is read with **one** command that returns the parent, the status, the
+title and the tags of every task, so the whole board costs two round trips
+(the listing of the files and that command) and no file is read.
+
 ## Steps
 
 1. [x] Scaffold the project (package.json, tsconfig, vite config, index.html).
@@ -187,6 +206,8 @@ flattens it into the rows to display:
     its child.
 16. [x] Task statuses: `PLANNING`, `NEXT`, `TODO`, `DOING`, `PAUSED`, `DONE`
     and `CANCELED`.
+17. [x] Board of the tasks: one column per status, the tasks that have no
+    child, and the drag and drop that changes the status.
 
 ## Verification commands
 

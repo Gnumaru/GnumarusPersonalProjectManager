@@ -123,6 +123,25 @@ function ctrlClick(element: Element | null | undefined, dom: JSDOM): void {
   element.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, ctrlKey: true }));
 }
 
+/** Drags a card of the board onto a column, as the mouse would do. */
+function dragCard(harness: Harness, taskId: number, status: string): void {
+  const source = harness.root.querySelector<HTMLElement>(
+    `.kanban-card[data-task-id="${taskId}"] .kanban-card-title`,
+  );
+  const target = harness.root.querySelector<HTMLElement>(`.kanban-column[data-status="${status}"]`);
+  if (source === null || target === null) {
+    return;
+  }
+  const event = (type: string, node: Element, x: number, y: number): void => {
+    node.dispatchEvent(
+      new harness.dom.window.MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 }),
+    );
+  };
+  event('mousedown', source, 10, 10);
+  event('mousemove', target, 60, 60);
+  event('mouseup', target, 60, 60);
+}
+
 /** Drags a row of the tree onto another one, as the mouse would do. */
 function dragTask(harness: Harness, draggedId: number, targetId: number): void {
   const target = harness.root.querySelector<HTMLElement>(`.tree-row[data-task-id="${targetId}"]`);
@@ -826,7 +845,7 @@ describe('App and the tree view', () => {
     harness.app.dispose();
   });
 
-  it('goes back to the flat list', async () => {
+    it('goes back to the flat list', async () => {
     const harness = await createTreeHarness();
     await switchToTree(harness);
     expect(harness.root.querySelector('.tree-wrap')?.hasAttribute('hidden')).toBe(false);
@@ -837,6 +856,94 @@ describe('App and the tree view', () => {
     expect(harness.root.querySelector('.tree-wrap')?.hasAttribute('hidden')).toBe(true);
     expect(harness.root.querySelector('.table-wrap')?.hasAttribute('hidden')).toBe(false);
     expect(harness.root.querySelectorAll('.task-table tbody tr')).toHaveLength(5);
+
+    harness.app.dispose();
+  });
+});
+
+describe('App and the board', () => {
+  async function createBoardHarness(): Promise<Harness> {
+    return createHarness(0, {
+      tasks: [
+        { id: 1 },
+        { id: 2, parentId: 1 },
+        { id: 3, parentId: 1 },
+        { id: 4, parentId: 2 },
+        { id: 5 },
+      ],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+  }
+
+  async function switchToBoard(harness: Harness): Promise<void> {
+    click(buttonByText(harness.doc, 'Kanban'));
+    await flush();
+  }
+
+  it('shows one column per status, in the expected order', async () => {
+    const harness = await createBoardHarness();
+    await switchToBoard(harness);
+
+    const columns = [...harness.root.querySelectorAll('.kanban-column')];
+    expect(columns.map((column) => column.getAttribute('data-status'))).toEqual([
+      'planning',
+      'todo',
+      'next',
+      'paused',
+      'doing',
+      'done',
+      'canceled',
+    ]);
+    expect(columns[0]?.querySelector('.kanban-column-title')?.textContent).toBe('PLANNING');
+    expect(columns[2]?.querySelector('.kanban-column-title')?.textContent).toBe('NEXT');
+
+    // The list and the tree are hidden, the pagination bar too.
+    expect(harness.root.querySelector('.table-wrap')?.hasAttribute('hidden')).toBe(true);
+    expect(harness.root.querySelector('.tree-wrap')?.hasAttribute('hidden')).toBe(true);
+    expect(harness.root.querySelector('.pagination-footer')?.hasAttribute('hidden')).toBe(true);
+
+    harness.app.dispose();
+  });
+
+  it('shows only the tasks that have no child', async () => {
+    const harness = await createBoardHarness();
+    await switchToBoard(harness);
+
+    // The tasks 1 and 2 have a child: they are not on the board.
+    const cards = [...harness.root.querySelectorAll('.kanban-card')];
+    expect(cards.map((card) => card.getAttribute('data-task-id'))).toEqual(['3', '4', '5']);
+    expect(harness.root.querySelector('.result-count')?.textContent).toBe('3 cards');
+
+    harness.app.dispose();
+  });
+
+  it('changes the status of a task when its card is dropped on another column', async () => {
+    const harness = await createBoardHarness();
+    await switchToBoard(harness);
+
+    // The card of the task 3 is dropped on the DOING column.
+    dragCard(harness, 3, 'doing');
+    await flush();
+
+    const file = harness.bridge.files.get('/home/user/projects/task_3.txt');
+    expect(file).toContain('status=doing');
+
+    // The card moved to the column of its new status.
+    const doing = harness.root.querySelector('.kanban-column[data-status="doing"]');
+    expect(doing?.querySelectorAll('.kanban-card')).toHaveLength(1);
+    expect(doing?.querySelector('.kanban-card')?.getAttribute('data-task-id')).toBe('3');
+
+    harness.app.dispose();
+  });
+
+  it('opens the task of a card', async () => {
+    const harness = await createBoardHarness();
+    await switchToBoard(harness);
+
+    click(harness.root.querySelector<HTMLButtonElement>('.kanban-card .kanban-card-title'));
+    await flush();
+
+    expect(harness.doc.querySelector('.modal-title')?.textContent).toContain('Task 3');
 
     harness.app.dispose();
   });
