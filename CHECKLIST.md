@@ -25,6 +25,8 @@
 - [x] Task dialog: view mode and edit mode (title, status, tags, description)
 - [x] Delete confirmation
 - [x] OS-like directory picker (back, forward, up, root, drives, home, path box, new folder)
+- [x] `Enter` enters the selected folder in the picker
+- [x] The scroll of the picker is not reset when an item is clicked
 - [x] Service unavailable banner with periodic ping
 - [x] Toasts for feedback
 - [x] Responsive CSS, desktop first (1366x768 minimum)
@@ -38,6 +40,8 @@
 - [x] `src/ui/widgets.test.ts` - task table and pagination bar (jsdom)
 - [x] `src/ui/app.test.ts` - the whole application against a fake bridge (jsdom)
 - [x] `src/ui/fileDialog.test.ts` - path helpers and file list sorting
+- [x] `src/ui/fileDialog.test.ts` - the picker: the list is not rebuilt when an
+      item is selected, `Enter` enters the selected folder
 - [x] `scripts/e2e-smoke.sh` - headless Chrome renders the built app (root and nested path)
 - [x] `scripts/e2e-browser.mjs` - real browser drives pagination, search, create, edit and delete
 

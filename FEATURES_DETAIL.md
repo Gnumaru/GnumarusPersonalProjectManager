@@ -329,6 +329,12 @@ A dialog that behaves like the file dialogs of an operating system:
 * A **path box**: type a path and press `Enter` or `Go`.
 * **New folder**: creates the directory and enters it.
 * Double click a folder to enter it, single click to select it.
+* **Enter** enters the selected folder, whatever has the focus (a row of the
+  list, the path box and the name of the new folder keep their own meaning).
+
+Clicking an item of the list only changes the class of the rows: the list is
+**not** rebuilt, so the scroll of the dialog stays where it was and a folder can
+be entered with a double click.
 
 ---
 
@@ -360,7 +366,7 @@ A dialog that behaves like the file dialogs of an operating system:
 | `src/core/taskRepository.test.ts` | The repository against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
 | `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons) and the pagination bar (jsdom). |
 | `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token and the tree view. |
-| `src/ui/fileDialog.test.ts` | Path helpers and sorting of the file list. |
+| `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
 | `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. |
 

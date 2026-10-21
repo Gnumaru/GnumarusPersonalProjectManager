@@ -726,6 +726,45 @@ async function runChecks() {
   await waitFor(`document.querySelector('.fd-list') !== null`);
   await delay(800);
   await capture('file-dialog');
+
+  // --- the folder picker ----------------------------------------------------
+
+  // The parent of the task folder holds the "tasks" directory.
+  const parentDirectory = taskDirectory.replace(/\/[^/]+$/u, '');
+
+  await evaluate(`(() => {
+    const input = document.querySelector('.path-input');
+    input.value = ${JSON.stringify(parentDirectory)};
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    return true;
+  })()`);
+  await waitFor(
+    `[...document.querySelectorAll('.fd-entry-name')].some((node) => node.textContent === 'tasks')`,
+  );
+
+  // Clicking an item does not rebuild the list: the scroll cannot be reset.
+  await evaluate(`(() => {
+    const list = document.querySelector('.fd-list');
+    window.__fdRow = [...list.querySelectorAll('.fd-entry')]
+      .find((node) => node.querySelector('.fd-entry-name').textContent === 'tasks');
+    window.__fdRow.click();
+    return true;
+  })()`);
+  await delay(300);
+  const listKept = await evaluate(
+    `document.querySelector('.fd-list').contains(window.__fdRow)
+      && window.__fdRow.classList.contains('fd-entry-selected')`,
+  );
+  check(listKept === true, 'clicking an item does not rebuild the list of the dialog');
+
+  // Enter enters the selected directory.
+  await evaluate(
+    `document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`,
+  );
+  await waitFor(`document.querySelector('.path-input').value.endsWith('/tasks')`);
+  const enteredPath = await evaluate(`document.querySelector('.path-input').value`);
+  check(enteredPath.endsWith('/tasks'), 'Enter enters the selected folder', enteredPath);
+
   await evaluate(`document.querySelector('.modal-close').click()`);
 }
 

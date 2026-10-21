@@ -65,6 +65,8 @@ list or as a tree.
 | Feature | Status | Where |
 | ------- | ------ | ----- |
 | OS like folder picker (back, forward, up, root, drives, home, path box, new folder) | Done | `src/ui/fileDialog.ts` |
+| **Enter enters the selected folder in the picker** | Done | `src/ui/fileDialog.ts` |
+| **The scroll of the picker is kept when an item is clicked** | Done | `src/ui/fileDialog.ts` |
 | Responsive, desktop first layout (1366x768 and above) | Done | `src/styles.css` |
 | Light and dark colour schemes | Done | `src/styles.css` |
 | Keyboard shortcuts (`Ctrl+F` focuses the search, `Enter` searches, `Esc` clears) | Done | `src/ui/app.ts` |

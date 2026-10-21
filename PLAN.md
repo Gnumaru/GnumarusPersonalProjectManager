@@ -159,6 +159,8 @@ flattens it into the rows to display:
     ask the user for a token in that case.
 13. [x] Tree view: a second display mode with collapsible rows, the focus on a
     task and the focus on the general root.
+14. [x] Folder picker: `Enter` enters the selected folder and the scroll of the
+    list is not reset when an item is selected.
 
 ## Verification commands
 

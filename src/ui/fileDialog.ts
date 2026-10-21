@@ -146,6 +146,7 @@ export class FileDialog {
       el(this.doc, 'div', { class: 'fd-footer-buttons' }, [cancelButton, confirmButton]),
     ]);
     this.modal.onClose(() => {
+      this.doc.removeEventListener('keydown', this.handleDialogKeyDown, true);
       this.onCancel?.();
     });
   }
@@ -153,6 +154,7 @@ export class FileDialog {
   /** Opens the dialog, starting at the given path when possible. */
   async open(startPath?: string): Promise<void> {
     this.modal.open();
+    this.doc.addEventListener('keydown', this.handleDialogKeyDown, true);
     await this.loadPlaces();
     const initial = startPath ?? this.homeDirectory;
     const opened = await this.navigateTo(initial, true);
@@ -161,6 +163,47 @@ export class FileDialog {
       await this.navigateTo(this.homeDirectory, true);
     }
   }
+
+  /**
+   * Enters the selected directory when the user presses `Enter`.
+   *
+   * The key is listened to on the whole document, so the folder is entered
+   * whatever has the focus. The cases that already have a meaning come first:
+   *
+   * * a row of the list enters the folder it shows;
+   * * the path box goes to the path that was typed in it;
+   * * any other text field (the name of the new folder) handles the key.
+   *
+   * When nothing else applies, the selected directory is entered.
+   */
+  private readonly handleDialogKeyDown = (event: KeyboardEvent): void => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+    const target = event.target;
+    if (hasAncestorWithClass(target, 'fd-entry')) {
+      return;
+    }
+    if (target === this.pathInput && this.pathInput.value.trim() !== this.currentPath) {
+      return;
+    }
+    if (isTextEntry(target) || isButton(target)) {
+      return;
+    }
+    const selected = this.selected;
+    if (selected === null) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (isDirectoryEntry(this.entries, selected)) {
+      void this.navigateTo(selected, true);
+      return;
+    }
+    if (this.mode === 'file') {
+      this.confirm();
+    }
+  };
 
   private iconButton(icon: string, title: string, onClick: () => void): HTMLButtonElement {
     const node = button(this.doc, '', {
@@ -350,6 +393,7 @@ export class FileDialog {
     const row = el(this.doc, 'div', {
       class: `fd-entry${this.selected === entry.path ? ' fd-entry-selected' : ''}`,
       attrs: { tabindex: '0', role: 'button', 'aria-label': entry.name },
+      dataset: { path: entry.path },
       on: {
         click: () => {
           this.select(entry.path);
@@ -391,10 +435,24 @@ export class FileDialog {
     return this.filters.some((filter) => lower.endsWith(filter.toLowerCase()));
   }
 
+  /**
+   * Selects an entry of the list.
+   *
+   * The list is **not** rebuilt: emptying it would bring the scroll back to the
+   * top and it would become impossible to enter a folder with a double click.
+   * Only the class of the rows is updated.
+   */
   private select(path: string): void {
     this.selected = path;
-    this.renderList();
+    this.updateSelectedRows();
     this.updateSelectionLabel();
+  }
+
+  /** Marks the row of the selected entry, leaving the rest of the list alone. */
+  private updateSelectedRows(): void {
+    for (const row of this.listElement.querySelectorAll<HTMLElement>('.fd-entry')) {
+      row.classList.toggle('fd-entry-selected', row.dataset['path'] === this.selected);
+    }
   }
 
   private updateSelectionLabel(): void {
@@ -493,6 +551,42 @@ export class FileDialog {
 
 function isDirectoryEntry(entries: readonly DirectoryEntry[], path: string): boolean {
   return entries.some((entry) => entry.path === path && entry.type === 'dir');
+}
+
+/** Name of the tag of an event target, in upper case. */
+function tagNameOf(target: EventTarget | null): string {
+  if (target === null || typeof target !== 'object') {
+    return '';
+  }
+  const tagName = (target as { tagName?: unknown }).tagName;
+  return typeof tagName === 'string' ? tagName.toUpperCase() : '';
+}
+
+/** True when the event target is a text entry. */
+function isTextEntry(target: EventTarget | null): boolean {
+  const name = tagNameOf(target);
+  return name === 'INPUT' || name === 'TEXTAREA' || name === 'SELECT';
+}
+
+/** True when the event target is a button: it handles `Enter` by itself. */
+function isButton(target: EventTarget | null): boolean {
+  return tagNameOf(target) === 'BUTTON';
+}
+
+/** True when the event target is inside an element with the given class. */
+function hasAncestorWithClass(target: EventTarget | null, className: string): boolean {
+  let current: unknown = target;
+  while (current !== null && typeof current === 'object') {
+    const element = current as {
+      classList?: { contains(value: string): boolean };
+      parentNode?: unknown;
+    };
+    if (element.classList?.contains(className) === true) {
+      return true;
+    }
+    current = element.parentNode;
+  }
+  return false;
 }
 
 /** Sorts the entries of the file list in a natural, case insensitive order. */
