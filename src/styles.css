@@ -1306,6 +1306,16 @@ button[hidden] {
   gap: 14px;
 }
 
+.field-row-even {
+  grid-template-columns: 1fr 1fr;
+}
+
+input[type='date'] {
+  font-family: var(--mono);
+  font-size: 13px;
+  color-scheme: light dark;
+}
+
 .form-error {
   color: var(--danger);
   font-size: 12.5px;
@@ -2035,6 +2045,10 @@ button[hidden] {
 
   .field-row {
     grid-template-columns: 1fr;
+  }
+
+  .field-row-even {
+    grid-template-columns: 1fr 1fr;
   }
 }
 

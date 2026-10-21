@@ -3,7 +3,9 @@
 import {
   STATUS_LABELS,
   TASK_STATUSES,
+  dateInputValue,
   normalizeTags,
+  timestampFromDateInput,
   type Task,
   type TaskInput,
   type TaskStatus,
@@ -50,6 +52,8 @@ export class TaskDialog {
   private titleInput: HTMLInputElement | null = null;
   private statusSelect: HTMLSelectElement | null = null;
   private tagsInput: HTMLInputElement | null = null;
+  private startInput: HTMLInputElement | null = null;
+  private endInput: HTMLInputElement | null = null;
   private descriptionInput: HTMLTextAreaElement | null = null;
   private errorLabel: HTMLDivElement | null = null;
   private confirmingDelete = false;
@@ -281,6 +285,22 @@ export class TaskDialog {
       placeholder: 'tags separated by spaces',
     });
 
+    this.startInput = input(this.doc, {
+      class: 'field-input',
+      id: 'task-start',
+      type: 'date',
+      value: dateInputValue(task?.start ?? ''),
+      title: 'The day the task starts',
+    });
+
+    this.endInput = input(this.doc, {
+      class: 'field-input',
+      id: 'task-end',
+      type: 'date',
+      value: dateInputValue(task?.end ?? ''),
+      title: 'The day the task ends',
+    });
+
     this.descriptionInput = textArea(this.doc, {
       class: 'field-input',
       id: 'task-description',
@@ -324,6 +344,16 @@ export class TaskDialog {
         el(this.doc, 'label', { class: 'field', attrs: { for: 'task-tags' } }, [
           el(this.doc, 'span', { class: 'field-label', text: 'Tags' }),
           this.tagsInput,
+        ]),
+      ]),
+      el(this.doc, 'div', { class: 'field-row field-row-even' }, [
+        el(this.doc, 'label', { class: 'field', attrs: { for: 'task-start' } }, [
+          el(this.doc, 'span', { class: 'field-label', text: 'Start date' }),
+          this.startInput,
+        ]),
+        el(this.doc, 'label', { class: 'field', attrs: { for: 'task-end' } }, [
+          el(this.doc, 'span', { class: 'field-label', text: 'End date' }),
+          this.endInput,
         ]),
       ]),
       el(this.doc, 'label', { class: 'field', attrs: { for: 'task-description' } }, [
@@ -415,11 +445,20 @@ export class TaskDialog {
       ? (rawStatus as TaskStatus)
       : 'todo';
 
+    const start = timestampFromDateInput(this.startInput?.value ?? '');
+    const end = timestampFromDateInput(this.endInput?.value ?? '');
+    if (start.length > 0 && end.length > 0 && end < start) {
+      this.setError('The end date cannot be before the start date.');
+      return;
+    }
+
     const taskInput: TaskInput = {
       title,
       description: this.descriptionInput?.value ?? '',
       status,
       tags: normalizeTags(this.tagsInput?.value ?? ''),
+      start,
+      end,
     };
 
     try {

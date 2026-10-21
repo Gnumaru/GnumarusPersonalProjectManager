@@ -280,6 +280,62 @@ describe('App', () => {
     harness.app.dispose();
   });
 
+  it('edits the start and the end dates of a task', async () => {
+    const harness = await createHarness(3);
+    await selectFolder(harness);
+
+    // Open the editor of the first task.
+    const editButtons = harness.root.querySelectorAll<HTMLButtonElement>('.row-action');
+    click(editButtons[1]);
+    await flush();
+
+    // The editor holds a date picker for the start and for the end.
+    const startInput = harness.doc.querySelector<HTMLInputElement>('#task-start');
+    const endInput = harness.doc.querySelector<HTMLInputElement>('#task-end');
+    expect(startInput).not.toBeNull();
+    expect(endInput).not.toBeNull();
+    expect(startInput?.getAttribute('type')).toBe('date');
+    expect(endInput?.getAttribute('type')).toBe('date');
+    if (startInput === null || endInput === null) {
+      return;
+    }
+
+    startInput.value = '2026-10-19';
+    endInput.value = '2026-10-23';
+    click(buttonByText(harness.doc, 'Save changes'));
+    await flush();
+
+    // The dates are written in the compact format.
+    const edited = harness.bridge.files.get('/home/user/projects/task_1.txt');
+    expect(edited).toContain('start=20261019000000000');
+    expect(edited).toContain('end=20261023000000000');
+  });
+
+  it('refuses a date range that ends before it starts', async () => {
+    const harness = await createHarness(3);
+    await selectFolder(harness);
+
+    const editButtons = harness.root.querySelectorAll<HTMLButtonElement>('.row-action');
+    click(editButtons[1]);
+    await flush();
+
+    const startInput = harness.doc.querySelector<HTMLInputElement>('#task-start');
+    const endInput = harness.doc.querySelector<HTMLInputElement>('#task-end');
+    if (startInput === null || endInput === null) {
+      return;
+    }
+    startInput.value = '2026-10-19';
+    endInput.value = '2026-10-12';
+    click(buttonByText(harness.doc, 'Save changes'));
+    await flush();
+
+    const error = harness.doc.querySelector('.form-error');
+    expect(error?.textContent).toContain('end date');
+    // The file was not written.
+    const file = harness.bridge.files.get('/home/user/projects/task_1.txt');
+    expect(file).not.toContain('start=2026');
+  });
+
   it('creates, edits and deletes a task', async () => {
     const harness = await createHarness(3);
     await selectFolder(harness);

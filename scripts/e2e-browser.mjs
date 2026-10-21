@@ -389,10 +389,20 @@ async function runChecks() {
     return true;
   })()`);
   await waitFor(`document.querySelector('#task-title') !== null`);
+  const datePickers = await evaluate(
+    `document.querySelector('#task-start')?.getAttribute('type') + '/' + document.querySelector('#task-end')?.getAttribute('type')`,
+  );
+  check(
+    datePickers === 'date/date',
+    'the editor holds a date picker for the start and for the end date',
+    datePickers,
+  );
   await evaluate(`(() => {
     document.querySelector('#task-title').value = 'Created by the browser test';
     document.querySelector('#task-tags').value = 'browser created';
     document.querySelector('#task-description').value = 'The description written by the test.';
+    document.querySelector('#task-start').value = '2026-10-19';
+    document.querySelector('#task-end').value = '2026-10-23';
     return true;
   })()`);
   await evaluate(`(() => {
@@ -417,6 +427,16 @@ async function runChecks() {
   check(
     createdContent?.content?.includes('tags=browser created') === true,
     'the new task file holds the tags',
+  );
+  check(
+    createdContent?.content?.includes('start=20261019000000000') === true,
+    'the new task file holds the start date',
+    createdContent?.content,
+  );
+  check(
+    createdContent?.content?.includes('end=20261023000000000') === true,
+    'the new task file holds the end date',
+    createdContent?.content,
   );
 
   // --- edit -----------------------------------------------------------------

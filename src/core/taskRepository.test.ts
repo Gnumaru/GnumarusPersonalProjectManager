@@ -58,6 +58,8 @@ describeLive('TaskRepository against the live service', () => {
       description: 'The body of the task',
       status: 'doing',
       tags: ['tests', 'bridge'],
+      start: '',
+      end: '',
     });
 
     expect(task.id).toBe(1);
@@ -77,6 +79,8 @@ describeLive('TaskRepository against the live service', () => {
       description: '',
       status: 'todo',
       tags: [],
+      start: '',
+      end: '',
     });
     await api.execShell({ command: `mkdir -p -- '${testDirectory}/nested'` });
     await api.execShell({
@@ -95,6 +99,8 @@ describeLive('TaskRepository against the live service', () => {
         description: `filler-${id}`,
         status: 'todo',
         tags: ['filler'],
+        start: '',
+        end: '',
       });
     }
 
@@ -132,6 +138,8 @@ describeLive('TaskRepository against the live service', () => {
       description: 'Updated body',
       status: 'done',
       tags: ['updated'],
+      start: '',
+      end: '',
     });
 
     expect(updated.id).toBe(1);
@@ -162,6 +170,8 @@ describeLive('TaskRepository against the live service', () => {
       description: '',
       status: 'todo',
       tags: [],
+      start: '',
+      end: '',
     });
 
     const child = await repository.createTask(
@@ -171,6 +181,8 @@ describeLive('TaskRepository against the live service', () => {
         description: 'The body of the child',
         status: 'doing',
         tags: ['child'],
+        start: '',
+        end: '',
       },
       parent.id,
     );
@@ -189,7 +201,7 @@ describeLive('TaskRepository against the live service', () => {
     await expect(
       repository.createTask(
         testDirectory,
-        { title: 'Orphan', description: '', status: 'todo', tags: [] },
+        { title: 'Orphan', description: '', status: 'todo', tags: [], start: '', end: '' },
         9999,
       ),
     ).rejects.toThrow('does not exist');
@@ -201,10 +213,12 @@ describeLive('TaskRepository against the live service', () => {
       description: '',
       status: 'todo',
       tags: [],
+      start: '',
+      end: '',
     });
     await repository.createTask(
       testDirectory,
-      { title: 'Counted child', description: '', status: 'todo', tags: [] },
+      { title: 'Counted child', description: '', status: 'todo', tags: [], start: '', end: '' },
       parent.id,
     );
 
@@ -218,15 +232,17 @@ describeLive('TaskRepository against the live service', () => {
       description: '',
       status: 'todo',
       tags: [],
+      start: '',
+      end: '',
     });
     const first = await repository.createTask(
       testDirectory,
-      { title: 'Son', description: '', status: 'todo', tags: [] },
+      { title: 'Son', description: '', status: 'todo', tags: [], start: '', end: '' },
       parent.id,
     );
     const second = await repository.createTask(
       testDirectory,
-      { title: 'Daughter', description: '', status: 'todo', tags: [] },
+      { title: 'Daughter', description: '', status: 'todo', tags: [], start: '', end: '' },
       parent.id,
     );
 
@@ -243,6 +259,8 @@ describeLive('TaskRepository against the live service', () => {
       description: '',
       status: 'todo',
       tags: [],
+      start: '',
+      end: '',
     });
 
     const file = await api.readFile(repository.taskPath(testDirectory, task.id));
@@ -260,10 +278,12 @@ describeLive('TaskRepository against the live service', () => {
       description: '',
       status: 'todo',
       tags: [],
+      start: '',
+      end: '',
     });
     const child = await repository.createTask(
       testDirectory,
-      { title: 'Hierarchy child', description: '', status: 'todo', tags: [] },
+      { title: 'Hierarchy child', description: '', status: 'todo', tags: [], start: '', end: '' },
       root.id,
     );
 
@@ -281,16 +301,20 @@ describeLive('TaskRepository against the live service', () => {
       description: '',
       status: 'todo',
       tags: [],
+      start: '',
+      end: '',
     });
     const second = await repository.createTask(testDirectory, {
       title: 'Second parent',
       description: '',
       status: 'todo',
       tags: [],
+      start: '',
+      end: '',
     });
     const child = await repository.createTask(
       testDirectory,
-      { title: 'Moved child', description: '', status: 'todo', tags: [] },
+      { title: 'Moved child', description: '', status: 'todo', tags: [], start: '', end: '' },
       first.id,
     );
 

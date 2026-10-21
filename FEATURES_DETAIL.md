@@ -48,6 +48,20 @@ Rules:
   written and read, and shown in the view of a task; they will be used by the
   features to come.
 
+### The dates in the editor
+
+The editor of a task holds two **date pickers** (`<input type="date">`), one
+for the start date and one for the end date. They are filled with the day of the
+`start=` and `end=` keys and written back in the compact format, at midnight:
+
+```
+dateInputValue('20261019100000000')  ->  '2026-10-19'   (the value of the picker)
+timestampFromDateInput('2026-10-19') ->  '20261019000000000'
+```
+
+The end date cannot be before the start date: the editor refuses to save the
+task and explains why.
+
 ### The timestamps
 
 The dates are written in the **compact format** `YYYYMMDDHHNNSSIII`:

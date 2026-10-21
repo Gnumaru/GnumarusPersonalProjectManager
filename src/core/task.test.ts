@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vite-plus/test';
 import {
   applyTaskInput,
   buildTask,
+  dateInputValue,
   formatTaskTimestamp,
   isTaskFileName,
   isTaskStatus,
@@ -15,6 +16,7 @@ import {
   serializeTask,
   TASK_STATUSES,
   taskFileName,
+  timestampFromDateInput,
   withParent,
 } from './task.js';
 
@@ -102,6 +104,58 @@ describe('the compact timestamps', () => {
     expect(normalizeTaskTimestamp('')).toBe('');
     expect(normalizeTaskTimestamp('nonsense')).toBe('');
     expect(normalizeTaskTimestamp('20261021024529365')).toBe('20261021024529365');
+  });
+});
+
+describe('the date pickers', () => {
+  it('gives the value of the picker for a timestamp', () => {
+    expect(dateInputValue('20261019100000000')).toBe('2026-10-19');
+    expect(dateInputValue('')).toBe('');
+    expect(dateInputValue('nonsense')).toBe('');
+  });
+
+  it('reads the value of the picker as a timestamp', () => {
+    expect(timestampFromDateInput('2026-10-19')).toBe('20261019000000000');
+    expect(timestampFromDateInput('')).toBe('');
+    expect(timestampFromDateInput('nonsense')).toBe('');
+  });
+
+  it('rejects the dates that do not exist', () => {
+    expect(timestampFromDateInput('2026-02-31')).toBe('');
+    expect(timestampFromDateInput('2026-13-01')).toBe('');
+  });
+
+  it('keeps the dates of a task that is edited', () => {
+    const now = new Date(2026, 4, 5, 10, 0, 0, 0);
+    const original = buildTask(
+      {
+        title: 'Dated',
+        description: '',
+        status: 'todo',
+        tags: [],
+        start: '20261001000000000',
+        end: '20261020000000000',
+      },
+      3,
+      now,
+    );
+    expect(original.start).toBe('20261001000000000');
+    expect(original.end).toBe('20261020000000000');
+
+    const updated = applyTaskInput(
+      original,
+      {
+        title: 'Dated',
+        description: '',
+        status: 'doing',
+        tags: [],
+        start: '20261101000000000',
+        end: '20261120000000000',
+      },
+      now,
+    );
+    expect(updated.start).toBe('20261101000000000');
+    expect(updated.end).toBe('20261120000000000');
   });
 });
 
@@ -328,7 +382,7 @@ describe('buildTask and applyTaskInput', () => {
   it('stamps the creation and update time', () => {
     const now = new Date(2026, 4, 5, 10, 0, 0, 0);
     const task = buildTask(
-      { title: '  Trimmed  ', description: 'body', status: 'todo', tags: ['x', 'y'] },
+      { title: '  Trimmed  ', description: 'body', status: 'todo', tags: ['x', 'y'], start: '', end: '' },
       3,
       now,
     );
@@ -344,7 +398,7 @@ describe('buildTask and applyTaskInput', () => {
 
   it('builds a child task that points to its parent', () => {
     const task = buildTask(
-      { title: 'Child', description: '', status: 'todo', tags: [] },
+      { title: 'Child', description: '', status: 'todo', tags: [], start: '', end: '' },
       4,
       new Date('2026-05-05T10:00:00.000Z'),
       3,
@@ -357,13 +411,13 @@ describe('buildTask and applyTaskInput', () => {
   it('keeps the id and the creation time when editing', () => {
     const now = new Date(2026, 4, 5, 10, 0, 0, 0);
     const original = buildTask(
-      { title: 'First', description: 'body', status: 'todo', tags: [] },
+      { title: 'First', description: 'body', status: 'todo', tags: [], start: '', end: '' },
       9,
       new Date(2026, 0, 1, 0, 0, 0, 0),
     );
     const updated = applyTaskInput(
       original,
-      { title: 'Second', description: 'new body', status: 'done', tags: ['t'] },
+      { title: 'Second', description: 'new body', status: 'done', tags: ['t'], start: '', end: '' },
       now,
     );
     expect(updated.id).toBe(9);
@@ -377,7 +431,7 @@ describe('buildTask and applyTaskInput', () => {
 
 describe('withParent', () => {
   const original = buildTask(
-    { title: 'Movable', description: 'body', status: 'todo', tags: ['t'] },
+    { title: 'Movable', description: 'body', status: 'todo', tags: ['t'], start: '', end: '' },
     7,
     new Date(2026, 0, 1, 0, 0, 0, 0),
     3,

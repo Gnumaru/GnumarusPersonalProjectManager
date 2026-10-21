@@ -107,6 +107,10 @@ export interface TaskInput {
   readonly description: string;
   readonly status: TaskStatus;
   readonly tags: readonly string[];
+  /** Start of the task, in the compact format, empty when it has not started. */
+  readonly start: string;
+  /** End of the task, in the compact format, empty when it is not finished. */
+  readonly end: string;
 }
 
 export const EMPTY_TASK_INPUT: TaskInput = {
@@ -114,6 +118,8 @@ export const EMPTY_TASK_INPUT: TaskInput = {
   description: '',
   status: 'todo',
   tags: [],
+  start: '',
+  end: '',
 };
 
 export function isTaskStatus(value: string): value is TaskStatus {
@@ -185,6 +191,44 @@ export function parseTaskTimestamp(value: string): Date | null {
 export function normalizeTaskTimestamp(value: string): string {
   const date = parseTaskTimestamp(value);
   return date === null ? '' : formatTaskTimestamp(date);
+}
+
+/**
+ * The value of a date picker (`YYYY-MM-DD`) for a compact timestamp.
+ *
+ * An empty string when the task has no date.
+ */
+export function dateInputValue(timestamp: string): string {
+  const date = parseTaskTimestamp(timestamp);
+  if (date === null) {
+    return '';
+  }
+  const pad = (value: number, length = 2): string => String(value).padStart(length, '0');
+  return `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
+ * The compact timestamp of a date chosen in a date picker.
+ *
+ * The time is midnight. An empty string when the picker is empty or when the
+ * date does not exist.
+ */
+export function timestampFromDateInput(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return '';
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(trimmed);
+  if (match === null) {
+    return '';
+  }
+  const year = Number.parseInt(match[1] ?? '', 10);
+  const month = Number.parseInt(match[2] ?? '', 10);
+  const day = Number.parseInt(match[3] ?? '', 10);
+  const date = new Date(year, month - 1, day, 0, 0, 0, 0);
+  const valid =
+    date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+  return valid ? formatTaskTimestamp(date) : '';
 }
 
 /** `task_12.txt` for the id `12`. */
@@ -348,8 +392,8 @@ export function buildTask(
     tags: normalizeTags(input.tags),
     created: timestamp,
     updated: timestamp,
-    start: '',
-    end: '',
+    start: input.start,
+    end: input.end,
     description: input.description,
   };
 }
@@ -361,6 +405,8 @@ export function applyTaskInput(task: Task, input: TaskInput, now: Date): Task {
     title: input.title.trim(),
     status: input.status,
     tags: normalizeTags(input.tags),
+    start: input.start,
+    end: input.end,
     updated: formatTaskTimestamp(now),
     description: input.description,
   };

@@ -208,12 +208,15 @@
 ### User interface
 - [x] The view of a task shows the **Created**, **Updated**, **Start** and
       **End** dates, formatted for the user
+- [x] The editor holds a **date picker** for the start date and for the end date
+- [x] The end date cannot be before the start date
 
 ### Tests
 - [x] `src/core/task.test.ts` - the compact format, the migration of the old
-      format, the start and the end dates
+      format, the start and the end dates, the conversion for the date pickers
 - [x] `src/core/taskRepository.test.ts` - the file written by the live bridge
-- [x] `src/ui/widgets.test.ts`, `src/ui/app.test.ts` - the fixtures
+- [x] `src/ui/widgets.test.ts`, `src/ui/app.test.ts` - the fixtures, the date
+      pickers of the editor
 
 ### Build / deploy
 - [x] `npm run verify`

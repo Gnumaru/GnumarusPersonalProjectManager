@@ -237,6 +237,8 @@ reads no file.
 19. [x] Gantt chart: the rows of the tasks on the left, the chart on the right,
     one column per day, the weeks and the months numbered and named, and the
     bars drawn from the start date to the end date.
+20. [x] Date pickers in the editor: the user chooses the start date and the end
+    date of a task.
 
 ## Verification commands
 
