@@ -23,6 +23,8 @@ created=20261020100000000
 updated=20261020100000000
 start=
 end=
+blocked_by=3,5
+related=7,9
 ----
 The description of the task.
 It can have as many lines as needed.
@@ -47,6 +49,21 @@ Rules:
   are empty when the task has not started and when it is not finished. They are
   written and read, and shown in the view of a task; they will be used by the
   features to come.
+* `blocked_by` - the ids of the tasks that **block** this one: they prevent its
+  completion. The key is absent when the task is not blocked.
+* `related` - the ids of the tasks that are **related** to this one: a relation
+  the user makes explicit, that is neither a blocking relation nor a
+  parent/child relation. The key is absent when there is none.
+
+### The blocking and the related tasks in the editor
+
+The editor of a task holds two fields, **Blocked by** and **Related tasks**.
+The user types the id of a task (or several ids separated by commas) and
+presses `Enter`: each id becomes a chip that can be removed with its `×`.
+
+A task cannot block itself nor be related to itself: the editor refuses those
+ids. The relations are shown in the read only view of the task (`Blocked by` and
+`Related`).
 
 ### The dates in the editor
 
@@ -466,6 +483,40 @@ POST /api/shell  grep -rH -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e 
 
 The range of the schedule goes from the earliest date of the tasks to the
 latest one, widened to whole weeks.
+
+---
+
+## 5 ter. The comments of a task
+
+**Files:** `src/core/comment.ts`, `src/core/taskRepository.ts`, `src/ui/taskDialog.ts`
+
+A task can have **0 or more comments**. Every comment is a text file of its
+own, stored in the project folder, named `comment_<id>.txt`. The format is the
+format of the task files: a block of `key=value` lines, a line that contains
+only the separator and then the text of the comment.
+
+```
+id=3
+task=12
+created=20261021024529365
+updated=20261021024529365
+----
+The text of the comment.
+```
+
+The `task` key holds the id of the task the comment belongs to. The ids of the
+comments are **incremental integers**, unique in the project, exactly like the
+ids of the tasks: the next comment takes the number of the highest one plus
+one.
+
+### In the editor of the task
+
+The editor of a task shows the comments of the task, **the most recent first**
+(the creation date is the order, the id breaks the ties). Every comment can be
+edited or deleted, and a new one can be written at the bottom of the list.
+
+The comments of a task are found with a `grep` on the `task=` key, so only the
+comment files of that task are read.
 
 ---
 

@@ -1316,6 +1316,74 @@ input[type='date'] {
   color-scheme: light dark;
 }
 
+/* The lists of task ids: the chips and the input. */
+.id-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-height: 34px;
+  padding: 3px 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.id-list:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.id-list-items {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.id-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 2px 1px 8px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+}
+
+.id-chip-remove {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  border-radius: 999px;
+}
+
+.id-chip-remove:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.id-list-input {
+  flex: 1;
+  min-width: 90px;
+  padding: 3px 4px;
+  font-size: 12.5px;
+  border: none;
+  background: transparent;
+  outline: none;
+}
+
+.id-list-input:focus {
+  box-shadow: none;
+}
+
 .form-error {
   color: var(--danger);
   font-size: 12.5px;
@@ -1434,6 +1502,94 @@ input[type='date'] {
 .task-children-empty {
   margin: 0;
   color: var(--text-faint);
+  font-size: 13px;
+}
+
+/* The comments of a task, below the form. */
+.task-comments {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-comments-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-comments-count {
+  font-size: 11.5px;
+  font-family: var(--mono);
+  color: var(--text-faint);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 7px;
+}
+
+.task-comments-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.task-comment {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--bg-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.task-comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-comment-date {
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.task-comment-text {
+  font-size: 13px;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.task-comment-actions {
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.task-comment:hover .task-comment-actions,
+.task-comment:focus-within .task-comment-actions {
+  opacity: 1;
+}
+
+.task-comment-new-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.task-comment-new {
+  flex: 1;
+  min-height: 0;
+}
+
+.task-comment-editor {
   font-size: 13px;
 }
 

@@ -13,7 +13,8 @@
 import { ApiClient, ApiError, ApiUnavailableError } from '../api/client.js';
 import { loadConfig, saveConfig, type AppConfig } from '../core/config.js';
 import { DEFAULT_PAGE_SIZE, computePageInfo, type PageInfo } from '../core/pagination.js';
-import { TaskRepository, extractTaskIds, type TaskHierarchy, type TaskMetadata } from '../core/taskRepository.js';
+import { TaskRepository, extractTaskIds, joinPath, type TaskHierarchy, type TaskMetadata } from '../core/taskRepository.js';
+import { commentFileName, type TaskComment } from '../core/comment.js';
 import {
   ancestorsOf,
   buildTaskTree,
@@ -1454,6 +1455,51 @@ export class App {
     this.openEditDialog(task);
   }
 
+  /** The comments of a task, the most recent first. */
+  private async loadTaskComments(taskId: number): Promise<TaskComment[]> {
+    const projectDir = this.config.projectDir;
+    if (projectDir === null) {
+      return [];
+    }
+    return this.repository.listComments(projectDir, taskId);
+  }
+
+  /** Adds a comment to a task. */
+  private async addTaskComment(taskId: number, text: string): Promise<void> {
+    const projectDir = this.config.projectDir;
+    if (projectDir === null) {
+      return;
+    }
+    await this.repository.createComment(projectDir, taskId, text);
+  }
+
+  /** Changes the text of a comment. */
+  private async updateTaskComment(
+    _taskId: number,
+    commentId: number,
+    text: string,
+  ): Promise<void> {
+    const projectDir = this.config.projectDir;
+    if (projectDir === null) {
+      return;
+    }
+    await this.repository.updateComment(this.commentPath(projectDir, commentId), text);
+  }
+
+  /** Deletes a comment of a task. */
+  private async deleteTaskComment(_taskId: number, commentId: number): Promise<void> {
+    const projectDir = this.config.projectDir;
+    if (projectDir === null) {
+      return;
+    }
+    await this.repository.deleteComment(this.commentPath(projectDir, commentId));
+  }
+
+  /** The path of the file of a comment. */
+  private commentPath(projectDir: string, commentId: number): string {
+    return joinPath(projectDir, commentFileName(commentId));
+  }
+
   /** Reads a task from the disk, `null` when it cannot be read. */
   private async loadTaskById(id: number): Promise<Task | null> {
     const projectDir = this.config.projectDir;
@@ -1565,6 +1611,18 @@ export class App {
       },
       onDelete: async () => {
         await this.deleteTask(task);
+      },
+      onLoadComments: async (taskId) => {
+        return this.loadTaskComments(taskId);
+      },
+      onAddComment: async (taskId, text) => {
+        await this.addTaskComment(taskId, text);
+      },
+      onUpdateComment: async (taskId, commentId, text) => {
+        await this.updateTaskComment(taskId, commentId, text);
+      },
+      onDeleteComment: async (taskId, commentId) => {
+        await this.deleteTaskComment(taskId, commentId);
       },
     });
     dialog.open();

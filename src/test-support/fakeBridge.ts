@@ -194,14 +194,26 @@ export class FakeBridge {
     let stdout = '';
     if (command.startsWith('find ')) {
       const prefix = cwd === '/' ? '/' : `${cwd}/`;
+      const namePattern = globToRegExp(/-name '([^']*)'/u.exec(command)?.[1] ?? '*.txt');
       stdout = [...this.files.keys()]
-        .filter((filePath) => filePath.startsWith(prefix) && filePath.endsWith('.txt'))
+        .filter((filePath) => filePath.startsWith(prefix))
+        .filter((filePath) => namePattern.test(filePath.slice(prefix.length)))
         .filter((filePath) => filePath.slice(prefix.length).split('/').every((part) => /^task_\d+$/.test(part) || part.length > 0))
         .map((filePath) => `./${filePath.slice(prefix.length)}`)
         .join('\n');
       if (stdout.length > 0) {
         stdout = `${stdout}\n`;
       }
+    } else if (command.includes("-e '^task=")) {
+      // The comment files of a task.
+      const match = /-e '\^task=(\d+)\$'/u.exec(command);
+      const taskId = match?.[1] ?? '';
+      const prefix = cwd === '/' ? '/' : `${cwd}/`;
+      const matches = [...this.files.entries()]
+        .filter(([filePath]) => filePath.startsWith(prefix) && filePath.endsWith('.txt'))
+        .filter(([, content]) => new RegExp(`^task=${taskId}$`, 'mu').test(content))
+        .map(([filePath]) => `./${filePath.slice(prefix.length)}`);
+      stdout = matches.length > 0 ? `${matches.join('\n')}\n` : '';
     } else if (command.includes('-rH') && command.includes("-e '^id='")) {
       // Reading the cards of the board: the metadata of every task.
       const prefix = cwd === '/' ? '/' : `${cwd}/`;
@@ -288,6 +300,15 @@ export class FakeBridge {
       stdin_bytes: `i:${stdin.length}`,
     });
   }
+}
+
+/** Turns a shell glob (`comment_*.txt`) into a regular expression. */
+function globToRegExp(pattern: string): RegExp {
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/gu, '\\$&')
+    .replace(/\*/gu, '[^/]*')
+    .replace(/\?/gu, '.');
+  return new RegExp(`^${escaped}$`, 'u');
 }
 
 function parseBody(body: BodyInit | null | undefined): Record<string, unknown> {

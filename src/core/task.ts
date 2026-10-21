@@ -99,6 +99,10 @@ export interface Task {
   readonly start: string;
   /** Timestamp of the end of the task, empty when it is not finished. */
   readonly end: string;
+  /** The ids of the tasks that block this one: they prevent its completion. */
+  readonly blockedBy: readonly number[];
+  /** The ids of the tasks that are related to this one. */
+  readonly related: readonly number[];
   readonly description: string;
 }
 
@@ -111,6 +115,10 @@ export interface TaskInput {
   readonly start: string;
   /** End of the task, in the compact format, empty when it is not finished. */
   readonly end: string;
+  /** The ids of the tasks that block this one. */
+  readonly blockedBy: readonly number[];
+  /** The ids of the tasks that are related to this one. */
+  readonly related: readonly number[];
 }
 
 export const EMPTY_TASK_INPUT: TaskInput = {
@@ -120,6 +128,8 @@ export const EMPTY_TASK_INPUT: TaskInput = {
   tags: [],
   start: '',
   end: '',
+  blockedBy: [],
+  related: [],
 };
 
 export function isTaskStatus(value: string): value is TaskStatus {
@@ -294,13 +304,21 @@ function sanitizeMetaValue(value: string): string {
   return value.replace(/[\r\n]+/gu, ' ').trim();
 }
 
+/** The metadata block of a file and the text that follows it. */
+export interface MetadataBlock {
+  /** The keys of the metadata block, in lower case. */
+  readonly metadata: ReadonlyMap<string, string>;
+  /** The text that follows the separator. */
+  readonly description: string;
+}
+
 /**
- * Parses the content of a task file.
+ * Splits the content of a file into its metadata block and its description.
  *
- * `idHint` is used when the file has no `id` key (for example when the file name
- * is the only source of truth).
+ * The metadata block is made of `key=value` lines and ends with a line that
+ * contains only the separator. Everything after it is the description.
  */
-export function parseTask(content: string, idHint?: number): Task {
+export function parseMetadataBlock(content: string): MetadataBlock {
   const lines = content.replace(/\r\n/gu, '\n').split('\n');
   const metadata = new Map<string, string>();
   let descriptionLines: string[] = [];
@@ -335,6 +353,41 @@ export function parseTask(content: string, idHint?: number): Task {
     .replace(/^\n+/u, '')
     .replace(/\s+$/u, '');
 
+  return { metadata, description };
+}
+
+/**
+ * Parses a list of task ids separated by commas.
+ *
+ * The invalid ids and the duplicates are left out.
+ */
+export function parseIdList(value: string): number[] {
+  const ids: number[] = [];
+  const seen = new Set<number>();
+  for (const part of value.split(',')) {
+    const trimmed = part.trim();
+    if (trimmed.length === 0) {
+      continue;
+    }
+    const id = Number.parseInt(trimmed, 10);
+    if (!Number.isSafeInteger(id) || id <= 0 || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+/**
+ * Parses the content of a task file.
+ *
+ * `idHint` is used when the file has no `id` key (for example when the file name
+ * is the only source of truth).
+ */
+export function parseTask(content: string, idHint?: number): Task {
+  const { metadata, description } = parseMetadataBlock(content);
+
   const rawStatus = metadata.get('status') ?? '';
   const status: TaskStatus = isTaskStatus(rawStatus) ? rawStatus : 'todo';
   const fileId = parseInteger(metadata.get('id'));
@@ -349,6 +402,8 @@ export function parseTask(content: string, idHint?: number): Task {
     updated: normalizeTaskTimestamp(metadata.get('updated') ?? ''),
     start: normalizeTaskTimestamp(metadata.get('start') ?? ''),
     end: normalizeTaskTimestamp(metadata.get('end') ?? ''),
+    blockedBy: parseIdList(metadata.get('blocked_by') ?? ''),
+    related: parseIdList(metadata.get('related') ?? ''),
     description,
   };
 }
@@ -370,6 +425,12 @@ export function serializeTask(task: Task): string {
   lines.push(`updated=${sanitizeMetaValue(task.updated)}`);
   lines.push(`start=${sanitizeMetaValue(task.start)}`);
   lines.push(`end=${sanitizeMetaValue(task.end)}`);
+  if (task.blockedBy.length > 0) {
+    lines.push(`blocked_by=${task.blockedBy.join(',')}`);
+  }
+  if (task.related.length > 0) {
+    lines.push(`related=${task.related.join(',')}`);
+  }
   lines.push(METADATA_SEPARATOR);
 
   const description = task.description.replace(/\r\n/gu, '\n').replace(/^\n+/u, '').replace(/\s+$/u, '');
@@ -394,6 +455,8 @@ export function buildTask(
     updated: timestamp,
     start: input.start,
     end: input.end,
+    blockedBy: [...input.blockedBy],
+    related: [...input.related],
     description: input.description,
   };
 }
@@ -407,6 +470,8 @@ export function applyTaskInput(task: Task, input: TaskInput, now: Date): Task {
     tags: normalizeTags(input.tags),
     start: input.start,
     end: input.end,
+    blockedBy: [...input.blockedBy],
+    related: [...input.related],
     updated: formatTaskTimestamp(now),
     description: input.description,
   };

@@ -10,6 +10,7 @@ import {
   METADATA_SEPARATOR,
   normalizeTags,
   normalizeTaskTimestamp,
+  parseIdList,
   parseTask,
   parseTaskIdFromFileName,
   parseTaskTimestamp,
@@ -135,6 +136,8 @@ describe('the date pickers', () => {
         tags: [],
         start: '20261001000000000',
         end: '20261020000000000',
+        blockedBy: [],
+        related: [],
       },
       3,
       now,
@@ -151,11 +154,106 @@ describe('the date pickers', () => {
         tags: [],
         start: '20261101000000000',
         end: '20261120000000000',
+        blockedBy: [],
+        related: [],
       },
       now,
     );
     expect(updated.start).toBe('20261101000000000');
     expect(updated.end).toBe('20261120000000000');
+  });
+});
+
+describe('the blocking and the related tasks', () => {
+  it('parses a list of ids', () => {
+    expect(parseIdList('3,5, 7')).toEqual([3, 5, 7]);
+    expect(parseIdList('')).toEqual([]);
+    expect(parseIdList('3, 3, 5')).toEqual([3, 5]);
+    expect(parseIdList('0,-2,abc')).toEqual([]);
+  });
+
+  it('reads the relations of a task', () => {
+    const task = parseTask(
+      [
+        'id=1',
+        'title=Blocked',
+        'blocked_by=3,5',
+        'related=7,9',
+        '----',
+        'body',
+      ].join('\n'),
+    );
+
+    expect(task.blockedBy).toEqual([3, 5]);
+    expect(task.related).toEqual([7, 9]);
+  });
+
+  it('has no relation when the keys are missing', () => {
+    const task = parseTask('id=1\ntitle=Alone\n----\nbody');
+
+    expect(task.blockedBy).toEqual([]);
+    expect(task.related).toEqual([]);
+  });
+
+  it('writes the relations only when there are some', () => {
+    const base = {
+      id: 1,
+      title: 'T',
+      status: 'todo' as const,
+      parentId: null,
+      tags: [],
+      created: '',
+      updated: '',
+      start: '',
+      end: '',
+      blockedBy: [] as number[],
+      related: [] as number[],
+      description: '',
+    };
+
+    expect(serializeTask(base)).not.toContain('blocked_by');
+    expect(serializeTask(base)).not.toContain('related=');
+    expect(serializeTask({ ...base, blockedBy: [3, 5] })).toContain('blocked_by=3,5');
+    expect(serializeTask({ ...base, related: [7] })).toContain('related=7');
+  });
+
+  it('keeps the relations when a task is edited', () => {
+    const now = new Date(2026, 4, 5, 10, 0, 0, 0);
+    const original = buildTask(
+      {
+        title: 'Related',
+        description: '',
+        status: 'todo',
+        tags: [],
+        start: '',
+        end: '',
+        blockedBy: [3],
+        related: [7],
+      },
+      2,
+      now,
+    );
+
+    expect(original.blockedBy).toEqual([3]);
+    expect(original.related).toEqual([7]);
+
+    const updated = applyTaskInput(
+      original,
+      {
+        title: 'Related',
+        description: '',
+        status: 'doing',
+        tags: [],
+        start: '',
+        end: '',
+        blockedBy: [4, 5],
+        related: [8],
+      },
+      now,
+    );
+
+    expect(updated.blockedBy).toEqual([4, 5]);
+    expect(updated.related).toEqual([8]);
   });
 });
 
@@ -288,6 +386,8 @@ describe('serializeTask', () => {
       start: '20261020110000000',
       end: '20261021120000000',
       description: 'Some description',
+      blockedBy: [],
+      related: [],
     };
 
     expect(serializeTask(task)).toBe(
@@ -318,6 +418,8 @@ describe('serializeTask', () => {
       start: '',
       end: '',
       description: '',
+      blockedBy: [],
+      related: [],
     };
     expect(serializeTask({ ...base, parentId: null })).not.toContain('parent=');
     expect(serializeTask({ ...base, parentId: 4 })).toContain('parent=4');
@@ -335,6 +437,8 @@ describe('serializeTask', () => {
       start: '',
       end: '',
       description: '',
+      blockedBy: [],
+      related: [],
     };
     const content = serializeTask(task);
     expect(content).toContain('title=first second');
@@ -355,6 +459,8 @@ describe('round trip', () => {
       start: '20260103000000000',
       end: '20260104000000000',
       description: 'Line one\nLine two',
+      blockedBy: [],
+      related: [],
     };
 
     const parsed = parseTask(serializeTask(original));
@@ -373,6 +479,8 @@ describe('round trip', () => {
       start: '',
       end: '',
       description: 'a=b\nc ---- d',
+      blockedBy: [],
+      related: [],
     };
     expect(parseTask(serializeTask(original))).toEqual(original);
   });
@@ -382,7 +490,7 @@ describe('buildTask and applyTaskInput', () => {
   it('stamps the creation and update time', () => {
     const now = new Date(2026, 4, 5, 10, 0, 0, 0);
     const task = buildTask(
-      { title: '  Trimmed  ', description: 'body', status: 'todo', tags: ['x', 'y'], start: '', end: '' },
+      { title: '  Trimmed  ', description: 'body', status: 'todo', tags: ['x', 'y'], start: '', end: '', blockedBy: [], related: [] },
       3,
       now,
     );
@@ -398,7 +506,7 @@ describe('buildTask and applyTaskInput', () => {
 
   it('builds a child task that points to its parent', () => {
     const task = buildTask(
-      { title: 'Child', description: '', status: 'todo', tags: [], start: '', end: '' },
+      { title: 'Child', description: '', status: 'todo', tags: [], start: '', end: '', blockedBy: [], related: [] },
       4,
       new Date('2026-05-05T10:00:00.000Z'),
       3,
@@ -411,13 +519,13 @@ describe('buildTask and applyTaskInput', () => {
   it('keeps the id and the creation time when editing', () => {
     const now = new Date(2026, 4, 5, 10, 0, 0, 0);
     const original = buildTask(
-      { title: 'First', description: 'body', status: 'todo', tags: [], start: '', end: '' },
+      { title: 'First', description: 'body', status: 'todo', tags: [], start: '', end: '', blockedBy: [], related: [] },
       9,
       new Date(2026, 0, 1, 0, 0, 0, 0),
     );
     const updated = applyTaskInput(
       original,
-      { title: 'Second', description: 'new body', status: 'done', tags: ['t'], start: '', end: '' },
+      { title: 'Second', description: 'new body', status: 'done', tags: ['t'], start: '', end: '', blockedBy: [], related: [] },
       now,
     );
     expect(updated.id).toBe(9);
@@ -431,7 +539,7 @@ describe('buildTask and applyTaskInput', () => {
 
 describe('withParent', () => {
   const original = buildTask(
-    { title: 'Movable', description: 'body', status: 'todo', tags: ['t'], start: '', end: '' },
+    { title: 'Movable', description: 'body', status: 'todo', tags: ['t'], start: '', end: '', blockedBy: [], related: [] },
     7,
     new Date(2026, 0, 1, 0, 0, 0, 0),
     3,

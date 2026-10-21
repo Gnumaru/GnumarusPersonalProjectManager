@@ -336,6 +336,128 @@ describe('App', () => {
     expect(file).not.toContain('start=2026');
   });
 
+  it('adds the tasks that block a task and the tasks that are related to it', async () => {
+    const harness = await createHarness(3);
+    await selectFolder(harness);
+
+    const editButtons = harness.root.querySelectorAll<HTMLButtonElement>('.row-action');
+    click(editButtons[1]);
+    await flush();
+
+    // The editor holds a field for the blocking tasks and one for the related
+    // ones.
+    const fields = [...harness.doc.querySelectorAll('.id-list')];
+    expect(fields).toHaveLength(2);
+
+    const addId = (field: Element, id: string): void => {
+      const input = field.querySelector<HTMLInputElement>('.id-list-input');
+      if (input === null) {
+        return;
+      }
+      input.value = id;
+      input.dispatchEvent(
+        new harness.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      );
+    };
+
+    addId(fields[0] as Element, '3');
+    addId(fields[1] as Element, '2');
+
+    const chips = [...harness.doc.querySelectorAll('.id-chip-label')].map(
+      (chip) => chip.textContent,
+    );
+    expect(chips).toEqual(['#3', '#2']);
+
+    click(buttonByText(harness.doc, 'Save changes'));
+    await flush();
+
+    // The relations are written in the file of the task.
+    const file = harness.bridge.files.get('/home/user/projects/task_1.txt');
+    expect(file).toContain('blocked_by=3');
+    expect(file).toContain('related=2');
+  });
+
+  it('refuses to add the task itself as a blocker or as a related task', async () => {
+    const harness = await createHarness(3);
+    await selectFolder(harness);
+
+    const editButtons = harness.root.querySelectorAll<HTMLButtonElement>('.row-action');
+    click(editButtons[1]);
+    await flush();
+
+    const field = harness.doc.querySelector('.id-list');
+    const input = field?.querySelector<HTMLInputElement>('.id-list-input');
+    if (input === null || input === undefined) {
+      return;
+    }
+    input.value = '1';
+    input.dispatchEvent(
+      new harness.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    );
+
+    expect(harness.doc.querySelectorAll('.id-chip-label')).toHaveLength(0);
+  });
+
+  it('writes, edits and deletes the comments of a task', async () => {
+    const harness = await createHarness(3);
+    await selectFolder(harness);
+
+    const editButtons = harness.root.querySelectorAll<HTMLButtonElement>('.row-action');
+    click(editButtons[1]);
+    await flush();
+
+    // The editor shows the comments of the task.
+    expect(harness.doc.querySelector('.task-comments')).not.toBeNull();
+    expect(harness.doc.querySelector('.task-comments-empty')).not.toBeNull();
+
+    // A new comment is written in its own file.
+    const newComment = harness.doc.querySelector<HTMLTextAreaElement>('.task-comment-new');
+    expect(newComment).not.toBeNull();
+    if (newComment === null) {
+      return;
+    }
+    newComment.value = 'The first comment';
+    click(buttonByText(harness.doc, 'Add comment'));
+    await flush();
+
+    const commentFile = harness.bridge.files.get('/home/user/projects/comment_1.txt');
+    expect(commentFile).toContain('id=1');
+    expect(commentFile).toContain('task=1');
+    expect(commentFile).toContain('The first comment');
+
+    // The comment shows up in the list.
+    const comments = [...harness.doc.querySelectorAll('.task-comment')];
+    expect(comments).toHaveLength(1);
+    expect(comments[0]?.querySelector('.task-comment-text')?.textContent).toBe('The first comment');
+
+    // The comment is edited.
+    click(buttonByText(harness.doc, 'Edit'));
+    await flush();
+    const editor = harness.doc.querySelector<HTMLTextAreaElement>('.task-comment-editor');
+    expect(editor).not.toBeNull();
+    if (editor === null) {
+      return;
+    }
+    editor.value = 'The edited comment';
+    click(buttonByText(harness.doc, 'Save'));
+    await flush();
+
+    const editedFile = harness.bridge.files.get('/home/user/projects/comment_1.txt');
+    expect(editedFile).toContain('The edited comment');
+    expect(
+      harness.doc.querySelector('.task-comment-text')?.textContent,
+    ).toBe('The edited comment');
+
+    // The comment is deleted.
+    click(buttonByText(harness.doc, 'Delete'));
+    await flush();
+
+    expect(harness.bridge.files.has('/home/user/projects/comment_1.txt')).toBe(false);
+    expect(harness.doc.querySelectorAll('.task-comment')).toHaveLength(0);
+
+    harness.app.dispose();
+  });
+
   it('creates, edits and deletes a task', async () => {
     const harness = await createHarness(3);
     await selectFolder(harness);

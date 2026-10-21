@@ -60,6 +60,8 @@ describeLive('TaskRepository against the live service', () => {
       tags: ['tests', 'bridge'],
       start: '',
       end: '',
+      blockedBy: [],
+      related: [],
     });
 
     expect(task.id).toBe(1);
@@ -81,6 +83,8 @@ describeLive('TaskRepository against the live service', () => {
       tags: [],
       start: '',
       end: '',
+      blockedBy: [],
+      related: [],
     });
     await api.execShell({ command: `mkdir -p -- '${testDirectory}/nested'` });
     await api.execShell({
@@ -101,6 +105,8 @@ describeLive('TaskRepository against the live service', () => {
         tags: ['filler'],
         start: '',
         end: '',
+        blockedBy: [],
+        related: [],
       });
     }
 
@@ -140,6 +146,8 @@ describeLive('TaskRepository against the live service', () => {
       tags: ['updated'],
       start: '',
       end: '',
+      blockedBy: [],
+      related: [],
     });
 
     expect(updated.id).toBe(1);
@@ -172,6 +180,8 @@ describeLive('TaskRepository against the live service', () => {
       tags: [],
       start: '',
       end: '',
+      blockedBy: [],
+      related: [],
     });
 
     const child = await repository.createTask(
@@ -183,6 +193,8 @@ describeLive('TaskRepository against the live service', () => {
         tags: ['child'],
         start: '',
         end: '',
+        blockedBy: [],
+        related: [],
       },
       parent.id,
     );
@@ -201,7 +213,7 @@ describeLive('TaskRepository against the live service', () => {
     await expect(
       repository.createTask(
         testDirectory,
-        { title: 'Orphan', description: '', status: 'todo', tags: [], start: '', end: '' },
+        { title: 'Orphan', description: '', status: 'todo', tags: [], start: '', end: '', blockedBy: [], related: [] },
         9999,
       ),
     ).rejects.toThrow('does not exist');
@@ -215,10 +227,12 @@ describeLive('TaskRepository against the live service', () => {
       tags: [],
       start: '',
       end: '',
+      blockedBy: [],
+      related: [],
     });
     await repository.createTask(
       testDirectory,
-      { title: 'Counted child', description: '', status: 'todo', tags: [], start: '', end: '' },
+      { title: 'Counted child', description: '', status: 'todo', tags: [], start: '', end: '', blockedBy: [], related: [] },
       parent.id,
     );
 
@@ -234,15 +248,17 @@ describeLive('TaskRepository against the live service', () => {
       tags: [],
       start: '',
       end: '',
+      blockedBy: [],
+      related: [],
     });
     const first = await repository.createTask(
       testDirectory,
-      { title: 'Son', description: '', status: 'todo', tags: [], start: '', end: '' },
+      { title: 'Son', description: '', status: 'todo', tags: [], start: '', end: '', blockedBy: [], related: [] },
       parent.id,
     );
     const second = await repository.createTask(
       testDirectory,
-      { title: 'Daughter', description: '', status: 'todo', tags: [], start: '', end: '' },
+      { title: 'Daughter', description: '', status: 'todo', tags: [], start: '', end: '', blockedBy: [], related: [] },
       parent.id,
     );
 
@@ -261,6 +277,8 @@ describeLive('TaskRepository against the live service', () => {
       tags: [],
       start: '',
       end: '',
+      blockedBy: [],
+      related: [],
     });
 
     const file = await api.readFile(repository.taskPath(testDirectory, task.id));
@@ -272,6 +290,61 @@ describeLive('TaskRepository against the live service', () => {
     expect(file.content).not.toContain('T');
   });
 
+  it('creates, reads, edits and deletes the comments of a task', async () => {
+    const task = await repository.createTask(testDirectory, {
+      title: 'Commented task',
+      description: '',
+      status: 'todo',
+      tags: [],
+      start: '',
+      end: '',
+      blockedBy: [],
+      related: [],
+    });
+
+    const comment = await repository.createComment(testDirectory, task.id, 'The first comment');
+    expect(comment.id).toBeGreaterThan(0);
+    expect(comment.taskId).toBe(task.id);
+    expect(comment.text).toBe('The first comment');
+
+    // The comment is a file of its own, in the format of the task files.
+    const path = `${testDirectory}/comment_${comment.id}.txt`;
+    const file = await api.readFile(path);
+    expect(file.content).toContain(`id=${comment.id}`);
+    expect(file.content).toContain(`task=${task.id}`);
+    expect(file.content).toContain('----');
+    expect(file.content).toContain('The first comment');
+
+    // The comments of the task are listed, the most recent first.
+    const second = await repository.createComment(testDirectory, task.id, 'The second comment');
+    const comments = await repository.listComments(testDirectory, task.id);
+    expect(comments.map((entry) => entry.text)).toEqual(['The second comment', 'The first comment']);
+    expect(comments.map((entry) => entry.id)).toEqual([second.id, comment.id]);
+
+    // The comments of the other tasks are not listed.
+    const other = await repository.createTask(testDirectory, {
+      title: 'Other task',
+      description: '',
+      status: 'todo',
+      tags: [],
+      start: '',
+      end: '',
+      blockedBy: [],
+      related: [],
+    });
+    expect(await repository.listComments(testDirectory, other.id)).toHaveLength(0);
+
+    // The text of a comment is edited.
+    await repository.updateComment(path, 'The edited comment');
+    const edited = await repository.loadComment(path);
+    expect(edited.text).toBe('The edited comment');
+    expect(edited.id).toBe(comment.id);
+
+    // A comment is deleted.
+    await repository.deleteComment(path);
+    expect(await repository.listComments(testDirectory, task.id)).toHaveLength(1);
+  });
+
   it('reads the hierarchy of the tasks', async () => {
     const root = await repository.createTask(testDirectory, {
       title: 'Hierarchy root',
@@ -280,10 +353,12 @@ describeLive('TaskRepository against the live service', () => {
       tags: [],
       start: '',
       end: '',
+      blockedBy: [],
+      related: [],
     });
     const child = await repository.createTask(
       testDirectory,
-      { title: 'Hierarchy child', description: '', status: 'todo', tags: [], start: '', end: '' },
+      { title: 'Hierarchy child', description: '', status: 'todo', tags: [], start: '', end: '', blockedBy: [], related: [] },
       root.id,
     );
 
@@ -303,6 +378,8 @@ describeLive('TaskRepository against the live service', () => {
       tags: [],
       start: '',
       end: '',
+      blockedBy: [],
+      related: [],
     });
     const second = await repository.createTask(testDirectory, {
       title: 'Second parent',
@@ -311,10 +388,12 @@ describeLive('TaskRepository against the live service', () => {
       tags: [],
       start: '',
       end: '',
+      blockedBy: [],
+      related: [],
     });
     const child = await repository.createTask(
       testDirectory,
-      { title: 'Moved child', description: '', status: 'todo', tags: [], start: '', end: '' },
+      { title: 'Moved child', description: '', status: 'todo', tags: [], start: '', end: '', blockedBy: [], related: [] },
       first.id,
     );
 

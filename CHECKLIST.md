@@ -12,6 +12,7 @@
 - [x] `src/core/task.ts` - task file format (parse, serialize, file name helpers)
 - [x] `src/core/task.ts` - the seven statuses: `planning`, `next`, `todo`,
       `doing`, `paused`, `done`, `canceled`
+- [x] `src/core/task.ts` - the `blocked_by` and the `related` keys
 - [x] `src/core/task.ts` - the compact timestamps `YYYYMMDDHHNNSSIII` (local
       time, no timezone), the old ISO format is still read
 - [x] `src/core/task.ts` - the `start` and `end` dates of a task
@@ -210,13 +211,18 @@
       **End** dates, formatted for the user
 - [x] The editor holds a **date picker** for the start date and for the end date
 - [x] The end date cannot be before the start date
+- [x] The editor holds a field for the **blocking** and for the **related**
+      tasks: the ids become chips that can be removed
+- [x] A task cannot block itself nor be related to itself
+- [x] The view of a task shows the blocking and the related tasks
 
 ### Tests
 - [x] `src/core/task.test.ts` - the compact format, the migration of the old
-      format, the start and the end dates, the conversion for the date pickers
+      format, the start and the end dates, the conversion for the date pickers,
+      the blocking and the related tasks
 - [x] `src/core/taskRepository.test.ts` - the file written by the live bridge
 - [x] `src/ui/widgets.test.ts`, `src/ui/app.test.ts` - the fixtures, the date
-      pickers of the editor
+      pickers of the editor, the blocking and the related tasks
 
 ### Build / deploy
 - [x] `npm run verify`
@@ -264,6 +270,32 @@
 - [x] `src/ui/app.test.ts` - the chart in the application, the collapse and the
       drag of a bar
 - [x] `scripts/e2e-browser.mjs` - the chart driven by a real browser
+
+### Build / deploy
+- [x] `npm run verify`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
+## Batch 8 - The comments of the tasks
+
+### Core (pure, unit tested)
+- [x] `src/core/comment.ts` - the format of the comment files (`comment_<id>.txt`)
+- [x] The ids of the comments are incremental integers, unique in the project
+- [x] The comments are sorted by creation, the most recent first
+
+### Data layer
+- [x] `TaskRepository.listComments` finds the comments of a task with a `grep`
+      on the `task=` key
+- [x] `TaskRepository.createComment`, `updateComment` and `deleteComment`
+
+### User interface
+- [x] The editor of a task shows the comments, the most recent first
+- [x] A comment can be created, edited and deleted
+
+### Tests
+- [x] `src/core/comment.test.ts` - the format, the names and the order
+- [x] `src/core/taskRepository.test.ts` - the comments against the live bridge
+- [x] `src/ui/app.test.ts` - the comments in the editor
+- [x] `scripts/e2e-browser.mjs` - a comment written by a real browser
 
 ### Build / deploy
 - [x] `npm run verify`

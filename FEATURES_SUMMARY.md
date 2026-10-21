@@ -48,6 +48,11 @@ list or as a tree.
 | Unique incremental task id | Done | `src/core/taskRepository.ts` |
 | Automatic id allocation, collision safe | Done | `src/core/taskRepository.ts` |
 | `parent=<id>` key written and read for the child tasks | Done | `src/core/task.ts` |
+| **`blocked_by=...`: the tasks that block a task** | Done | `src/core/task.ts` |
+| **`related=...`: the tasks that are related to a task** | Done | `src/core/task.ts` |
+| **The blocking and the related tasks are edited in the editor** | Done | `src/ui/idListField.ts` |
+| **The comments of a task, one file `comment_<id>.txt` each** | Done | `src/core/comment.ts` |
+| **The comments are listed, created, edited and deleted in the editor** | Done | `src/ui/taskDialog.ts` |
 | **A task moved under another one (drag and drop)** | Done | `src/core/task.ts`, `src/core/taskRepository.ts` |
 | **Dates written in the compact format `YYYYMMDDHHNNSSIII` (local time, no timezone)** | Done | `src/core/task.ts` |
 | **`start=...` and `end=...`: the start and the end date of a task** | Done | `src/core/task.ts` |

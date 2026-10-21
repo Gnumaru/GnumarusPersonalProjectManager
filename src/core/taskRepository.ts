@@ -9,8 +9,18 @@
 
 import { ApiClient, ApiError } from '../api/client.js';
 import {
+  buildComment,
+  commentFileName,
+  parseComment,
+  parseCommentIdFromFileName,
+  serializeComment,
+  sortComments,
+  type TaskComment,
+} from './comment.js';
+import {
   applyTaskInput,
   buildTask,
+  formatTaskTimestamp,
   isTaskStatus,
   normalizeTags,
   parseTask,
@@ -72,6 +82,15 @@ export const READ_METADATA_COMMAND =
 export function childrenCommand(parentId: number): string {
   return `grep -rl --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^parent=${parentId}$' .`;
 }
+
+/** Command used to list the comment files of a task. */
+export function commentsCommand(taskId: number): string {
+  return `grep -rl --include='comment_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^task=${taskId}$' .`;
+}
+
+/** Command used to list every comment file of the project. */
+export const FIND_COMMENT_FILES_COMMAND =
+  "find . -type f -name 'comment_*.txt' -not -path '*/.git/*' -not -path '*/.svn/*' -not -path '*/.hg/*' -print";
 
 /** The metadata of a task, as it is read in one command. */
 export interface TaskMetadata {
@@ -482,6 +501,107 @@ export class TaskRepository {
     const updated = withDates(current, start, end, new Date());
     await this.api.overwriteFile(path, serializeTask(updated));
     return updated;
+  }
+
+  /**
+   * The comments of a task, the most recent first.
+   *
+   * Only the comment files of the task are read: they are found with a `grep`
+   * on the `task=` key.
+   */
+  async listComments(projectDir: string, taskId: number): Promise<TaskComment[]> {
+    const result = await this.api.execShell({
+      command: commentsCommand(taskId),
+      cwd: projectDir,
+      timeout: 60,
+    });
+    if (result.returncode !== 0 && result.returncode !== 1) {
+      throw new Error(
+        `Unable to list the comments of the task #${taskId}: ${result.stderr.trim() || `exit code ${result.returncode}`}`,
+      );
+    }
+
+    const comments: TaskComment[] = [];
+    for (const path of this.parsePaths(result.stdout, projectDir)) {
+      try {
+        comments.push(await this.loadComment(path));
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          // The file disappeared between the listing and the read.
+          continue;
+        }
+        throw error;
+      }
+    }
+    return sortComments(comments);
+  }
+
+  /** Reads a single comment file. */
+  async loadComment(path: string): Promise<TaskComment> {
+    const file = await this.api.readFile(path);
+    const name = path.slice(path.lastIndexOf('/') + 1);
+    return parseComment(file.content, parseCommentIdFromFileName(name) ?? undefined);
+  }
+
+  /** Creates a comment on a task. */
+  async createComment(projectDir: string, taskId: number, text: string): Promise<TaskComment> {
+    let id = await this.nextCommentId(projectDir);
+
+    // The id must be unique: retry with the next one when the file exists.
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const path = joinPath(projectDir, commentFileName(id));
+      const comment = buildComment(id, taskId, text, new Date());
+      try {
+        await this.api.createFile(path, serializeComment(comment));
+        return comment;
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 409) {
+          id += 1;
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error('Unable to allocate a free comment id');
+  }
+
+  /** Changes the text of a comment. */
+  async updateComment(path: string, text: string): Promise<TaskComment> {
+    const current = await this.loadComment(path);
+    const updated: TaskComment = {
+      ...current,
+      text,
+      updated: formatTaskTimestamp(new Date()),
+    };
+    await this.api.overwriteFile(path, serializeComment(updated));
+    return updated;
+  }
+
+  /** Deletes a comment file. */
+  async deleteComment(path: string): Promise<void> {
+    await this.api.deleteFile(path);
+  }
+
+  /** The id that will be used for the next comment created in `projectDir`. */
+  async nextCommentId(projectDir: string): Promise<number> {
+    const result = await this.api.execShell({
+      command: FIND_COMMENT_FILES_COMMAND,
+      cwd: projectDir,
+      timeout: 60,
+    });
+    if (result.returncode !== 0 && result.returncode !== 1) {
+      throw new Error(
+        `Unable to list the comments of "${projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
+      );
+    }
+    const ids: number[] = [];
+    for (const path of this.parsePaths(result.stdout, projectDir)) {
+      const id = parseCommentIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
+      if (id !== null) {
+        ids.push(id);
+      }
+    }
+    return ids.length === 0 ? 1 : Math.max(...ids) + 1;
   }
 
   /** Deletes a task file. */

@@ -10,7 +10,9 @@ import {
   type TaskInput,
   type TaskStatus,
 } from '../core/task.js';
-import { button, el, formatTimestamp, input, select, textArea } from './dom.js';
+import { button, clear, el, formatTimestamp, input, select, textArea } from './dom.js';
+import type { TaskComment } from '../core/comment.js';
+import { IdListField } from './idListField.js';
 import { createIcon } from './icons.js';
 import { Modal } from './modal.js';
 
@@ -32,6 +34,14 @@ export interface TaskDialogOptions {
   readonly onAddChild?: (() => void) | undefined;
   /** Called when the user clicks one of the children. */
   readonly onOpenChild?: ((child: Task) => void) | undefined;
+  /** Reads the comments of a task. */
+  readonly onLoadComments?: ((taskId: number) => Promise<TaskComment[]>) | undefined;
+  /** Adds a comment to a task. */
+  readonly onAddComment?: ((taskId: number, text: string) => Promise<void>) | undefined;
+  /** Changes the text of a comment. */
+  readonly onUpdateComment?: ((taskId: number, commentId: number, text: string) => Promise<void>) | undefined;
+  /** Deletes a comment. */
+  readonly onDeleteComment?: ((taskId: number, commentId: number) => Promise<void>) | undefined;
   readonly onCancel?: (() => void) | undefined;
 }
 
@@ -46,6 +56,12 @@ export class TaskDialog {
   private readonly onEdit: (() => void) | undefined;
   private readonly onAddChild: (() => void) | undefined;
   private readonly onOpenChild: ((child: Task) => void) | undefined;
+  private readonly onLoadComments: ((taskId: number) => Promise<TaskComment[]>) | undefined;
+  private readonly onAddComment: ((taskId: number, text: string) => Promise<void>) | undefined;
+  private readonly onUpdateComment:
+    | ((taskId: number, commentId: number, text: string) => Promise<void>)
+    | undefined;
+  private readonly onDeleteComment: ((taskId: number, commentId: number) => Promise<void>) | undefined;
   private readonly onCancel: (() => void) | undefined;
   private readonly modal: Modal;
 
@@ -57,6 +73,17 @@ export class TaskDialog {
   private descriptionInput: HTMLTextAreaElement | null = null;
   private errorLabel: HTMLDivElement | null = null;
   private confirmingDelete = false;
+  /** The ids of the tasks that block the task. */
+  private blockedByIds: number[];
+  /** The ids of the tasks that are related to the task. */
+  private relatedIds: number[];
+  /** The comments of the task, the most recent first. */
+  private comments: TaskComment[] = [];
+  /** The comment that is being edited, `null` when none is. */
+  private editingCommentId: number | null = null;
+  /** The text of the comment that is being written. */
+  private newCommentText = '';
+  private commentsElement: HTMLElement | null = null;
 
   constructor(options: TaskDialogOptions) {
     this.doc = options.doc;
@@ -69,7 +96,13 @@ export class TaskDialog {
     this.onEdit = options.onEdit;
     this.onAddChild = options.onAddChild;
     this.onOpenChild = options.onOpenChild;
+    this.onLoadComments = options.onLoadComments;
+    this.onAddComment = options.onAddComment;
+    this.onUpdateComment = options.onUpdateComment;
+    this.onDeleteComment = options.onDeleteComment;
     this.onCancel = options.onCancel;
+    this.blockedByIds = [...(options.task?.blockedBy ?? [])];
+    this.relatedIds = [...(options.task?.related ?? [])];
 
     const title =
       options.mode === 'create'
@@ -89,6 +122,27 @@ export class TaskDialog {
   /** Opens the dialog. */
   open(): void {
     this.modal.open();
+    void this.loadComments();
+  }
+
+  /**
+   * Reads the comments of the task.
+   *
+   * The comments are only shown when the task already exists: a task that is
+   * being created has no comment yet.
+   */
+  private async loadComments(): Promise<void> {
+    const task = this.task;
+    if (task === undefined || this.onLoadComments === undefined) {
+      return;
+    }
+    try {
+      this.comments = await this.onLoadComments(task.id);
+    } catch (error) {
+      this.comments = [];
+      this.setError(error instanceof Error ? error.message : String(error));
+    }
+    this.renderComments();
   }
 
   private render(): void {
@@ -110,6 +164,14 @@ export class TaskDialog {
       this.definitionRow('Updated', task.updated.length > 0 ? formatTimestamp(task.updated) : '—'),
       this.definitionRow('Start', task.start.length > 0 ? formatTimestamp(task.start) : '—'),
       this.definitionRow('End', task.end.length > 0 ? formatTimestamp(task.end) : '—'),
+      this.definitionRow(
+        'Blocked by',
+        task.blockedBy.length === 0 ? '—' : task.blockedBy.map((id) => `#${id}`).join('  '),
+      ),
+      this.definitionRow(
+        'Related',
+        task.related.length === 0 ? '—' : task.related.map((id) => `#${id}`).join('  '),
+      ),
     ];
 
     const description = el(this.doc, 'div', {
@@ -301,6 +363,29 @@ export class TaskDialog {
       title: 'The day the task ends',
     });
 
+    // The tasks that block this one and the tasks that are related to it.
+    const blockedByField = new IdListField({
+      doc: this.doc,
+      label: 'Blocked by',
+      placeholder: 'id of the task, then Enter',
+      values: this.blockedByIds,
+      excluded: task === undefined ? [] : [task.id],
+      onChange: (values) => {
+        this.blockedByIds = values;
+      },
+    });
+
+    const relatedField = new IdListField({
+      doc: this.doc,
+      label: 'Related tasks',
+      placeholder: 'id of the task, then Enter',
+      values: this.relatedIds,
+      excluded: task === undefined ? [] : [task.id],
+      onChange: (values) => {
+        this.relatedIds = values;
+      },
+    });
+
     this.descriptionInput = textArea(this.doc, {
       class: 'field-input',
       id: 'task-description',
@@ -356,12 +441,21 @@ export class TaskDialog {
           this.endInput,
         ]),
       ]),
+      el(this.doc, 'div', { class: 'field-row field-row-even' }, [
+        blockedByField.element,
+        relatedField.element,
+      ]),
       el(this.doc, 'label', { class: 'field', attrs: { for: 'task-description' } }, [
         el(this.doc, 'span', { class: 'field-label', text: 'Description' }),
         this.descriptionInput,
       ]),
       this.errorLabel,
     );
+
+    // The comments of the task, below the form.
+    this.commentsElement = el(this.doc, 'div', { class: 'task-comments' });
+    formChildren.push(this.commentsElement);
+    this.renderComments();
 
     const form = el(
       this.doc,
@@ -433,6 +527,194 @@ export class TaskDialog {
     this.modal.setFooter(footerChildren);
   }
 
+  /**
+   * Draws the comments of the task, the most recent first.
+   *
+   * The section is only shown when the task already exists: a task that is
+   * being created has no comment yet.
+   */
+  private renderComments(): void {
+    const container = this.commentsElement;
+    if (container === null) {
+      return;
+    }
+    clear(container);
+
+    const task = this.task;
+    if (task === undefined) {
+      return;
+    }
+
+    container.append(
+      el(this.doc, 'div', { class: 'task-comments-header' }, [
+        el(this.doc, 'span', { class: 'field-label', text: 'Comments' }),
+        el(this.doc, 'span', {
+          class: 'task-comments-count',
+          text: String(this.comments.length),
+        }),
+      ]),
+    );
+
+    if (this.comments.length === 0) {
+      container.append(
+        el(this.doc, 'p', {
+          class: 'task-comments-empty',
+          text: 'This task has no comment yet.',
+        }),
+      );
+    }
+
+    for (const comment of this.comments) {
+      container.append(this.renderComment(comment));
+    }
+
+    container.append(this.renderNewComment());
+  }
+
+  /** One comment of the list, with its actions. */
+  private renderComment(comment: TaskComment): HTMLElement {
+    const element = el(this.doc, 'article', { class: 'task-comment' });
+    element.dataset['commentId'] = String(comment.id);
+
+    const isEditing = this.editingCommentId === comment.id;
+
+    const meta = el(this.doc, 'div', { class: 'task-comment-meta' }, [
+      el(this.doc, 'span', {
+        class: 'task-comment-date',
+        text:
+          comment.created.length > 0 ? formatTimestamp(comment.created) : `#${comment.id}`,
+      }),
+    ]);
+
+    if (isEditing) {
+      const editor = textArea(this.doc, {
+        class: 'field-input task-comment-editor',
+        value: comment.text,
+        rows: 4,
+      });
+      meta.append(
+        button(this.doc, 'Save', {
+          class: 'primary small',
+          onClick: () => {
+            void this.saveComment(comment.id, editor.value);
+          },
+        }),
+        button(this.doc, 'Cancel', {
+          class: 'secondary small',
+          onClick: () => {
+            this.editingCommentId = null;
+            this.renderComments();
+          },
+        }),
+      );
+      element.append(meta, editor);
+      return element;
+    }
+
+    const actions = el(this.doc, 'div', { class: 'task-comment-actions' }, [
+      button(this.doc, 'Edit', {
+        class: 'secondary small',
+        onClick: () => {
+          this.editingCommentId = comment.id;
+          this.renderComments();
+        },
+      }),
+      button(this.doc, 'Delete', {
+        class: 'danger small',
+        onClick: () => {
+          void this.removeComment(comment.id);
+        },
+      }),
+    ]);
+
+    element.append(
+      meta,
+      el(this.doc, 'div', { class: 'task-comment-text', text: comment.text }),
+      actions,
+    );
+    return element;
+  }
+
+  /** The field that writes a new comment. */
+  private renderNewComment(): HTMLElement {
+    const editor = textArea(this.doc, {
+      class: 'field-input task-comment-new',
+      value: this.newCommentText,
+      placeholder: 'Write a comment…',
+      rows: 3,
+    });
+    editor.addEventListener('input', () => {
+      this.newCommentText = editor.value;
+    });
+
+    return el(this.doc, 'div', { class: 'task-comment-new-row' }, [
+      editor,
+      button(this.doc, 'Add comment', {
+        class: 'primary',
+        onClick: () => {
+          void this.addComment(editor.value);
+        },
+      }),
+    ]);
+  }
+
+  /** Adds a comment to the task. */
+  private async addComment(text: string): Promise<void> {
+    const task = this.task;
+    if (task === undefined || this.onAddComment === undefined) {
+      return;
+    }
+    const trimmed = text.trim();
+    if (trimmed.length === 0) {
+      this.setError('The comment needs a text.');
+      return;
+    }
+    try {
+      await this.onAddComment(task.id, trimmed);
+      this.newCommentText = '';
+      await this.loadComments();
+    } catch (error) {
+      this.setError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /** Changes the text of a comment. */
+  private async saveComment(commentId: number, text: string): Promise<void> {
+    const task = this.task;
+    if (task === undefined || this.onUpdateComment === undefined) {
+      return;
+    }
+    const trimmed = text.trim();
+    if (trimmed.length === 0) {
+      this.setError('The comment needs a text.');
+      return;
+    }
+    try {
+      await this.onUpdateComment(task.id, commentId, trimmed);
+      this.editingCommentId = null;
+      await this.loadComments();
+    } catch (error) {
+      this.setError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /** Deletes a comment of the task. */
+  private async removeComment(commentId: number): Promise<void> {
+    const task = this.task;
+    if (task === undefined || this.onDeleteComment === undefined) {
+      return;
+    }
+    try {
+      await this.onDeleteComment(task.id, commentId);
+      if (this.editingCommentId === commentId) {
+        this.editingCommentId = null;
+      }
+      await this.loadComments();
+    } catch (error) {
+      this.setError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   private async submit(): Promise<void> {
     const title = this.titleInput?.value.trim() ?? '';
     if (title.length === 0) {
@@ -459,6 +741,8 @@ export class TaskDialog {
       tags: normalizeTags(this.tagsInput?.value ?? ''),
       start,
       end,
+      blockedBy: this.blockedByIds,
+      related: this.relatedIds,
     };
 
     try {

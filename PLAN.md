@@ -37,6 +37,8 @@ created=20261020220000000
 updated=20261020220000000
 start=
 end=
+blocked_by=3,5
+related=7,9
 ----
 Free text description of the task.
 ```
@@ -47,6 +49,11 @@ Free text description of the task.
 * Root tasks have **no** `parent` key. Child tasks would carry `parent=<id>`.
 * `status` is one of `planning`, `next`, `todo`, `doing`, `paused`, `done` or
   `canceled` (the badge shows the name in upper case).
+* `blocked_by` holds the ids of the tasks that **block** this one: they
+  prevent its completion.
+* `related` holds the ids of the tasks that are **related** to this one: a
+  relation the user makes explicit, that is neither a blocking relation nor a
+  parent/child relation.
 * The dates are written in the compact format `YYYYMMDDHHNNSSIII` (local time,
   no timezone). A task also carries the dates of its start and of its end.
 * `tags` is a whitespace separated list (a tag can never contain whitespace).
@@ -247,6 +254,10 @@ reads no file.
 22. [x] The Gantt chart: the months follow the days (and cannot be collapsed any
     more), the weeks are numbered from the year and the day columns alternate
     between two colours.
+23. [x] The tasks that block a task and the tasks that are related to it are
+    written in the file and edited in the editor.
+24. [x] The comments of a task: a file `comment_<id>.txt` per comment, listed in
+    the editor of the task.
 
 ## Verification commands
 

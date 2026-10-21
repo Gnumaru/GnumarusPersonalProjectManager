@@ -21,6 +21,8 @@ const task: Task = {
   start: '20261003120000000',
   end: '',
   description: 'The description of the task',
+  blockedBy: [],
+  related: [],
 };
 
 describe('renderTaskRows', () => {

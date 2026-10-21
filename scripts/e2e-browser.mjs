@@ -405,6 +405,17 @@ async function runChecks() {
     document.querySelector('#task-end').value = '2026-10-23';
     return true;
   })()`);
+  // A task that blocks the new one and a task that is related to it.
+  await evaluate(`(() => {
+    const fields = [...document.querySelectorAll('.id-list')];
+    const blocked = fields[0].querySelector('.id-list-input');
+    blocked.value = '2';
+    blocked.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const related = fields[1].querySelector('.id-list-input');
+    related.value = '3';
+    related.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    return true;
+  })()`);
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Create task');
     button.click();
@@ -438,6 +449,16 @@ async function runChecks() {
     'the new task file holds the end date',
     createdContent?.content,
   );
+  check(
+    createdContent?.content?.includes('blocked_by=2') === true,
+    'the new task file holds the tasks that block it',
+    createdContent?.content,
+  );
+  check(
+    createdContent?.content?.includes('related=3') === true,
+    'the new task file holds the tasks that are related to it',
+    createdContent?.content,
+  );
 
   // --- edit -----------------------------------------------------------------
 
@@ -453,6 +474,19 @@ async function runChecks() {
     document.querySelector('#task-title').value = 'Edited by the browser test';
     return true;
   })()`);
+  // A comment is added to the task.
+  await evaluate(`(() => {
+    const editor = document.querySelector('.task-comment-new');
+    editor.value = 'A comment written by the browser test.';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Add comment');
+    button.click();
+    return true;
+  })()`);
+  await delay(1200);
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Save changes');
     button.click();
@@ -466,6 +500,20 @@ async function runChecks() {
     'the edited title was written to the file',
   );
   check(editedContent.content.includes('id=13'), 'the id of the task was preserved');
+
+  const commentContent = await apiRequest(
+    `/api/file?path=${encodeURIComponent(`${taskDirectory}/comment_1.txt`)}`,
+  );
+  check(
+    commentContent.content.includes('task=13'),
+    'the comment is written in a file of its own',
+    commentContent.content,
+  );
+  check(
+    commentContent.content.includes('A comment written by the browser test.'),
+    'the comment holds its text',
+    commentContent.content,
+  );
 
   // --- delete ---------------------------------------------------------------
 

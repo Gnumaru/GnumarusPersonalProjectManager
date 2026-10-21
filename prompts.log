@@ -51,9 +51,36 @@ na visualização gantt faça com que seja possível alterar as datas da tarefa 
 ====
 crie nos arquivos de tarefas um metadado para guardar ids de outras tarefas que bloqueiam esta tarefa. uma tarefa pode ter 0 ou mais tarefas bloqueadoras que impedem a conclusao desta. crie também nos arquivos de tarefas um metadado para guardar ids de tarefas relacionadas. uma tarefa relacionada é uma tarefa que o usuário quer explicitar que tenha relação com esta, mas não é nem uma relação de bloqueio nem uma relacao de pai ou filho. crie na modal de edicao de tarefas uma funcionalidade que permita adicionar tarefas bloqueadoras e tarefas relacionadas.
 ====
+permita que o usuario adicione comentarios em tarefas. uma tarefa pode ter 0 ou mais comentarios. ela é armazenada em arquivos txt dedicados como as tarefas, com nome no formato "comment_X.txt" sendo X o id do comentario. os ids de comentario sao numeros inteiros incrementais igual aos ids de tarefa. o formato dos arquivos de comentario é igual ao formato dos arquivos de tarefa, com uma secao de chaves e valores seguida por uma linha contendo apenas "----" e finalmente seguida pelo texto do comentario.
+na modal de edição de tarefas deve ser exibida a lista de comentários daquela tarefa, ordenados por ordem de criação do mais recente pro mais antigo (mais recente primeiro, no alto) e deve ser possível deletar comentários, editar comentarios e criar novos comentarios.
+====
+permita que o usuario possa escolher salvar os arquivos do projeto no navegador (vamos chamar isso de projeto embutido) ao invez de usar o webservice de baixo nivel. escolha a melhor forma de implementar isso, seja com OPFS, indexeddb, localstorage ou qualquer outra api nativa do navegador (ou mesmo uma mistura delas). escolhendo trabalhar com projeto embutido, todos os arquivos (ou os dados que estariam nos arquivos) serão salvos usando as apis nativas do browser ao inves de fazer chamadas a api do webservice. admito que isso é uma mudança grande de arquitetura/paradigma e muito do nosso codigo vai ter de ser generalizado e abstraido em uma fachada generica/abstrata para funcionar tanto com apis do browser quanto acessando o webservice já que não podemos usar comandos shell (como grep o rg) pra facilitar e agilizar a consulta de dados. não deve ser possível armazenar multiplos projetos embutido simultaneos no navegador. se o usuario escolher trabalhar com projeto embutido ele so pode trabalhar em um unico projeto e pra trocar de projeto ele precisaria descartar por completo o projeto atual. se o usuario estiver trabalhando com um projeto embutido deve haver uma funcionalidade que permita ao usuario baixar um arquivo zip contendo arquivos no exato mesmo formato que eles estariam em disco caso estivessemos trabalhando em um projeto nativo (atraves do webservice). e deve haver tambem uma funcionalidade para fazer upload de arquivo zip para importalo como um projeto embutido (descartando os dados do projeto embutido atual)
+====
+====
+====
+====
+====
+====
+====
+é possível 
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
 
 ====
-	permita que o usuario possa escolher abrir a raiz do sistema OPFS do navegador ao invez de um diretorio nativo pela api do webservice de baixo nivel. escolhendo OPFS todos os arquivos serão salvos dentro do OPFS ao inves de fazer chamadas a api do webservice. admito que isso é uma mudança grande de paradigma e muito do nosso codigo vai ter de ser generalizado em uma fachada generica/abstrata para funcionar tanto em opfs quanto acessando o webservice já que não podemos usar comandos shell dentro do opfs pra facilitar consulta
+
 ====
 
 ====
