@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vite-plus/test';
-import { ApiClient, ApiError, ApiUnavailableError, decodeTagged, parseMountPoints } from './client.js';
+import {
+  ApiClient,
+  ApiError,
+  ApiUnavailableError,
+  decodeTagged,
+  parseMountPoints,
+  parseServiceInfo,
+} from './client.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -22,6 +29,35 @@ describe('decodeTagged', () => {
     expect(decodeTagged('plain')).toBe('plain');
     expect(decodeTagged(7)).toBe(7);
     expect(decodeTagged(null)).toBeNull();
+  });
+});
+
+describe('parseServiceInfo', () => {
+  it('reads the authentication policy published by the help page', () => {
+    const info = parseServiceInfo({
+      version: '0.10.0',
+      auth: {
+        how: 'Authorization: Bearer <token> header',
+        open_routes: ['/', '/api/help'],
+        required: 'b:false',
+      },
+    });
+
+    expect(info.version).toBe('0.10.0');
+    expect(info.authRequired).toBe(false);
+    expect(info.openRoutes).toEqual(['/', '/api/help']);
+  });
+
+  it('accepts a plain boolean as well', () => {
+    expect(parseServiceInfo({ auth: { required: true } }).authRequired).toBe(true);
+    expect(parseServiceInfo({ auth: { required: false } }).authRequired).toBe(false);
+  });
+
+  it('reports an unknown policy when the help page says nothing', () => {
+    expect(parseServiceInfo({ version: '0.10.0' }).authRequired).toBeNull();
+    expect(parseServiceInfo({ auth: {} }).authRequired).toBeNull();
+    expect(parseServiceInfo(null).authRequired).toBeNull();
+    expect(parseServiceInfo('nonsense').version).toBeNull();
   });
 });
 
@@ -177,5 +213,115 @@ describe('ApiClient', () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ service: 'ok' }));
     const client = new ApiClient({ fetchImpl });
     await expect(client.ping()).resolves.toBe(true);
+  });
+});
+
+describe('ApiClient.fetchServiceStatus', () => {
+  it('reads the policy announced by the help page', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        version: '0.10.0',
+        auth: { required: 'b:false', open_routes: ['/', '/api/help'] },
+      }),
+    );
+    const client = new ApiClient({ fetchImpl });
+
+    const status = await client.fetchServiceStatus();
+
+    expect(status.available).toBe(true);
+    expect(status.authRequired).toBe(false);
+    expect(status.version).toBe('0.10.0');
+    // The help page was enough: no protected route was probed.
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('reports that a token is needed when the help page asks for one', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ auth: { required: 'b:true' } }));
+    const client = new ApiClient({ fetchImpl });
+
+    const status = await client.fetchServiceStatus();
+
+    expect(status.authRequired).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('probes a protected route when the help page does not publish the policy', async () => {
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const href = String(url);
+      if (href.endsWith('/api/help')) {
+        return jsonResponse({ version: '0.10.0' });
+      }
+      return jsonResponse({ error: 'unauthorized' }, 401);
+    });
+    const client = new ApiClient({ fetchImpl });
+
+    const status = await client.fetchServiceStatus();
+
+    expect(status.available).toBe(true);
+    expect(status.authRequired).toBe(true);
+  });
+
+  it('accepts a service that answers a protected route without a token', async () => {
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const href = String(url);
+      if (href.endsWith('/api/help')) {
+        return jsonResponse({ version: '0.10.0' });
+      }
+      // The probe must not carry any token.
+      expect(new Headers(init?.headers).has('Authorization')).toBe(false);
+      return jsonResponse({ system: 'Linux' });
+    });
+    const client = new ApiClient({ fetchImpl, token: 'a-stale-token' });
+
+    const status = await client.fetchServiceStatus();
+
+    expect(status.authRequired).toBe(false);
+  });
+
+  it('falls back to the shell route when the read only probe is unknown', async () => {
+    const urls: string[] = [];
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const href = String(url);
+      urls.push(href);
+      if (href.endsWith('/api/help')) {
+        return jsonResponse({ version: '0.10.0' });
+      }
+      if (href.endsWith('/api/sysinfo')) {
+        return jsonResponse({ error: 'not_found' }, 404);
+      }
+      // The service insists on a JSON content type for the shell route.
+      const headers = new Headers(init?.headers);
+      expect(headers.get('Content-Type')).toBe('application/json');
+      expect(headers.has('Authorization')).toBe(false);
+      return jsonResponse({ stdout: 'gnumarus-auth-probe' });
+    });
+    const client = new ApiClient({ fetchImpl, token: 'a-stale-token' });
+
+    const status = await client.fetchServiceStatus();
+
+    expect(status.authRequired).toBe(false);
+    expect(urls.some((href) => href.endsWith('/api/shell'))).toBe(true);
+  });
+
+  it('reports an unreachable service', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError('fetch failed');
+    });
+    const client = new ApiClient({ fetchImpl });
+
+    const status = await client.fetchServiceStatus();
+
+    expect(status.available).toBe(false);
+    expect(status.authRequired).toBeNull();
+  });
+
+  it('treats a protected help page as a token requirement', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ error: 'unauthorized' }, 401));
+    const client = new ApiClient({ fetchImpl });
+
+    const status = await client.fetchServiceStatus();
+
+    expect(status.available).toBe(true);
+    expect(status.authRequired).toBe(true);
   });
 });

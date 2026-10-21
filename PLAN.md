@@ -20,9 +20,10 @@ Browser (SPA, no framework, strict TypeScript)
   |-- src/api/client.ts        REST client for the GnumarusOSBridge API (token aware)
   |-- src/core/task.ts         task file format: parse / serialize
   |-- src/core/taskRepository.ts  data access (find, grep, read, create, update, delete)
+  |-- src/core/taskTree.ts     tree of the tasks: build / flatten (pure)
   |-- src/core/pagination.ts   pure pagination math
   |-- src/core/config.ts       ~/.config/GnumarusProjectManager/config.json
-  |-- src/ui/*                 DOM widgets (top bar, task table, dialogs, file picker)
+  |-- src/ui/*                 DOM widgets (top bar, task table, task tree, dialogs, file picker)
 ```
 
 ### Task file format
@@ -65,11 +66,71 @@ The API token is entered by the user in the app and kept in `localStorage`
 project directory is persisted in `~/.config/GnumarusProjectManager/config.json`
 through the bridge, so it survives browser cache clearing.
 
+The token is **optional**: when the service announces (or proves) that it does
+not require one, the application never shows the token dialog and never sends
+an `Authorization` header it does not have.
+
 ### Pagination and memory
 
 Only the tasks of the current page are loaded into memory. The repository first
 resolves the *paths* of the matching task files, slices the requested page out of
 them and only then reads those 10 files. Switching pages discards the previous page.
+
+## Batch 3 - Optional API token
+
+The Gnumarus OS Bridge service can be started with the flag that **disables the
+token requirement**. When that happens the application must work exactly as
+before, but it must **not ask the user for a token**.
+
+The authentication policy is discovered in this order:
+
+1. `GET /api/help` publishes an `auth` block whose `required` field is a tagged
+   boolean (`b:true` / `b:false`). `b:false` means "no token needed".
+2. When the help page does not publish the policy, a **protected route is
+   probed without any token** (`GET /api/sysinfo`, then `POST /api/shell` with a
+   harmless `echo`). A `401` answer means "a token is required", a `2xx` answer
+   means "no token needed".
+3. When nothing can be determined, the application behaves conservatively and
+   asks for the token.
+
+The policy is read again on every service check (every five seconds), so a
+service restarted with the opposite policy is noticed without a reload.
+
+## Batch 4 - Tree view
+
+The flat list stays as it is. A **second view mode** shows the tasks as a tree:
+every task is a row with its name (and its tags), the rows can be collapsed and
+expanded, and the tree can be **focused** on a task (that task becomes the root
+of the displayed tree, the tasks outside of its hierarchy are hidden) or on the
+**general root** (every task without a parent is shown).
+
+### Where the data comes from
+
+The structure is read with **one** `grep` that only looks at the `parent=`
+lines of the task files, combined with the listing of the task files (the ids
+come from the file names). The content of the files never reaches the browser
+except for the rows that are actually displayed.
+
+```
+GET  (find)      every task file below the project folder  -> the ids
+POST /api/shell  grep -rH '^parent='                      -> the parent of every task
+```
+
+Only the tasks of the **visible rows** are read (their file is read to get the
+title and the tags), so the memory holds the tree that is on the screen and
+nothing else.
+
+### The pure part
+
+`src/core/taskTree.ts` builds the tree from the `id -> parent` mapping and
+flattens it into the rows to display:
+
+* a task whose parent does not exist is a **root** (it would otherwise be
+  invisible),
+* a cycle in the `parent=` keys is broken (the task that closes the cycle
+  becomes a root),
+* the traversal keeps the ids of the current path, so a cycle can never loop
+  forever.
 
 ## Steps
 
@@ -85,6 +146,11 @@ them and only then reads those 10 files. Switching pages discards the previous p
 10. [x] Build, run every test and deploy to `/var/www/html/GnumarusProjectManager`.
 11. [x] Child tasks: create a task from an existing parent, show the parent of a
     task, count and list the children of a task.
+12. [x] Optional token: detect that the service does not require a token
+    (`/api/help` `auth.required`, or a probe of a protected route) and never
+    ask the user for a token in that case.
+13. [x] Tree view: a second display mode with collapsible rows, the focus on a
+    task and the focus on the general root.
 
 ## Verification commands
 

@@ -1,10 +1,15 @@
 /**
  * REST client for the GnumarusOSBridge low level operations service.
  *
- * Every endpoint but `/api/help` requires the token generated when the service
- * starts. The token is provided by the user through the application interface
- * and kept in `localStorage` (ephemeral data, same nature as the RAM of a
- * native application).
+ * Every endpoint but `/api/help` may require the token generated when the
+ * service starts. The token is provided by the user through the application
+ * interface and kept in `localStorage` (ephemeral data, same nature as the RAM
+ * of a native application).
+ *
+ * The service can also be started with the flag that disables the token
+ * requirement. The client discovers it through the `auth` block published by
+ * `/api/help` and, when the help page says nothing about it, by probing a
+ * protected route without a token (see `fetchServiceStatus`).
  */
 
 export const DEFAULT_API_BASE_URL = 'http://127.0.0.1:1423';
@@ -62,6 +67,32 @@ export class ApiUnavailableError extends Error {
     super(message);
     this.name = 'ApiUnavailableError';
   }
+}
+
+/**
+ * Authentication policy of the service.
+ *
+ * `true` when the service demands a token on every route but the open ones,
+ * `false` when it was started with the flag that disables the token and `null`
+ * when the policy could not be determined.
+ */
+export type AuthRequirement = boolean | null;
+
+/** What the client knows about the running service. */
+export interface ServiceStatus {
+  /** `false` when the service cannot be reached at all. */
+  readonly available: boolean;
+  /** Whether the service demands a token. */
+  readonly authRequired: AuthRequirement;
+  /** Version of the service, when it announced one. */
+  readonly version: string | null;
+}
+
+/** The parts of the `/api/help` payload the application cares about. */
+export interface ServiceInfo {
+  readonly version: string | null;
+  readonly authRequired: AuthRequirement;
+  readonly openRoutes: readonly string[];
 }
 
 export interface ApiClientOptions {
@@ -151,6 +182,51 @@ function asBoolean(value: unknown, fallback = false): boolean {
   return typeof decoded === 'boolean' ? decoded : fallback;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * Extracts the interesting parts of the payload of `/api/help`.
+ *
+ * The service publishes an `auth` block whose `required` field is a tagged
+ * boolean: `b:false` means the service was started without the token
+ * requirement, `b:true` means every route but the open ones needs the token.
+ * When the block or the field is missing the policy is unknown (`null`).
+ */
+export function parseServiceInfo(payload: unknown): ServiceInfo {
+  if (!isRecord(payload)) {
+    return { version: null, authRequired: null, openRoutes: [] };
+  }
+
+  const rawVersion = payload['version'];
+  const auth = payload['auth'];
+
+  let authRequired: AuthRequirement = null;
+  const openRoutes: string[] = [];
+
+  if (isRecord(auth)) {
+    const required = decodeTagged(auth['required']);
+    if (typeof required === 'boolean') {
+      authRequired = required;
+    }
+    const routes = auth['open_routes'];
+    if (Array.isArray(routes)) {
+      for (const route of routes) {
+        if (typeof route === 'string') {
+          openRoutes.push(route);
+        }
+      }
+    }
+  }
+
+  return {
+    version: typeof rawVersion === 'string' ? rawVersion : null,
+    authRequired,
+    openRoutes,
+  };
+}
+
 function extractErrorMessage(status: number, body: string): string {
   try {
     const parsed: unknown = JSON.parse(body);
@@ -192,14 +268,80 @@ export class ApiClient {
 
   /** `true` when the service answers on its open route (no token required). */
   async ping(): Promise<boolean> {
+    const status = await this.fetchServiceStatus();
+    return status.available;
+  }
+
+  /**
+   * Reads the open route `/api/help` and works out the authentication policy.
+   *
+   * The policy comes from the `auth` block of the help page. When the help page
+   * does not publish it, a protected route is probed **without** any token:
+   * `GET /api/sysinfo` first (read only, no parameter) and then
+   * `POST /api/shell` with a harmless `echo`. A `401` answer means the service
+   * demands a token, a successful answer means it does not.
+   */
+  async fetchServiceStatus(): Promise<ServiceStatus> {
+    let payload: unknown;
     try {
       const response = await this.fetchImpl(`${this.baseUrl}/api/help`, {
         method: 'GET',
         headers: { Accept: 'application/json' },
       });
-      return response.ok;
+      if (response.status === 401) {
+        // Even the help page is protected: a token is mandatory.
+        return { available: true, authRequired: true, version: null };
+      }
+      if (!response.ok) {
+        return { available: false, authRequired: null, version: null };
+      }
+      payload = (await response.json()) as unknown;
     } catch {
-      return false;
+      return { available: false, authRequired: null, version: null };
+    }
+
+    const info = parseServiceInfo(payload);
+    const authRequired = info.authRequired ?? (await this.probeAuthRequirement());
+    return { available: true, authRequired, version: info.version };
+  }
+
+  /**
+   * Finds out whether the service demands a token by calling a protected route
+   * without one. `null` means "it could not be determined".
+   */
+  private async probeAuthRequirement(): Promise<AuthRequirement> {
+    const readOnly = await this.probeWithoutToken(`${this.baseUrl}/api/sysinfo`, {
+      method: 'GET',
+    });
+    if (readOnly !== null) {
+      return readOnly;
+    }
+    return this.probeWithoutToken(`${this.baseUrl}/api/shell`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: 'echo gnumarus-auth-probe' }),
+    });
+  }
+
+  /**
+   * Calls a route **without** the `Authorization` header.
+   *
+   * Returns `true` when the service answers `401` (a token is required),
+   * `false` when it accepts the call (no token is required) and `null` when the
+   * answer says nothing about the token (unknown route, network error, ...).
+   */
+  private async probeWithoutToken(url: string, init: RequestInit): Promise<AuthRequirement> {
+    try {
+      const headers = new Headers(init.headers);
+      headers.delete('Authorization');
+      headers.set('Accept', 'application/json');
+      const response = await this.fetchImpl(url, { ...init, headers });
+      if (response.status === 401) {
+        return true;
+      }
+      return response.ok ? false : null;
+    } catch {
+      return null;
     }
   }
 

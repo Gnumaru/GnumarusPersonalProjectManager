@@ -1,0 +1,123 @@
+/**
+ * Rows of the tree view.
+ *
+ * Every row shows one task: its name and its tags. A row with children can be
+ * collapsed and expanded, and the actions of the task (focus, view, edit and
+ * add a child) are always one click away.
+ */
+
+import type { Task } from '../core/task.js';
+import type { TreeRow } from '../core/taskTree.js';
+import { el } from './dom.js';
+import { createIcon } from './icons.js';
+
+export interface TreeViewHandlers {
+  /** Collapses or expands the task. */
+  readonly onToggle: (id: number) => void;
+  /** Makes the task the root of the displayed tree. */
+  readonly onFocus: (id: number) => void;
+  readonly onView: (task: Task) => void;
+  readonly onEdit: (task: Task) => void;
+  readonly onAddChild: (task: Task) => void;
+}
+
+/** Width of one level of indentation, in pixels. */
+export const TREE_INDENT_PX = 20;
+
+/** Builds one row per task of the tree. */
+export function renderTreeRows(
+  doc: Document,
+  rows: readonly TreeRow[],
+  tasks: ReadonlyMap<number, Task>,
+  handlers: TreeViewHandlers,
+): HTMLElement[] {
+  const elements: HTMLElement[] = [];
+  for (const row of rows) {
+    const task = tasks.get(row.id);
+    if (task === undefined) {
+      // The file of the task could not be read: the row is left out.
+      continue;
+    }
+    elements.push(renderTreeRow(doc, row, task, handlers));
+  }
+  return elements;
+}
+
+function renderTreeRow(
+  doc: Document,
+  row: TreeRow,
+  task: Task,
+  handlers: TreeViewHandlers,
+): HTMLElement {
+  const indent = el(doc, 'span', { class: 'tree-indent' });
+  indent.style.width = `${row.depth * TREE_INDENT_PX}px`;
+
+  const twisty = el(doc, 'button', {
+    class: 'tree-twisty',
+    title: row.hasChildren
+      ? row.expanded
+        ? 'Collapse the child tasks'
+        : 'Show the child tasks'
+      : 'This task has no child task',
+  });
+  twisty.type = 'button';
+  twisty.dataset['taskId'] = String(task.id);
+  if (row.hasChildren) {
+    twisty.append(createIcon(doc, 'caret'));
+    twisty.classList.add(row.expanded ? 'is-expanded' : 'is-collapsed');
+    twisty.setAttribute('aria-expanded', row.expanded ? 'true' : 'false');
+    twisty.setAttribute('aria-label', row.expanded ? 'Collapse the child tasks' : 'Show the child tasks');
+    twisty.addEventListener('click', () => {
+      handlers.onToggle(task.id);
+    });
+  } else {
+    twisty.disabled = true;
+    twisty.setAttribute('aria-hidden', 'true');
+  }
+
+  const title = el(doc, 'button', {
+    class: 'tree-title',
+    text: task.title.length > 0 ? task.title : 'Untitled task',
+    title: `#${task.id}${task.description.length > 0 ? ` - ${task.description.replace(/\s+/gu, ' ').slice(0, 120)}` : ''}`,
+  });
+  title.type = 'button';
+  title.addEventListener('click', () => {
+    handlers.onView(task);
+  });
+
+  const tags = el(doc, 'span', { class: 'tree-tags' });
+  for (const tag of task.tags) {
+    tags.append(el(doc, 'span', { class: 'tag', text: tag }));
+  }
+
+  const actions = el(doc, 'span', { class: 'tree-actions' }, [
+    actionButton(doc, 'target', 'Focus the tree on this task', () => {
+      handlers.onFocus(task.id);
+    }),
+    actionButton(doc, 'eye', 'View task', () => {
+      handlers.onView(task);
+    }),
+    actionButton(doc, 'pencil', 'Edit task', () => {
+      handlers.onEdit(task);
+    }),
+    actionButton(doc, 'child', 'Add a child task', () => {
+      handlers.onAddChild(task);
+    }),
+  ]);
+
+  const element = el(doc, 'div', { class: 'tree-row' }, [indent, twisty, title, tags, actions]);
+  element.dataset['taskId'] = String(task.id);
+  element.dataset['depth'] = String(row.depth);
+  return element;
+}
+
+function actionButton(doc: Document, icon: string, title: string, onClick: () => void): HTMLElement {
+  const button = doc.createElement('button');
+  button.type = 'button';
+  button.className = 'icon-button tree-action';
+  button.title = title;
+  button.setAttribute('aria-label', title);
+  button.append(createIcon(doc, icon));
+  button.addEventListener('click', onClick);
+  return button;
+}

@@ -4,6 +4,10 @@
  * It implements the endpoints used by the application (files, directories and
  * the two shell commands used to list and to search task files) with the same
  * tagged scalar convention as the real service.
+ *
+ * It also reproduces the authentication policy of the real service: the open
+ * route `/api/help` publishes the `auth` block, and every other route answers
+ * `401` when the service demands a token and the request does not carry it.
  */
 
 interface FakeEntry {
@@ -12,7 +16,12 @@ interface FakeEntry {
 
 export interface FakeBridgeOptions {
   readonly baseUrl?: string;
-  readonly token?: string;
+  /** Token accepted by the fake. `null` means no token is accepted at all. */
+  readonly token?: string | null;
+  /** Whether the service demands a token (default: `true`). */
+  readonly authRequired?: boolean;
+  /** Routes that always answer `401`, whatever the token is. */
+  readonly rejectPaths?: readonly string[];
 }
 
 export class FakeBridge {
@@ -21,11 +30,16 @@ export class FakeBridge {
   readonly requests: { method: string; path: string }[] = [];
   readonly baseUrl: string;
   readonly token: string | null;
+  /** Mutable on purpose: a test can simulate a service restarted with a token. */
+  authRequired: boolean;
+  readonly rejectPaths: ReadonlySet<string>;
   offline = false;
 
   constructor(options: FakeBridgeOptions = {}) {
     this.baseUrl = options.baseUrl ?? 'http://127.0.0.1:1423';
-    this.token = options.token ?? 'test-token';
+    this.token = options.token === undefined ? 'test-token' : options.token;
+    this.authRequired = options.authRequired ?? true;
+    this.rejectPaths = new Set(options.rejectPaths ?? []);
   }
 
   /** Adds a file to the fake file system. */
@@ -49,12 +63,38 @@ export class FakeBridge {
     const path = url.pathname;
     this.requests.push({ method, path });
 
-    if (path === '/api/help' || path === '/') {
-      return json({ service: 'fake', version: '0.0.0' });
+    if (path === '/api/help') {
+      return json({
+        service: 'fake',
+        version: '0.0.0',
+        auth: {
+          how: 'Authorization: Bearer <token> header (preferred) or ?token= query parameter.',
+          open_routes: ['/', '/api/help', '/api/oauth2/callback', 'OPTIONS *'],
+          required: this.authRequired ? 'b:true' : 'b:false',
+        },
+      });
+    }
+    if (path === '/') {
+      return json({ service: 'fake', version: '0.0.0', help: '/api/help' });
+    }
+
+    if (this.authRequired && !this.isAuthorized(init)) {
+      return json({ error: 'unauthorized', message: 'Valid API token required' }, 401);
+    }
+    if (this.rejectPaths.has(path)) {
+      return json({ error: 'unauthorized', message: 'Valid API token required' }, 401);
     }
 
     const filePath = url.searchParams.get('path') ?? '';
 
+    if (path === '/api/sysinfo' && method === 'GET') {
+      return json({
+        system: 'Linux',
+        system_name: 'Linux',
+        hostname: 'fake',
+        cpu_count: 'i:4',
+      });
+    }
     if (path === '/api/dir' && method === 'GET') {
       return this.readDirectory(filePath);
     }
@@ -104,6 +144,19 @@ export class FakeBridge {
     return json({ error: 'not_found', message: 'Unknown route' }, 404);
   };
 
+  /**
+   * Checks the `Authorization` header of a request against the token of the
+   * fake, the same way the real service does.
+   */
+  private isAuthorized(init: RequestInit | undefined): boolean {
+    const header = new Headers(init?.headers).get('Authorization');
+    if (this.token === null) {
+      // The fake has no token: only a request without any token is accepted.
+      return header === null;
+    }
+    return header === `Bearer ${this.token}`;
+  }
+
   private readDirectory(path: string): Response {
     if (!this.directories.has(path)) {
       return json({ error: 'not_found', message: 'Directory not found' }, 404);
@@ -149,6 +202,21 @@ export class FakeBridge {
       if (stdout.length > 0) {
         stdout = `${stdout}\n`;
       }
+    } else if (command.includes('-rH') && command.includes("'^parent='")) {
+      // Reading the hierarchy: one line per task that has a parent.
+      const prefix = cwd === '/' ? '/' : `${cwd}/`;
+      const lines: string[] = [];
+      for (const [filePath, content] of this.files) {
+        if (!filePath.startsWith(prefix) || !filePath.endsWith('.txt')) {
+          continue;
+        }
+        const match = /^parent=(\d+)$/mu.exec(content);
+        if (match === null) {
+          continue;
+        }
+        lines.push(`./${filePath.slice(prefix.length)}:parent=${match[1] ?? ''}`);
+      }
+      stdout = lines.length > 0 ? `${lines.join('\n')}\n` : '';
     } else if (command.includes("'^parent='")) {
       // Counting the children of every task.
       const counts = new Map<string, number>();

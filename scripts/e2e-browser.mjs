@@ -8,7 +8,8 @@
  *
  * Requirements:
  *   - the Gnumarus OS Bridge service running on http://127.0.0.1:1423
- *   - its API token (GNUMARUS_API_TOKEN, or read from the systemd journal)
+ *   - its API token (GNUMARUS_API_TOKEN, or read from the systemd journal), only
+ *     when the service was started with the token requirement
  *   - Google Chrome (CHROME_BIN, defaults to /opt/google/chrome/chrome)
  *
  * The script creates its own task folder, points the application configuration
@@ -62,6 +63,32 @@ function serviceIsUp() {
   }
 }
 
+/**
+ * Reads the authentication policy published by the service.
+ *
+ * `true` when the service demands a token, `false` when it was started without
+ * the token requirement and `null` when it could not be determined.
+ */
+function serviceAuthRequired() {
+  try {
+    const response = execFileSync('curl', ['-fsS', '--max-time', '3', `${serviceUrl}/api/help`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const payload = JSON.parse(response);
+    const required = payload?.auth?.required;
+    if (required === 'b:true') {
+      return true;
+    }
+    if (required === 'b:false') {
+      return false;
+    }
+    return typeof required === 'boolean' ? required : null;
+  } catch {
+    return null;
+  }
+}
+
 function resolveToken() {
   const fromEnvironment = process.env['GNUMARUS_API_TOKEN'];
   if (fromEnvironment !== undefined && fromEnvironment.trim().length > 0) {
@@ -82,18 +109,24 @@ function resolveToken() {
 }
 
 const token = resolveToken();
+const authRequired = serviceAuthRequired();
 
 if (!serviceIsUp()) {
   console.log(`The service ${serviceUrl} is not running: the browser test is skipped.`);
   process.exit(0);
 }
 
-if (token === null) {
-  console.log('The API token could not be found: the browser test is skipped.');
+if (token === null && authRequired !== false) {
+  console.log(
+    'The API token could not be found and the service requires one: the browser test is skipped.',
+  );
   process.exit(0);
 }
 
-const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+const headers = { 'Content-Type': 'application/json' };
+if (token !== null) {
+  headers.Authorization = `Bearer ${token}`;
+}
 
 async function apiRequest(path, options = {}) {
   const response = await fetch(`${serviceUrl}${path}`, { ...options, headers });
@@ -247,9 +280,11 @@ async function run() {
   const appUrl = `http://127.0.0.1:${httpPort}/index.html`;
   await session.send('Page.navigate', { url: appUrl });
   await delay(1200);
-  await evaluate(`localStorage.setItem('gnumarus-project-manager.token', ${JSON.stringify(token)})`);
-  await session.send('Page.reload', { ignoreCache: true });
-  await delay(1500);
+  if (token !== null) {
+    await evaluate(`localStorage.setItem('gnumarus-project-manager.token', ${JSON.stringify(token)})`);
+    await session.send('Page.reload', { ignoreCache: true });
+    await delay(1500);
+  }
 
   await runChecks();
 }
@@ -259,6 +294,18 @@ async function runChecks() {
     `document.querySelector('.service-text')?.textContent === 'Service online'`,
   );
   check(serviceState === true, 'the service is detected as online');
+
+  if (authRequired === false) {
+    const tokenButtonHidden = await evaluate(`(() => {
+      const button = [...document.querySelectorAll('button')]
+        .find((node) => node.textContent.trim() === 'API token');
+      return button === undefined || button.hasAttribute('hidden');
+    })()`);
+    check(
+      tokenButtonHidden === true,
+      'the application does not ask for a token when the service does not require one',
+    );
+  }
 
   const projectPath = await waitFor(
     `document.querySelector('.project-path')?.getAttribute('title') === ${JSON.stringify(taskDirectory)}`,
@@ -494,8 +541,99 @@ async function runChecks() {
   );
   await evaluate(`document.querySelector('.modal-close').click()`);
 
+  // --- tree view ------------------------------------------------------------
+
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Tree');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.tree-row') !== null`);
+
+  const treeRoots = await evaluate(
+    `[...document.querySelectorAll('.tree-row')].map((node) => node.dataset['taskId']).join('|')`,
+  );
+  check(
+    treeRoots === '1|2|3|4|5|6|7|8|9|10|11|12',
+    'the tree shows the tasks that have no parent',
+    treeRoots,
+  );
+
+  const treeTitles = await evaluate(
+    `[...document.querySelectorAll('.tree-row .tree-title')].map((node) => node.textContent).join('|')`,
+  );
+  check(treeTitles.includes('Browser test task 1'), 'the tree shows the name of the tasks', treeTitles);
+
+  // The child of the first task is hidden until its parent is expanded.
+  const childHidden = await evaluate(
+    `document.querySelector('.tree-row[data-task-id="13"]') === null`,
+  );
+  check(childHidden === true, 'the child task is hidden when its parent is collapsed');
+
+  await evaluate(`(() => {
+    const row = document.querySelector('.tree-row[data-task-id="1"]');
+    row.querySelector('.tree-twisty').click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.tree-row[data-task-id="13"]') !== null`);
+  const childDepth = await evaluate(
+    `document.querySelector('.tree-row[data-task-id="13"]')?.dataset['depth'] ?? ''`,
+  );
+  check(childDepth === '1', 'the child task is shown under its parent', childDepth);
+
+  // Focusing a task makes it the root of the tree.
+  await evaluate(`(() => {
+    const row = document.querySelector('.tree-row[data-task-id="1"]');
+    row.querySelectorAll('.tree-action')[0].click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.tree-row').length === 2`);
+  const focusedIds = await evaluate(
+    `[...document.querySelectorAll('.tree-row')].map((node) => node.dataset['taskId']).join('|')`,
+  );
+  check(focusedIds === '1|13', 'the focused task is the root of the tree', focusedIds);
+
+  const breadcrumb = await evaluate(
+    `[...document.querySelectorAll('.tree-crumb')].map((node) => node.textContent).join('|')`,
+  );
+  check(
+    breadcrumb === 'General root|Browser test task 1',
+    'the breadcrumb shows the focused task',
+    breadcrumb,
+  );
+
+  // The general root shows every task without a parent again.
+  await evaluate(`document.querySelector('.tree-crumb').click()`);
+  await waitFor(`document.querySelectorAll('.tree-row').length === 12`);
+
+  // The name of a task opens its view.
+  await evaluate(`(() => {
+    const row = document.querySelector('.tree-row[data-task-id="1"]');
+    row.querySelector('.tree-title').click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.modal-title') !== null`);
+  const treeModalTitle = await evaluate(`document.querySelector('.modal-title')?.textContent ?? ''`);
+  check(
+    treeModalTitle.includes('Browser test task 1'),
+    'the tree opens the view of a task',
+    treeModalTitle,
+  );
+  await evaluate(`document.querySelector('.modal-close').click()`);
+
+  // Back to the flat list for the rest of the test.
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'List');
+    button.click();
+    return true;
+  })()`);
+  // The pagination bar comes back when the list is drawn again.
+  await waitFor(`document.querySelector('.pagination-footer')?.hasAttribute('hidden') === false`);
+  await waitFor(`document.querySelector('.page-current')?.textContent === '1'`);
+
   await evaluate(`document.querySelector('[data-page-action="last"]').click()`);
   await waitFor(`document.querySelector('.page-current')?.textContent === '2'`);
+  await waitFor(`document.querySelector('tr[data-task-id="13"]') !== null`);
   await evaluate(`(() => {
     const rows = [...document.querySelectorAll('.task-table tbody tr')];
     const row = rows.find((candidate) => candidate.dataset['taskId'] === '13');

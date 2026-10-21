@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vite-plus/test';
-import { ApiClient } from '../api/client.js';
+import { ApiClient, parseServiceInfo } from '../api/client.js';
 import { TaskRepository } from './taskRepository.js';
 
 declare const process: { env: Record<string, string | undefined>; cwd(): string };
@@ -8,7 +8,31 @@ const token = process.env['GNUMARUS_API_TOKEN'];
 const baseUrl = process.env['GNUMARUS_API_URL'] ?? 'http://127.0.0.1:1423';
 const testDirectory = `${process.cwd()}/tmp/integration`;
 
-const describeLive = token === undefined || token.length === 0 ? describe.skip : describe;
+/**
+ * The integration suite runs when the service is reachable.
+ *
+ * A token is enough, but a service started **without** the token requirement
+ * works as well: the policy published by `/api/help` tells which case it is.
+ */
+async function canRunAgainstTheLiveService(): Promise<boolean> {
+  if (token !== undefined && token.length > 0) {
+    return true;
+  }
+  try {
+    const response = await fetch(`${baseUrl}/api/help`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) {
+      return false;
+    }
+    const payload: unknown = await response.json();
+    return parseServiceInfo(payload).authRequired === false;
+  } catch {
+    return false;
+  }
+}
+
+const describeLive = (await canRunAgainstTheLiveService()) ? describe : describe.skip;
 
 describeLive('TaskRepository against the live service', () => {
   const api = new ApiClient({ baseUrl, token: token ?? null });
@@ -211,5 +235,26 @@ describeLive('TaskRepository against the live service', () => {
     expect(ids).toContain(first.id);
     expect(ids).toContain(second.id);
     expect(children.every((child) => child.parentId === parent.id)).toBe(true);
+  });
+
+  it('reads the hierarchy of the tasks', async () => {
+    const root = await repository.createTask(testDirectory, {
+      title: 'Hierarchy root',
+      description: '',
+      status: 'todo',
+      tags: [],
+    });
+    const child = await repository.createTask(
+      testDirectory,
+      { title: 'Hierarchy child', description: '', status: 'todo', tags: [] },
+      root.id,
+    );
+
+    const hierarchy = await repository.readHierarchy(testDirectory);
+
+    expect(hierarchy.parents.get(root.id)).toBeNull();
+    expect(hierarchy.parents.get(child.id)).toBe(root.id);
+    expect(hierarchy.paths.get(root.id)).toContain(`task_${root.id}.txt`);
+    expect(hierarchy.paths.size).toBe(hierarchy.parents.size);
   });
 });

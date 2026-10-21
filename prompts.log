@@ -4,7 +4,9 @@ crie a versão inicial do app de gerenciamento de projetos. por enquanto crie ap
 ====
 agora crie uma funcionalidade para adicionar tarefas filhas a partir de uma tarefa pai existente
 ====
+eu subi o webservice de acesso low level com parametros pra nao exigir token. agora eu acessei nosso gerenciador de projetos mas ele ainda esta exigindo que eu forneça um token. se eu fornecer qualquer coisa já funciona porque o webservice nao valida ja que iniciou com parametros pra nao exigir token. contudo eu quero que nosso app perceba que o webservice nao esta exigindo token (pelo api/help deve ser possivel obter essa informacao, ou mesmo 'pingando' alguma rota que deveria ser fechada, como por exemplo tentando rodar um comando sheel, como um echo, um pwd, um ls ou algo assim. dai, se o app perceber que o webservice nao esta exigindo token, ele sequer pede ao usuario
 ====
+a interface grafica atual tem apenas um modo de exibicao em lista simples. este modo é bom, vamos manter como está. mas eu quero que exista um segundo modo de exibição em árvore, em que cada tarefa é exibida como uma linha, apenas mostrando o nome (talvez as tags tambem), e elas podem ser colapsadas ou expandidas para exibir as tarefas filhas. deve ser possível "focar" em uma tarefa para que ela seja a raiz da árvore (todas as outras que não fazem parte da hierarquia nao sao exibidas) ou focar na "raiz geral" para exibir todas as tarefas que nao tem pai. deve ser possivel a partir dessa visualizacao invocar as modais de visualizacao e edicao da tarefa.
 ====
 ====
 ====

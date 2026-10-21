@@ -78,3 +78,69 @@
 ### Build / deploy
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
+## Batch 3 - Optional API token
+
+### Detection
+- [x] `src/api/client.ts` reads the `auth.required` flag published by `/api/help`
+- [x] `parseServiceInfo` decodes the tagged boolean (`b:true` / `b:false`)
+- [x] Fallback probe of a protected route without a token (`/api/sysinfo`, then
+      `POST /api/shell` with `echo`) when the help page does not publish the policy
+- [x] `fetchServiceStatus` reports availability, policy and version in one call
+
+### User interface
+- [x] The token dialog is never opened when the service does not require a token
+- [x] The **API token** button is hidden when the token is not needed
+- [x] The status pill describes the authentication policy in its tooltip
+- [x] The configuration is loaded even when there is no token
+- [x] A `401` re-reads the policy before the token dialog is shown
+
+### Tests
+- [x] `src/api/client.test.ts` - policy announced by the help page, probe fallback,
+      unreachable service
+- [x] `src/ui/app.test.ts` - no token dialog without a token, token dialog when the
+      service demands one
+- [x] `src/test-support/fakeBridge.ts` - the fake announces and enforces the policy
+- [x] `src/core/taskRepository.test.ts` - the integration suite also runs against a
+      service started without the token requirement
+
+### Build / deploy
+- [x] `npm run verify`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
+## Batch 4 - Tree view
+
+### Core (pure, unit tested)
+- [x] `src/core/taskTree.ts` - build the tree from the `id -> parent` mapping
+- [x] A task whose parent does not exist becomes a root
+- [x] A cycle in the `parent=` keys is broken
+- [x] `flattenTaskTree` - the rows to display, with the depth and the expansion
+- [x] The focus on a task and the focus on the general root
+- [x] The ancestors of a task (the breadcrumb)
+
+### Data layer
+- [x] `TaskRepository.readHierarchy` reads the structure with one `grep` of the
+      `parent=` lines (`src/core/taskRepository.ts`)
+- [x] Only the files of the displayed rows are read (a few at a time)
+
+### User interface
+- [x] A **List / Tree** toggle in the toolbar
+- [x] A row per task with its name and its tags
+- [x] A twisty to collapse and to expand the children of a task
+- [x] An action to focus the tree on a task
+- [x] The breadcrumb of the focused task, with the **General root** button
+- [x] The view and the edit dialogs are opened from a row of the tree
+- [x] The pagination bar is hidden in the tree view
+- [x] The search keeps the ancestors of the matches visible
+
+### Tests
+- [x] `src/core/taskTree.test.ts` - the tree of the tasks (roots, children, cycles,
+      focus, search)
+- [x] `src/ui/app.test.ts` - the tree in the application (expansion, focus,
+      breadcrumb, dialogs, search)
+- [x] `src/core/taskRepository.test.ts` - the hierarchy read from the live bridge
+- [x] `scripts/e2e-browser.mjs` - the tree driven by a real browser
+
+### Build / deploy
+- [x] `npm run verify`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`

@@ -1,6 +1,7 @@
 # Features Summary
 
-Gnumarus Project Manager - **root tasks and child tasks**.
+Gnumarus Project Manager - **root tasks and child tasks**, displayed as a flat
+list or as a tree.
 
 ## Task management
 
@@ -20,6 +21,20 @@ Gnumarus Project Manager - **root tasks and child tasks**.
 | Free form tags (add and remove) | Done | `src/core/task.ts` |
 | Task status (to do / in progress / done) | Done | `src/core/task.ts` |
 
+## Tree view
+
+| Feature | Status | Where |
+| ------- | ------ | ----- |
+| **List / Tree toggle** | Done | `src/ui/app.ts` |
+| **One row per task, with its name and its tags** | Done | `src/ui/taskTreeView.ts` |
+| **Collapse and expand the children of a task** | Done | `src/ui/taskTreeView.ts`, `src/core/taskTree.ts` |
+| **Focus the tree on a task (it becomes the root of the tree)** | Done | `src/ui/app.ts` |
+| **Focus the general root (every task without a parent)** | Done | `src/ui/app.ts` |
+| **Breadcrumb of the focused task** | Done | `src/ui/app.ts` |
+| **View and edit dialogs opened from a row of the tree** | Done | `src/ui/taskTreeView.ts` |
+| **The hierarchy read with a single `grep`** | Done | `src/core/taskRepository.ts` |
+| **Only the displayed task files are read** | Done | `src/ui/app.ts` |
+
 ## Storage
 
 | Feature | Status | Where |
@@ -38,6 +53,9 @@ Gnumarus Project Manager - **root tasks and child tasks**.
 | ------- | ------ | ----- |
 | REST client with the API token | Done | `src/api/client.ts` |
 | Token entered by the user, kept in `localStorage` | Done | `src/ui/app.ts` |
+| **Detection of a service started without the token requirement** | Done | `src/api/client.ts` |
+| **No token asked when the service does not require one** | Done | `src/ui/app.ts` |
+| **Token button hidden when the token is useless** | Done | `src/ui/app.ts` |
 | Service availability banner and periodic ping | Done | `src/ui/app.ts` |
 | Configuration file in `~/.config/GnumarusProjectManager/config.json` | Done | `src/core/config.ts` |
 
@@ -57,8 +75,8 @@ Gnumarus Project Manager - **root tasks and child tasks**.
 | Feature | Status | Where |
 | ------- | ------ | ----- |
 | Strict TypeScript (`strict` plus the strictest extra flags, no `any`) | Done | `tsconfig.json` |
-| Unit tests of the format, the pagination, the client and the widgets | Done | `src/**/*.test.ts` |
-| Integration tests against the running bridge | Done | `src/core/taskRepository.test.ts` |
+| Unit tests of the format, the pagination, the tree, the client and the widgets | Done | `src/**/*.test.ts` |
+| Integration tests against the running bridge (with or without a token) | Done | `src/core/taskRepository.test.ts` |
 | Browser end to end test driving a real Chrome | Done | `scripts/e2e-browser.mjs` |
 | Headless render test at the root and at a nested path | Done | `scripts/e2e-smoke.sh` |
 | Automated deploy to `/var/www/html/GnumarusProjectManager` | Done | `scripts/deploy.mjs` |

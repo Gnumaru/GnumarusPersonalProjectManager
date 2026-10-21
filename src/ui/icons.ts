@@ -26,6 +26,9 @@ const ICON_PATHS: Readonly<Record<string, string>> = {
   root: '<path d="M12 2 3 7v2h18V7l-9-5Zm-7 9h2v8H5v-8Zm6 0h2v8h-2v-8Zm6 0h2v8h-2v-8Z"/>',
   close: '<path d="m12 10.6 5-5 1.4 1.4-5 5 5 5-1.4 1.4-5-5-5 5L5.6 17l5-5-5-5L7 5.6l5 5Z"/>',
   check: '<path d="m9.5 16.2-4-4L7 10.8l2.5 2.5L17 6l1.4 1.4-8.9 8.8Z"/>',
+  caret: '<path d="M9.4 6.4 15 12l-5.6 5.6L8 16.2l4.2-4.2L8 7.8 9.4 6.4Z"/>',
+  target:
+    '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 3.2a6.8 6.8 0 1 1 0 13.6 6.8 6.8 0 0 1 0-13.6Zm0 3.4a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8Z"/>',
   warning: '<path d="M12 2 1 21h22L12 2Zm1 14h-2v2h2v-2Zm0-7h-2v5h2V9Z"/>',
 };
 

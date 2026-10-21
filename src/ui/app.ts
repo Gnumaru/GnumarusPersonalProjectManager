@@ -4,20 +4,32 @@
  * Wires the user interface to the low level operations service: it keeps the
  * state (selected folder, search term, current page), loads the tasks of the
  * current page and exposes the create/edit/view/delete actions.
+ *
+ * Two display modes are available: the flat **list** of the tasks (paginated)
+ * and the **tree** of the tasks, where every task can be collapsed, expanded
+ * and focused.
  */
 
 import { ApiClient, ApiError, ApiUnavailableError } from '../api/client.js';
 import { loadConfig, saveConfig, type AppConfig } from '../core/config.js';
 import { DEFAULT_PAGE_SIZE, computePageInfo, type PageInfo } from '../core/pagination.js';
-import { TaskRepository } from '../core/taskRepository.js';
+import { TaskRepository, extractTaskIds, type TaskHierarchy } from '../core/taskRepository.js';
+import {
+  ancestorsOf,
+  buildTaskTree,
+  flattenTaskTree,
+  type TaskTree,
+  type TreeRow,
+} from '../core/taskTree.js';
 import type { Task, TaskInput } from '../core/task.js';
-import { button, clear, el, input } from './dom.js';
+import { button, clear, el, input, type Child } from './dom.js';
 import { FileDialog } from './fileDialog.js';
 import { createIcon } from './icons.js';
 import { Modal } from './modal.js';
 import { renderPaginationBar } from './paginationBar.js';
 import { TaskDialog } from './taskDialog.js';
 import { renderTaskRows } from './taskTable.js';
+import { renderTreeRows } from './taskTreeView.js';
 import { showToast } from './toast.js';
 
 export const TOKEN_STORAGE_KEY = 'gnumarus-project-manager.token';
@@ -35,6 +47,9 @@ export interface TokenStorage {
 
 export type ServiceState = 'checking' | 'online' | 'offline' | 'unauthorized';
 
+/** The two ways the tasks can be displayed. */
+export type ViewMode = 'list' | 'tree';
+
 export interface AppOptions {
   readonly doc: Document;
   readonly root: HTMLElement;
@@ -45,6 +60,9 @@ export interface AppOptions {
 
 const SERVICE_CHECK_INTERVAL_MS = 5000;
 
+/** Amount of task files read at the same time when the tree is drawn. */
+const TREE_READ_CONCURRENCY = 8;
+
 export class App {
   private readonly doc: Document;
   private readonly root: HTMLElement;
@@ -54,6 +72,14 @@ export class App {
   private readonly tokenStorageKey: string;
 
   private token: string | null = null;
+  /**
+   * Whether the service demands a token.
+   *
+   * `false` when the service was started without the token requirement: the
+   * application then works without a token and never asks the user for one.
+   * `null` when the policy could not be determined.
+   */
+  private authRequired: boolean | null = null;
   private config: AppConfig = { projectDir: null, pageSize: DEFAULT_PAGE_SIZE };
   private query = '';
   private page = 1;
@@ -63,13 +89,37 @@ export class App {
   private childCounts = new Map<number, number>();
   private serviceState: ServiceState = 'checking';
 
+  /** The display mode currently in use. */
+  private viewMode: ViewMode = 'list';
+  /** The task the tree is focused on, `null` for the general root. */
+  private treeFocusId: number | null = null;
+  /** The tasks whose children are shown in the tree. */
+  private treeExpanded = new Set<number>();
+  /** The rows of the tree currently displayed. */
+  private treeRows: TreeRow[] = [];
+  /** The tasks of the displayed rows, indexed by their id. */
+  private treeTasks = new Map<number, Task>();
+  /** The structure of the tasks, read from the disk. */
+  private treeHierarchy: TaskHierarchy | null = null;
+  /** The tree built from the hierarchy. */
+  private treeStructure: TaskTree | null = null;
+  /** The tasks matching the current search, `null` when there is no search. */
+  private treeMatches: Set<number> | null = null;
+
   private projectPathElement!: HTMLElement;
   private serviceTextElement!: HTMLElement;
   private servicePillElement!: HTMLElement;
+  private tokenButton!: HTMLButtonElement;
   private bannerElement!: HTMLElement;
   private searchInput!: HTMLInputElement;
   private clearSearchButton!: HTMLButtonElement;
   private newTaskButton!: HTMLButtonElement;
+  private listViewButton!: HTMLButtonElement;
+  private treeViewButton!: HTMLButtonElement;
+  private tableWrapElement!: HTMLElement;
+  private treeWrapElement!: HTMLElement;
+  private treeHeaderElement!: HTMLElement;
+  private treeRowsElement!: HTMLElement;
   private rowsElement!: HTMLTableSectionElement;
   private emptyStateElement!: HTMLElement;
   private paginationElement!: HTMLElement;
@@ -98,15 +148,14 @@ export class App {
   /** Boots the application. */
   async start(): Promise<void> {
     this.buildLayout();
+    this.updateViewToggle();
     this.token = this.readStoredToken();
     this.api.setToken(this.token);
 
     this.setServiceState('checking');
     await this.checkService();
 
-    if (this.token !== null) {
-      await this.loadConfig();
-    }
+    await this.loadConfig();
     await this.refresh();
 
     this.startServiceWatch();
@@ -136,14 +185,14 @@ export class App {
       this.serviceTextElement,
     ]);
 
-    const tokenButton = button(this.doc, 'API token', {
+    this.tokenButton = button(this.doc, 'API token', {
       class: 'secondary',
       title: 'Token used to talk to the Gnumarus OS Bridge service',
       onClick: () => {
         this.openTokenDialog();
       },
     });
-    tokenButton.append(createIcon(this.doc, 'pencil'));
+    this.tokenButton.append(createIcon(this.doc, 'pencil'));
 
     const refreshButton = button(this.doc, 'Refresh', {
       class: 'secondary',
@@ -166,7 +215,11 @@ export class App {
         this.projectPathElement,
         chooseFolderButton,
       ]),
-      el(this.doc, 'div', { class: 'topbar-actions' }, [this.servicePillElement, tokenButton, refreshButton]),
+      el(this.doc, 'div', { class: 'topbar-actions' }, [
+        this.servicePillElement,
+        this.tokenButton,
+        refreshButton,
+      ]),
     ]);
 
     this.bannerElement = el(this.doc, 'div', { class: 'banner', attrs: { hidden: 'hidden' } });
@@ -213,9 +266,38 @@ export class App {
     });
     this.newTaskButton.append(createIcon(this.doc, 'plus'));
 
+    this.listViewButton = button(this.doc, 'List', {
+      class: 'view-toggle-button is-active',
+      title: 'Show the tasks as a flat list',
+      onClick: () => {
+        void this.setViewMode('list');
+      },
+    });
+    this.listViewButton.dataset['viewMode'] = 'list';
+
+    this.treeViewButton = button(this.doc, 'Tree', {
+      class: 'view-toggle-button',
+      title: 'Show the tasks as a tree',
+      onClick: () => {
+        void this.setViewMode('tree');
+      },
+    });
+    this.treeViewButton.dataset['viewMode'] = 'tree';
+
+    const viewToggle = el(
+      this.doc,
+      'div',
+      { class: 'view-toggle', attrs: { role: 'group', 'aria-label': 'The way the tasks are displayed' } },
+      [this.listViewButton, this.treeViewButton],
+    );
+
     const toolbar = el(this.doc, 'div', { class: 'toolbar' }, [
       el(this.doc, 'div', { class: 'search-box' }, [this.searchInput, searchButton, this.clearSearchButton]),
-      el(this.doc, 'div', { class: 'toolbar-right' }, [this.resultCountElement, this.newTaskButton]),
+      el(this.doc, 'div', { class: 'toolbar-right' }, [
+        viewToggle,
+        this.resultCountElement,
+        this.newTaskButton,
+      ]),
     ]);
 
     this.rowsElement = this.doc.createElement('tbody');
@@ -236,8 +318,17 @@ export class App {
       this.rowsElement,
     ]);
 
+    this.tableWrapElement = el(this.doc, 'div', { class: 'table-wrap' }, [table]);
+    this.treeHeaderElement = el(this.doc, 'div', { class: 'tree-header' });
+    this.treeRowsElement = el(this.doc, 'div', { class: 'tree-rows' });
+    this.treeWrapElement = el(this.doc, 'div', { class: 'tree-wrap', attrs: { hidden: 'hidden' } }, [
+      this.treeHeaderElement,
+      this.treeRowsElement,
+    ]);
+
     const content = el(this.doc, 'main', { class: 'content' }, [
-      el(this.doc, 'div', { class: 'table-wrap' }, [table]),
+      this.tableWrapElement,
+      this.treeWrapElement,
       this.emptyStateElement,
     ]);
 
@@ -249,25 +340,40 @@ export class App {
   // -------------------------------------------------------------- service --
 
   private async checkService(): Promise<void> {
-    const available = await this.api.ping();
-    if (!available) {
+    const status = await this.api.fetchServiceStatus();
+    if (!status.available) {
       this.setServiceState('offline');
       return;
     }
-    if (this.serviceState === 'offline') {
+    const cameBack = this.serviceState === 'offline';
+    this.authRequired = status.authRequired;
+    this.updateAuthUi();
+    if (cameBack) {
       // The service came back: reload everything.
       showToast({ doc: this.doc, message: 'The Gnumarus OS Bridge service is back online.', kind: 'success' });
-      if (this.token !== null) {
-        await this.loadConfig();
-      }
+      await this.loadConfig();
       await this.refresh();
       return;
     }
-    if (this.token === null) {
-      this.setServiceState('online');
-      return;
-    }
     this.setServiceState('online');
+  }
+
+  /**
+   * Adapts the interface to the authentication policy of the service.
+   *
+   * When the service does not demand a token the **API token** button is
+   * hidden: there is nothing for the user to type. The tooltip of the status
+   * pill always describes the current policy.
+   */
+  private updateAuthUi(): void {
+    const tokenIsUseless = this.authRequired === false;
+    this.tokenButton.toggleAttribute('hidden', tokenIsUseless);
+    this.servicePillElement.title =
+      this.authRequired === false
+        ? 'The service accepts every request without an API token.'
+        : this.authRequired === true
+          ? 'The service requires an API token.'
+          : 'The authentication policy of the service is unknown.';
   }
 
   private startServiceWatch(): void {
@@ -369,31 +475,149 @@ export class App {
     if (projectDir === null) {
       this.tasks = [];
       this.info = computePageInfo(1, this.pageSize, 0);
-      this.renderTasks();
+      this.treeRows = [];
+      this.treeTasks = new Map<number, Task>();
+      this.renderCurrentView();
       return;
     }
 
     this.setBusy(true);
     try {
-      const [page, childCounts] = await Promise.all([
-        this.repository.getPage(projectDir, {
-          page: this.page,
-          pageSize: this.pageSize,
-          query: this.query,
-        }),
-        this.repository.childCounts(projectDir).catch(() => new Map<number, number>()),
-      ]);
-      this.tasks = [...page.tasks];
-      this.info = page.info;
-      this.page = page.info.page;
-      this.childCounts = childCounts;
+      if (this.viewMode === 'tree') {
+        await this.refreshTree(projectDir);
+      } else {
+        await this.refreshList(projectDir);
+      }
       this.setServiceState('online');
-      this.renderTasks();
+      this.renderCurrentView();
     } catch (error) {
       this.handleError(error);
     } finally {
       this.setBusy(false);
     }
+  }
+
+  /** Loads one page of the flat list of the tasks. */
+  private async refreshList(projectDir: string): Promise<void> {
+    const [page, childCounts] = await Promise.all([
+      this.repository.getPage(projectDir, {
+        page: this.page,
+        pageSize: this.pageSize,
+        query: this.query,
+      }),
+      this.repository.childCounts(projectDir).catch(() => new Map<number, number>()),
+    ]);
+    this.tasks = [...page.tasks];
+    this.info = page.info;
+    this.page = page.info.page;
+    this.childCounts = childCounts;
+  }
+
+  /**
+   * Reads the structure of the tasks and the tasks that are displayed.
+   *
+   * The hierarchy is read with a single `grep` of the `parent=` lines: the
+   * content of the files never reaches the browser here.
+   */
+  private async refreshTree(projectDir: string): Promise<void> {
+    const hierarchy = await this.repository.readHierarchy(projectDir);
+    this.treeHierarchy = hierarchy;
+    this.treeStructure = buildTaskTree(hierarchy.parents);
+
+    if (this.query.length > 0) {
+      const paths = await this.repository.searchTaskFilePaths(projectDir, this.query);
+      this.treeMatches = new Set(extractTaskIds(paths));
+    } else {
+      this.treeMatches = null;
+    }
+
+    await this.updateTreeRows();
+  }
+
+  /** Recomputes the rows of the tree and loads the tasks that are shown. */
+  private async updateTreeRows(): Promise<void> {
+    const structure = this.treeStructure;
+    if (structure === null) {
+      this.treeRows = [];
+      this.treeTasks = new Map<number, Task>();
+      return;
+    }
+    const rows = flattenTaskTree(structure, {
+      focusId: this.treeFocusId,
+      expanded: this.treeExpanded,
+      matches: this.treeMatches,
+    });
+    this.treeRows = rows;
+    this.treeTasks = await this.loadTreeTasks(rows);
+  }
+
+  /**
+   * Reads the files of the tasks that are displayed.
+   *
+   * Only the visible rows are read, and the tasks that are not displayed any
+   * more are released: the memory holds the tree that is on the screen.
+   */
+  private async loadTreeTasks(rows: readonly TreeRow[]): Promise<Map<number, Task>> {
+    const hierarchy = this.treeHierarchy;
+    const tasks = new Map<number, Task>();
+    if (hierarchy === null) {
+      return tasks;
+    }
+    const missing: number[] = [];
+    for (const row of rows) {
+      const cached = this.treeTasks.get(row.id);
+      if (cached !== undefined) {
+        tasks.set(row.id, cached);
+        continue;
+      }
+      missing.push(row.id);
+    }
+    for (const [id, task] of await this.readTasks(hierarchy, missing)) {
+      tasks.set(id, task);
+    }
+    return tasks;
+  }
+
+  /** Reads the given task files, a few of them at a time. */
+  private async readTasks(
+    hierarchy: TaskHierarchy,
+    ids: readonly number[],
+  ): Promise<Map<number, Task>> {
+    const loaded = new Map<number, Task>();
+    if (ids.length === 0) {
+      return loaded;
+    }
+    let index = 0;
+    const worker = async (): Promise<void> => {
+      while (index < ids.length) {
+        const position = index;
+        index += 1;
+        const id = ids[position];
+        if (id === undefined) {
+          continue;
+        }
+        const path = hierarchy.paths.get(id);
+        if (path === undefined) {
+          continue;
+        }
+        try {
+          loaded.set(id, await this.repository.loadTask(path));
+        } catch (error) {
+          if (error instanceof ApiError && error.status === 404) {
+            // The file disappeared between the listing and the read: skip it.
+            continue;
+          }
+          throw error;
+        }
+      }
+    };
+    const workers: Promise<void>[] = [];
+    const amount = Math.min(TREE_READ_CONCURRENCY, ids.length);
+    for (let workerIndex = 0; workerIndex < amount; workerIndex += 1) {
+      workers.push(worker());
+    }
+    await Promise.all(workers);
+    return loaded;
   }
 
   private handleError(error: unknown): void {
@@ -402,8 +626,7 @@ export class App {
       return;
     }
     if (error instanceof ApiError && error.status === 401) {
-      this.setServiceState('unauthorized');
-      this.openTokenDialog();
+      void this.handleUnauthorized();
       return;
     }
     showToast({
@@ -413,7 +636,50 @@ export class App {
     });
   }
 
-  private renderTasks(): void {
+  /**
+   * Reacts to a `401` answer of the service.
+   *
+   * The service may have been restarted with a token (or without one), so the
+   * authentication policy is read again before the token dialog is shown: the
+   * user is only asked for a token when the service really needs one.
+   */
+  private async handleUnauthorized(): Promise<void> {
+    const status = await this.api.fetchServiceStatus();
+    if (!status.available) {
+      this.setServiceState('offline');
+      return;
+    }
+    this.authRequired = status.authRequired;
+    this.updateAuthUi();
+    if (this.authRequired === false) {
+      this.setServiceState('online');
+      showToast({
+        doc: this.doc,
+        message:
+          'The Gnumarus OS Bridge service refused the request (401) even though it does not require a token.',
+        kind: 'error',
+      });
+      return;
+    }
+    this.setServiceState('unauthorized');
+    this.openTokenDialog();
+  }
+
+  /** Draws the view mode that is in use. */
+  private renderCurrentView(): void {
+    const isTree = this.viewMode === 'tree';
+    this.tableWrapElement.toggleAttribute('hidden', isTree);
+    this.treeWrapElement.toggleAttribute('hidden', !isTree);
+    this.paginationElement.toggleAttribute('hidden', isTree);
+    if (isTree) {
+      this.renderTree();
+    } else {
+      this.renderList();
+    }
+  }
+
+  /** Draws the flat list of the tasks. */
+  private renderList(): void {
     clear(this.rowsElement);
     for (const row of renderTaskRows(this.doc, this.tasks, {
       onView: (task) => {
@@ -435,40 +701,9 @@ export class App {
       this.rowsElement.append(row);
     }
 
-    const hasProject = this.config.projectDir !== null;
     const isEmpty = this.tasks.length === 0;
     this.rowsElement.parentElement?.classList.toggle('table-empty', isEmpty);
-
-    if (!hasProject) {
-      this.showEmptyState(
-        'Choose the folder that will hold your tasks',
-        'Every task is a text file named task_<id>.txt inside that folder.',
-        'Choose folder…',
-        () => {
-          void this.openFolderPicker();
-        },
-      );
-    } else if (isEmpty && this.query.length > 0) {
-      this.showEmptyState(
-        `No task matches "${this.query}"`,
-        'Try another search term or clear the search to see every task.',
-        'Clear search',
-        () => {
-          this.applySearch('');
-        },
-      );
-    } else if (isEmpty) {
-      this.showEmptyState(
-        'This folder does not contain any task yet',
-        'Create the first task to get started.',
-        'New task',
-        () => {
-          this.openCreateDialog();
-        },
-      );
-    } else {
-      this.hideEmptyState();
-    }
+    this.updateEmptyState(isEmpty);
 
     clear(this.paginationElement);
     this.paginationElement.append(
@@ -480,6 +715,133 @@ export class App {
     );
 
     this.resultCountElement.textContent = this.buildResultCount();
+    this.updateToolbarState();
+  }
+
+  /** Draws the tree of the tasks. */
+  private renderTree(): void {
+    this.renderTreeHeader();
+
+    clear(this.treeRowsElement);
+    for (const row of renderTreeRows(this.doc, this.treeRows, this.treeTasks, {
+      onToggle: (id) => {
+        void this.toggleTreeNode(id);
+      },
+      onFocus: (id) => {
+        void this.focusTree(id);
+      },
+      onView: (task) => {
+        void this.openViewDialog(task);
+      },
+      onEdit: (task) => {
+        this.openEditDialog(task);
+      },
+      onAddChild: (task) => {
+        this.openCreateDialog(task);
+      },
+    })) {
+      this.treeRowsElement.append(row);
+    }
+
+    this.updateEmptyState(this.treeRows.length === 0);
+    this.resultCountElement.textContent = this.buildResultCount();
+    this.updateToolbarState();
+  }
+
+  /**
+   * Draws the header of the tree: the chain of the tasks the tree is focused
+   * on, from the general root down to the focused task.
+   */
+  private renderTreeHeader(): void {
+    clear(this.treeHeaderElement);
+
+    const generalRoot = el(this.doc, 'button', {
+      class: 'tree-crumb',
+      text: 'General root',
+      title: 'Show every task that has no parent',
+    });
+    generalRoot.type = 'button';
+    if (this.treeFocusId === null) {
+      generalRoot.classList.add('is-active');
+    }
+    generalRoot.addEventListener('click', () => {
+      void this.focusTree(null);
+    });
+
+    const crumbs: Child[] = [generalRoot];
+    const structure = this.treeStructure;
+    if (this.treeFocusId !== null && structure !== null) {
+      for (const ancestorId of ancestorsOf(structure, this.treeFocusId)) {
+        crumbs.push(el(this.doc, 'span', { class: 'tree-crumb-sep', text: '›' }));
+        const crumb = el(this.doc, 'button', {
+          class: 'tree-crumb',
+          text: `#${ancestorId}`,
+          title: `Focus the tree on the task #${ancestorId}`,
+        });
+        crumb.type = 'button';
+        crumb.addEventListener('click', () => {
+          void this.focusTree(ancestorId);
+        });
+        crumbs.push(crumb);
+      }
+      crumbs.push(el(this.doc, 'span', { class: 'tree-crumb-sep', text: '›' }));
+      const focused = this.treeTasks.get(this.treeFocusId);
+      crumbs.push(
+        el(this.doc, 'span', {
+          class: 'tree-crumb is-active',
+          text: focused === undefined ? `#${this.treeFocusId}` : focused.title,
+        }),
+      );
+    }
+
+    this.treeHeaderElement.append(
+      el(this.doc, 'span', { class: 'tree-header-label', text: 'Focus' }),
+      el(this.doc, 'nav', { class: 'tree-breadcrumb' }, crumbs),
+    );
+  }
+
+  /** Shows the message of the empty state, when there is nothing to show. */
+  private updateEmptyState(isEmpty: boolean): void {
+    const hasProject = this.config.projectDir !== null;
+    if (!hasProject) {
+      this.showEmptyState(
+        'Choose the folder that will hold your tasks',
+        'Every task is a text file named task_<id>.txt inside that folder.',
+        'Choose folder…',
+        () => {
+          void this.openFolderPicker();
+        },
+      );
+      return;
+    }
+    if (isEmpty && this.query.length > 0) {
+      this.showEmptyState(
+        `No task matches "${this.query}"`,
+        'Try another search term or clear the search to see every task.',
+        'Clear search',
+        () => {
+          this.applySearch('');
+        },
+      );
+      return;
+    }
+    if (isEmpty) {
+      this.showEmptyState(
+        'This folder does not contain any task yet',
+        'Create the first task to get started.',
+        'New task',
+        () => {
+          this.openCreateDialog();
+        },
+      );
+      return;
+    }
+    this.hideEmptyState();
+  }
+
+  /** Keeps the state of the toolbar in sync with the current view. */
+  private updateToolbarState(): void {
+    const hasProject = this.config.projectDir !== null;
     this.clearSearchButton.toggleAttribute('hidden', this.query.length === 0);
     this.newTaskButton.toggleAttribute('disabled', !hasProject);
   }
@@ -487,6 +849,17 @@ export class App {
   private buildResultCount(): string {
     if (this.config.projectDir === null) {
       return '';
+    }
+    if (this.viewMode === 'tree') {
+      const total = this.treeHierarchy?.parents.size ?? 0;
+      const shown = this.treeRows.length;
+      if (this.query.length > 0) {
+        return `${shown} result${shown === 1 ? '' : 's'} for "${this.query}"`;
+      }
+      if (shown === total) {
+        return `${total} task${total === 1 ? '' : 's'}`;
+      }
+      return `${shown} of ${total} tasks`;
     }
     if (this.query.length > 0) {
       return `${this.info.totalItems} result${this.info.totalItems === 1 ? '' : 's'} for "${this.query}"`;
@@ -523,6 +896,63 @@ export class App {
 
   // -------------------------------------------------------------- actions --
 
+  /** Switches between the flat list and the tree of the tasks. */
+  private async setViewMode(mode: ViewMode): Promise<void> {
+    if (this.viewMode === mode) {
+      return;
+    }
+    this.viewMode = mode;
+    this.updateViewToggle();
+    await this.refresh();
+  }
+
+  private updateViewToggle(): void {
+    this.listViewButton.classList.toggle('is-active', this.viewMode === 'list');
+    this.treeViewButton.classList.toggle('is-active', this.viewMode === 'tree');
+    this.listViewButton.setAttribute('aria-pressed', this.viewMode === 'list' ? 'true' : 'false');
+    this.treeViewButton.setAttribute('aria-pressed', this.viewMode === 'tree' ? 'true' : 'false');
+  }
+
+  /**
+   * Makes a task the root of the displayed tree.
+   *
+   * `null` focuses the general root: every task that has no parent is shown.
+   */
+  private async focusTree(id: number | null): Promise<void> {
+    if (this.treeFocusId === id) {
+      return;
+    }
+    this.treeFocusId = id;
+    if (id !== null) {
+      // The focused task shows its children right away.
+      this.treeExpanded.add(id);
+    }
+    await this.updateTree();
+  }
+
+  /** Collapses or expands the children of a task of the tree. */
+  private async toggleTreeNode(id: number): Promise<void> {
+    if (this.treeExpanded.has(id)) {
+      this.treeExpanded.delete(id);
+    } else {
+      this.treeExpanded.add(id);
+    }
+    await this.updateTree();
+  }
+
+  /** Recomputes the tree and draws it again. */
+  private async updateTree(): Promise<void> {
+    this.setBusy(true);
+    try {
+      await this.updateTreeRows();
+      this.renderCurrentView();
+    } catch (error) {
+      this.handleError(error);
+    } finally {
+      this.setBusy(false);
+    }
+  }
+
   private applySearch(value: string): void {
     this.query = value.trim();
     this.searchInput.value = value;
@@ -539,7 +969,7 @@ export class App {
   }
 
   private async openFolderPicker(): Promise<void> {
-    if (this.token === null) {
+    if (this.token === null && this.authRequired !== false) {
       this.openTokenDialog();
       return;
     }

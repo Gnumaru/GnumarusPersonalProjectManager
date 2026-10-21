@@ -173,9 +173,72 @@ grep -rl --include='task_*.txt' ... -e '^parent=<id>$' .
 
 Both commands are executed by the bridge service, in the project folder.
 
-The hierarchy is one level deep in the user interface (the format would allow
+The hierarchy is one level deep in the flat list (the format would allow
 more), and the search, the pagination and the listing treat the children like
-any other task.
+any other task. The **tree view** shows the whole hierarchy.
+
+---
+
+## 5 bis. The tree view
+
+**Files:** `src/core/taskTree.ts`, `src/core/taskRepository.ts`, `src/ui/taskTreeView.ts`, `src/ui/app.ts`
+
+The toolbar holds a **List / Tree** toggle. The flat list stays exactly as it
+was; the tree is the second way of showing the tasks.
+
+### What a row shows
+
+Every task is one row with:
+
+* a **twisty** (`▸` / `▾`) that collapses and expands the children of the task
+  (it is disabled when the task has no child),
+* the **name** of the task, which opens the read only view of the task,
+* the **tags** of the task,
+* the **actions**: focus the tree on the task, view it, edit it and add a child.
+
+The indentation of a row is the depth of the task in the displayed tree.
+
+### The focus
+
+The tree can be focused on a task: that task becomes the root of the displayed
+tree and every task that is not part of its hierarchy is hidden. The **general
+root** (the first item of the breadcrumb) brings back every task that has no
+parent. The breadcrumb shows the chain of the focused task, from the general
+root down to it, and every ancestor can be focused in one click.
+
+### Where the data comes from
+
+The structure of the tasks is read with **one** command that only looks at the
+`parent=` lines, together with the listing of the task files (the id of a task
+is encoded in its file name):
+
+```
+grep -rH --include='task_*.txt' ... -e '^parent=' .
+./task_2.txt:parent=1
+./nested/task_3.txt:parent=2
+```
+
+The content of the files never reaches the browser here. The **files of the
+displayed rows only** are read afterwards (a few at a time), to get the title
+and the tags of the tasks that are on the screen: the memory holds the tree
+that is displayed and nothing else.
+
+### The rules of the tree
+
+`src/core/taskTree.ts` is pure and covered by unit tests:
+
+* a task whose **parent does not exist** (a deleted parent, a task moved to
+  another folder) becomes a **root**: it would otherwise never be displayed;
+* a **cycle** in the `parent=` keys (`a` is the parent of `b` and `b` is the
+  parent of `a`) is broken: the task that closes the cycle becomes a root;
+* the traversal remembers the ids of the current path, so a cycle can never
+  make it loop forever.
+
+### The search
+
+The search uses the same recursive `grep` as the flat list. In the tree, only
+the branches that hold a match are kept and the ancestors of the matches are
+expanded, so a match is never hidden behind a collapsed task.
 
 ---
 
@@ -184,10 +247,10 @@ any other task.
 **Files:** `src/api/client.ts`, `src/ui/app.ts`
 
 * The base URL is `http://127.0.0.1:1423`.
-* Every endpoint except `/api/help` needs the token generated when the service
-  starts. The user pastes it in the **API token** dialog of the top bar; the
-  token is kept in `localStorage` (ephemeral data, the same nature as the RAM
-  of a desktop application).
+* Every endpoint except `/api/help` may need the token generated when the
+  service starts. The user pastes it in the **API token** dialog of the top bar;
+  the token is kept in `localStorage` (ephemeral data, the same nature as the
+  RAM of a desktop application).
 * The service uses a tagged convention on the wire (`i:12`, `f:1.5`, `b:true`,
   `null`); the client decodes it in `decodeTagged` and encodes the numbers it
   sends back with `encodeTaggedNumber`.
@@ -195,6 +258,38 @@ any other task.
   application pings it **every five seconds**; when the service comes back the
   application reloads the configuration and the tasks by itself.
 * A rejected token shows a dedicated banner and opens the token dialog.
+
+### The token is optional
+
+The service can be started with the flag that **disables the token
+requirement**. The application discovers it and never asks for a token in that
+case:
+
+1. `GET /api/help` publishes an `auth` block whose `required` field is a
+   tagged boolean. `b:false` means "no token needed", `b:true` means "a token is
+   needed". The field is decoded by `parseServiceInfo`.
+2. When the help page does not publish the policy, a **protected route is
+   probed without any token**: `GET /api/sysinfo` first (read only, no
+   parameter) and then `POST /api/shell` with a harmless `echo`. A `401` answer
+   means the token is required, a successful answer means it is not.
+3. When nothing can be determined, the application behaves conservatively and
+   asks for the token.
+
+`ApiClient.fetchServiceStatus` returns everything the application needs in one
+call: the availability of the service, the authentication policy and the
+version of the service. The application calls it on every service check (every
+five seconds), so a service restarted with the opposite policy is noticed
+without reloading the page.
+
+What the application does with the policy:
+
+* The **API token** button of the top bar is **hidden** when the token is not
+  needed (there is nothing for the user to type).
+* The folder picker opens directly, without the token dialog.
+* The configuration file is read even when there is no token.
+* The tooltip of the status pill describes the current policy.
+* A `401` answer re-reads the policy before the token dialog is shown: the
+  user is only asked for a token when the service really needs one.
 
 ---
 
@@ -206,7 +301,7 @@ The selected project folder and the page size are stored in
 `~/.config/GnumarusProjectManager/config.json`, written through the bridge
 service, so the choice survives a browser cache wipe and can be shared by
 different browsers. The browser only stores the token, which changes every time
-the service restarts.
+the service restarts, and only when the service demands one.
 
 ---
 
@@ -250,14 +345,15 @@ A dialog that behaves like the file dialogs of an operating system:
 | ----- | -------------- |
 | `src/core/task.test.ts` | Format, parsing, serialization, round trip, tags. |
 | `src/core/pagination.test.ts` | Page count, clamping, slicing, page information. |
+| `src/core/taskTree.test.ts` | The tree of the tasks: roots, children, orphan tasks, cycles, focus, expansion and search. |
 | `src/core/config.test.ts` | Configuration parsing and serialization. |
-| `src/api/client.test.ts` | Tagged values, headers, error handling, shell calls (mocked `fetch`). |
-| `src/core/taskRepository.test.ts` | The repository against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children. Skipped when `GNUMARUS_API_TOKEN` is not set. |
+| `src/api/client.test.ts` | Tagged values, headers, error handling, shell calls, authentication policy of the service (mocked `fetch`). |
+| `src/core/taskRepository.test.ts` | The repository against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
 | `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons) and the pagination bar (jsdom). |
-| `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task and the navigation between the parent and its children. |
+| `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token and the tree view. |
 | `src/ui/fileDialog.test.ts` | Path helpers and sorting of the file list. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
-| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition and deletion, checked against the files on disk. |
+| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. |
 
 Commands:
 

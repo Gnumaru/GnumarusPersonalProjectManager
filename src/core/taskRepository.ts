@@ -42,9 +42,27 @@ export const GREP_TASK_FILES_COMMAND =
 export const COUNT_CHILDREN_COMMAND =
   "grep -rh --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg '^parent=' . | cut -d= -f2 | sort | uniq -c";
 
+/**
+ * Command used to read the hierarchy of the tasks.
+ *
+ * Only the `parent=` lines are read and the name of the file is printed in
+ * front of them (`-H`), so the answer stays small: one short line per child
+ * task.
+ */
+export const READ_PARENTS_COMMAND =
+  "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^parent=' .";
+
 /** Command used to list the task files that are children of a given task. */
 export function childrenCommand(parentId: number): string {
   return `grep -rl --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^parent=${parentId}$' .`;
+}
+
+/** The structure of the tasks of a project folder. */
+export interface TaskHierarchy {
+  /** Id of every task -> id of its parent (`null` for a task without parent). */
+  readonly parents: ReadonlyMap<number, number | null>;
+  /** Path of the file of every task. */
+  readonly paths: ReadonlyMap<number, string>;
 }
 
 export interface TaskPage {
@@ -210,6 +228,45 @@ export class TaskRepository {
     throw new Error('Unable to allocate a free task id');
   }
 
+  /**
+   * Reads the hierarchy of every task of the project folder.
+   *
+   * Two calls are needed: the listing of the task files (the id of a task is
+   * encoded in its file name) and a `grep` of the `parent=` lines (the parent
+   * of a task). The content of the files never reaches the browser here, only
+   * the structure of the tasks.
+   */
+  async readHierarchy(projectDir: string): Promise<TaskHierarchy> {
+    const [paths, result] = await Promise.all([
+      this.listTaskFilePaths(projectDir),
+      this.api.execShell({
+        command: READ_PARENTS_COMMAND,
+        cwd: projectDir,
+        timeout: 60,
+      }),
+    ]);
+    if (result.returncode !== 0 && result.returncode !== 1) {
+      throw new Error(
+        `Unable to read the hierarchy of "${projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
+      );
+    }
+
+    const parentsByPath = this.parseParents(result.stdout, projectDir);
+    const parents = new Map<number, number | null>();
+    const taskPaths = new Map<number, string>();
+
+    for (const path of paths) {
+      const id = parseTaskIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
+      if (id === null) {
+        continue;
+      }
+      parents.set(id, parentsByPath.get(path) ?? null);
+      taskPaths.set(id, path);
+    }
+
+    return { parents, paths: taskPaths };
+  }
+
   /** Amount of children of every task, indexed by the id of the parent. */
   async childCounts(projectDir: string): Promise<Map<number, number>> {
     const counts = new Map<number, number>();
@@ -295,6 +352,33 @@ export class TaskRepository {
   /** Clamps a page number to the available range. */
   safePage(page: number, totalItems: number, pageSize: number): number {
     return clampPage(page, totalPages(totalItems, pageSize));
+  }
+
+  /**
+   * Parses the output of `grep -rH -e '^parent='`.
+   *
+   * Every line looks like `./sub/task_5.txt:parent=3`. The path may contain a
+   * colon, so the last colon that is followed by the key is the separator.
+   */
+  private parseParents(stdout: string, projectDir: string): Map<string, number> {
+    const parents = new Map<string, number>();
+    for (const line of stdout.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) {
+        continue;
+      }
+      const match = /^(.*):parent=(\d+)$/u.exec(trimmed);
+      if (match === null) {
+        continue;
+      }
+      const relative = match[1] ?? '';
+      const parentId = Number.parseInt(match[2] ?? '', 10);
+      if (relative.length === 0 || !Number.isSafeInteger(parentId)) {
+        continue;
+      }
+      parents.set(joinPath(projectDir, relative), parentId);
+    }
+    return parents;
   }
 
   private parsePaths(stdout: string, projectDir: string): string[] {

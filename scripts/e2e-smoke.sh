@@ -82,12 +82,14 @@ echo "==> rendering the application at the domain root"
 render "http://127.0.0.1:${PORT}/" "${TMP_DIR}/root.html"
 expect_marker "${TMP_DIR}/root.html" "Gnumarus Project Manager" "the root page"
 expect_marker "${TMP_DIR}/root.html" "Service online" "the root page"
-expect_marker "${TMP_DIR}/root.html" "Choose the folder that will hold your tasks" "the root page"
+expect_marker "${TMP_DIR}/root.html" "New task" "the root page"
+expect_marker "${TMP_DIR}/root.html" "Tree" "the root page"
 
 echo "==> rendering the application at a nested path"
 render "http://127.0.0.1:${PORT}/nested/deep/app/" "${TMP_DIR}/nested.html"
 expect_marker "${TMP_DIR}/nested.html" "Gnumarus Project Manager" "the nested page"
 expect_marker "${TMP_DIR}/nested.html" "Service online" "the nested page"
+expect_marker "${TMP_DIR}/nested.html" "New task" "the nested page"
 
 echo "==> taking a screenshot"
 "${CHROME_BIN}" \
