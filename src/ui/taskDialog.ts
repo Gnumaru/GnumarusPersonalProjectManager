@@ -35,7 +35,7 @@ export interface TaskDialogOptions {
   /** Called when the user clicks one of the children. */
   readonly onOpenChild?: ((child: Task) => void) | undefined;
   /** Reads the comments of a task. */
-  readonly onLoadComments?: ((taskId: number) => Promise<TaskComment[]>) | undefined;
+  readonly onLoadComments?: ((taskId: number) => Promise<readonly TaskComment[]>) | undefined;
   /** Adds a comment to a task. */
   readonly onAddComment?: ((taskId: number, text: string) => Promise<void>) | undefined;
   /** Changes the text of a comment. */
@@ -56,7 +56,7 @@ export class TaskDialog {
   private readonly onEdit: (() => void) | undefined;
   private readonly onAddChild: (() => void) | undefined;
   private readonly onOpenChild: ((child: Task) => void) | undefined;
-  private readonly onLoadComments: ((taskId: number) => Promise<TaskComment[]>) | undefined;
+  private readonly onLoadComments: ((taskId: number) => Promise<readonly TaskComment[]>) | undefined;
   private readonly onAddComment: ((taskId: number, text: string) => Promise<void>) | undefined;
   private readonly onUpdateComment:
     | ((taskId: number, commentId: number, text: string) => Promise<void>)
@@ -78,7 +78,7 @@ export class TaskDialog {
   /** The ids of the tasks that are related to the task. */
   private relatedIds: number[];
   /** The comments of the task, the most recent first. */
-  private comments: TaskComment[] = [];
+  private comments: readonly TaskComment[] = [];
   /** The comment that is being edited, `null` when none is. */
   private editingCommentId: number | null = null;
   /** The text of the comment that is being written. */

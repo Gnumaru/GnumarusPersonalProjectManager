@@ -10,14 +10,14 @@ list or as a tree.
 | List the tasks of the selected folder | Done | `src/ui/taskTable.ts` |
 | Paginated listing, 10 tasks per page | Done | `src/core/pagination.ts`, `src/ui/paginationBar.ts` |
 | First / previous / next / last page buttons | Done | `src/ui/paginationBar.ts` |
-| Create a root task | Done | `src/ui/taskDialog.ts`, `src/core/taskRepository.ts` |
+| Create a root task | Done | `src/ui/taskDialog.ts`, `src/core/projectStore.ts` |
 | **Create a child task from an existing parent task** | Done | `src/ui/taskTable.ts`, `src/ui/taskDialog.ts` |
 | **List the children of a task and open them** | Done | `src/ui/taskDialog.ts` |
 | **Show the parent of a task and the amount of children of a task** | Done | `src/ui/taskTable.ts` |
-| Edit a task | Done | `src/ui/taskDialog.ts`, `src/core/taskRepository.ts` |
+| Edit a task | Done | `src/ui/taskDialog.ts`, `src/core/projectStore.ts` |
 | View a task | Done | `src/ui/taskDialog.ts` |
-| Delete a task (with confirmation) | Done | `src/ui/taskDialog.ts`, `src/core/taskRepository.ts` |
-| Recursive search of the tasks (grep) | Done | `src/core/taskRepository.ts` |
+| Delete a task (with confirmation) | Done | `src/ui/taskDialog.ts`, `src/core/projectStore.ts` |
+| Recursive search of the tasks (grep) | Done | `src/core/serviceStore.ts`, `src/core/embeddedStore.ts` |
 | Free form tags (add and remove) | Done | `src/core/task.ts` |
 | Task status (planning, next, to do, doing, paused, done, canceled) | Done | `src/core/task.ts` |
 
@@ -35,7 +35,7 @@ list or as a tree.
 | **Focus the general root (every task without a parent)** | Done | `src/ui/app.ts` |
 | **Breadcrumb of the focused task** | Done | `src/ui/app.ts` |
 | **View and edit dialogs opened from a row of the tree** | Done | `src/ui/taskTreeView.ts` |
-| **The hierarchy read with a single `grep`** | Done | `src/core/taskRepository.ts` |
+| **The hierarchy read with a single `grep`** | Done | `src/core/serviceStore.ts`, `src/core/embeddedStore.ts` |
 | **Only the displayed task files are read** | Done | `src/ui/app.ts` |
 
 ## Storage
@@ -45,19 +45,19 @@ list or as a tree.
 | One text file per task (`task_<id>.txt`) | Done | `src/core/task.ts` |
 | `key=value` metadata block ended by `----` | Done | `src/core/task.ts` |
 | Description as free text after the separator | Done | `src/core/task.ts` |
-| Unique incremental task id | Done | `src/core/taskRepository.ts` |
-| Automatic id allocation, collision safe | Done | `src/core/taskRepository.ts` |
+| Unique incremental task id | Done | `src/core/projectStore.ts` |
+| Automatic id allocation, collision safe | Done | `src/core/projectStore.ts` |
 | `parent=<id>` key written and read for the child tasks | Done | `src/core/task.ts` |
 | **`blocked_by=...`: the tasks that block a task** | Done | `src/core/task.ts` |
 | **`related=...`: the tasks that are related to a task** | Done | `src/core/task.ts` |
 | **The blocking and the related tasks are edited in the editor** | Done | `src/ui/idListField.ts` |
 | **The comments of a task, one file `comment_<id>.txt` each** | Done | `src/core/comment.ts` |
 | **The comments are listed, created, edited and deleted in the editor** | Done | `src/ui/taskDialog.ts` |
-| **A task moved under another one (drag and drop)** | Done | `src/core/task.ts`, `src/core/taskRepository.ts` |
+| **A task moved under another one (drag and drop)** | Done | `src/core/task.ts`, `src/core/projectStore.ts` |
 | **Dates written in the compact format `YYYYMMDDHHNNSSIII` (local time, no timezone)** | Done | `src/core/task.ts` |
 | **`start=...` and `end=...`: the start and the end date of a task** | Done | `src/core/task.ts` |
 | **Date pickers for the start and the end date in the editor** | Done | `src/ui/taskDialog.ts` |
-| Amount of children per task (read with `grep`) | Done | `src/core/taskRepository.ts` |
+| Amount of children per task (read with `grep`) | Done | `src/core/serviceStore.ts`, `src/core/embeddedStore.ts` |
 
 ## Bridge integration
 
@@ -77,7 +77,7 @@ list or as a tree.
 | ------- | ------ | ----- |
 | **Kanban board: one column per status** | Done | `src/ui/kanbanBoard.ts` |
 | **Columns in the order PLANNING, TODO, NEXT, PAUSED, DOING, DONE, CANCELED** | Done | `src/core/task.ts` |
-| **Only the tasks that have no child are on the board** | Done | `src/core/taskRepository.ts` |
+| **Only the tasks that have no child are on the board** | Done | `src/core/projectStore.ts` |
 | **Drag and drop between the columns changes the status** | Done | `src/ui/kanbanDrag.ts` |
 | **A card opens the task and its editor** | Done | `src/ui/kanbanBoard.ts` |
 
@@ -99,6 +99,17 @@ list or as a tree.
 | **The bars can be dragged to change the dates of a task** | Done | `src/ui/ganttDrag.ts` |
 | **The bars carry the colour of the status** | Done | `src/styles.css` |
 
+## The project
+
+| Feature | Status | Where |
+| ------- | ------ | ----- |
+| **The files live in the service or in an embedded project (in the browser)** | Done | `src/ui/projectDialog.ts` |
+| **The embedded project is kept in the OPFS, or in an IndexedDB** | Done | `src/core/browserStorage.ts` |
+| **The project can be downloaded as a ZIP archive** | Done | `src/core/zip.ts` |
+| **A ZIP archive can be imported as the embedded project** | Done | `src/ui/app.ts` |
+| **One storage facade for the service and for the browser** | Done | `src/core/projectStore.ts` |
+| **Only one embedded project in the browser: an import replaces it completely** | Done | `src/core/embeddedStore.ts` |
+
 ## User interface
 
 | Feature | Status | Where |
@@ -118,7 +129,8 @@ list or as a tree.
 | ------- | ------ | ----- |
 | Strict TypeScript (`strict` plus the strictest extra flags, no `any`) | Done | `tsconfig.json` |
 | Unit tests of the format, the pagination, the tree, the client and the widgets | Done | `src/**/*.test.ts` |
-| Integration tests against the running bridge (with or without a token) | Done | `src/core/taskRepository.test.ts` |
+| Unit tests of the embedded project, of the storage of the browser and of the ZIP archives | Done | `src/core/embeddedStore.test.ts`, `src/core/browserStorage.test.ts`, `src/core/zip.test.ts` |
+| Integration tests against the running bridge (with or without a token) | Done | `src/core/serviceStore.test.ts` |
 | Browser end to end test driving a real Chrome | Done | `scripts/e2e-browser.mjs` |
 | Headless render test at the root and at a nested path | Done | `scripts/e2e-smoke.sh` |
 | Automated deploy to `/var/www/html/GnumarusProjectManager` | Done | `scripts/deploy.mjs` |
@@ -128,4 +140,3 @@ list or as a tree.
 * Grand children (a task whose parent is itself a child): the format already
   supports it, but the user interface only offers one level of children.
 * Multi project management, task dependencies, due dates, priorities.
-* Import and export of a project.

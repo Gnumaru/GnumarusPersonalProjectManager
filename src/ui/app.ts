@@ -11,10 +11,20 @@
  */
 
 import { ApiClient, ApiError, ApiUnavailableError } from '../api/client.js';
-import { loadConfig, saveConfig, type AppConfig } from '../core/config.js';
+import {
+  loadConfig,
+  readMode,
+  saveConfig,
+  writeMode,
+  type AppConfig,
+} from '../core/config.js';
 import { DEFAULT_PAGE_SIZE, computePageInfo, type PageInfo } from '../core/pagination.js';
-import { TaskRepository, extractTaskIds, joinPath, type TaskHierarchy, type TaskMetadata } from '../core/taskRepository.js';
+import { createBrowserFileStorage } from '../core/browserStorage.js';
+import { EmbeddedProjectStore } from '../core/embeddedStore.js';
+import { ServiceProjectStore } from '../core/serviceStore.js';
+import type { ProjectStore, TaskHierarchy, TaskSummary } from '../core/projectStore.js';
 import { commentFileName, type TaskComment } from '../core/comment.js';
+import { createZip, readZip } from '../core/zip.js';
 import {
   ancestorsOf,
   buildTaskTree,
@@ -38,6 +48,13 @@ import {
 } from '../core/gantt.js';
 import {
   STATUS_LABELS,
+  applyTaskInput,
+  buildTask,
+  formatTaskTimestamp,
+  parseTaskIdFromFileName,
+  withDates,
+  withParent,
+  withStatus,
   type Task,
   type TaskCard,
   type TaskInput,
@@ -51,6 +68,7 @@ import { createIcon } from './icons.js';
 import { KanbanDragController } from './kanbanDrag.js';
 import { renderKanbanBoard } from './kanbanBoard.js';
 import { Modal } from './modal.js';
+import { ProjectDialog } from './projectDialog.js';
 import { renderPaginationBar } from './paginationBar.js';
 import { TaskDialog } from './taskDialog.js';
 import { renderTaskRows } from './taskTable.js';
@@ -93,7 +111,6 @@ export class App {
   private readonly doc: Document;
   private readonly root: HTMLElement;
   private readonly api: ApiClient;
-  private readonly repository: TaskRepository;
   private readonly storage: TokenStorage | undefined;
   private readonly tokenStorageKey: string;
 
@@ -106,7 +123,14 @@ export class App {
    * `null` when the policy could not be determined.
    */
   private authRequired: boolean | null = null;
-  private config: AppConfig = { projectDir: null, pageSize: DEFAULT_PAGE_SIZE };
+  private config: AppConfig = { mode: 'service', projectDir: null, pageSize: DEFAULT_PAGE_SIZE };
+  /**
+   * The storage of the project.
+   *
+   * `null` when there is no project yet: the service mode needs a folder and
+   * the embedded mode needs the storage of the browser.
+   */
+  private store: ProjectStore | null = null;
   private query = '';
   private page = 1;
   private pageSize = DEFAULT_PAGE_SIZE;
@@ -134,7 +158,7 @@ export class App {
   /** The cards of the board: the tasks that have no child. */
   private kanbanCards: TaskCard[] = [];
   /** The metadata of the tasks, read for the Gantt chart. */
-  private ganttMetadata = new Map<number, TaskMetadata>();
+  private ganttMetadata = new Map<number, TaskSummary>();
   /** The weeks and the months that are collapsed in the Gantt chart. */
   private ganttCollapsed = new Set<string>();
   /** The schedule of the chart currently drawn. */
@@ -143,6 +167,7 @@ export class App {
   private ganttLayoutState: GanttLayout | null = null;
 
   private projectPathElement!: HTMLElement;
+  private chooseFolderButton!: HTMLButtonElement;
   private serviceTextElement!: HTMLElement;
   private servicePillElement!: HTMLElement;
   private tokenButton!: HTMLButtonElement;
@@ -175,7 +200,6 @@ export class App {
     this.doc = options.doc;
     this.root = options.root;
     this.api = options.api ?? new ApiClient();
-    this.repository = new TaskRepository(this.api);
     this.storage = options.storage;
     this.tokenStorageKey = options.tokenStorageKey ?? TOKEN_STORAGE_KEY;
   }
@@ -200,10 +224,53 @@ export class App {
     await this.checkService();
 
     await this.loadConfig();
+    await this.openStore();
     await this.refresh();
 
     this.startServiceWatch();
     this.doc.addEventListener('keydown', this.handleGlobalKeyDown);
+  }
+
+  /**
+   * Opens the storage of the project.
+   *
+   * The service mode needs a folder, the embedded mode needs the storage of the
+   * browser: when one of them is missing the application waits for the user.
+   */
+  private async openStore(): Promise<void> {
+    const config = this.config;
+    if (config.mode === 'embedded') {
+      try {
+        const storage = await createBrowserFileStorage();
+        this.storageName = storage.name;
+        const store = new EmbeddedProjectStore(storage);
+        await store.load();
+        this.store = store;
+        if (!storage.persistent) {
+          showToast({
+            doc: this.doc,
+            message:
+              'This browser cannot keep the project: download the ZIP archive to keep it.',
+            kind: 'error',
+          });
+        }
+      } catch (error) {
+        this.store = null;
+        showToast({
+          doc: this.doc,
+          message: `Unable to open the storage of the browser: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          kind: 'error',
+        });
+      }
+      return;
+    }
+    if (config.projectDir === null) {
+      this.store = null;
+      return;
+    }
+    this.store = new ServiceProjectStore(this.api, config.projectDir);
   }
 
   // ---------------------------------------------------------------- layout --
@@ -222,6 +289,16 @@ export class App {
         void this.openFolderPicker();
       },
     });
+    this.chooseFolderButton = chooseFolderButton;
+
+    const projectButton = button(this.doc, 'Project…', {
+      class: 'secondary',
+      title: 'Choose where the files of the project are kept',
+      onClick: () => {
+        this.openProjectDialog();
+      },
+    });
+    projectButton.append(createIcon(this.doc, 'folder'));
 
     this.serviceTextElement = el(this.doc, 'span', { class: 'service-text', text: 'Checking…' });
     this.servicePillElement = el(this.doc, 'div', { class: 'service-pill' }, [
@@ -258,6 +335,7 @@ export class App {
         el(this.doc, 'span', { class: 'topbar-label', text: 'Project folder' }),
         this.projectPathElement,
         chooseFolderButton,
+        projectButton,
       ]),
       el(this.doc, 'div', { class: 'topbar-actions' }, [
         this.servicePillElement,
@@ -537,14 +615,20 @@ export class App {
   // --------------------------------------------------------------- config --
 
   private async loadConfig(): Promise<void> {
-    this.config = await loadConfig(this.api);
+    const mode = readMode();
+    this.config = await loadConfig(this.api, mode);
+    this.config = { ...this.config, mode };
     this.pageSize = this.config.pageSize;
     this.updateProjectPath();
   }
 
   private async persistConfig(): Promise<void> {
     try {
-      await saveConfig(this.api, { projectDir: this.config.projectDir, pageSize: this.pageSize });
+      await saveConfig(this.api, {
+        mode: this.config.mode,
+        projectDir: this.config.projectDir,
+        pageSize: this.pageSize,
+      });
     } catch (error) {
       showToast({
         doc: this.doc,
@@ -556,6 +640,13 @@ export class App {
 
   private updateProjectPath(): void {
     const projectDir = this.config.projectDir;
+    if (this.config.mode === 'embedded') {
+      this.projectPathElement.textContent = 'Embedded project';
+      this.projectPathElement.title = 'The files of the project are kept in this browser.';
+      this.chooseFolderButton.setAttribute('hidden', 'hidden');
+      return;
+    }
+    this.chooseFolderButton.removeAttribute('hidden');
     if (projectDir === null) {
       this.projectPathElement.textContent = 'No folder selected';
       this.projectPathElement.title = '';
@@ -565,11 +656,143 @@ export class App {
     this.projectPathElement.title = projectDir;
   }
 
+  // -------------------------------------------------------------- project --
+
+  /** Opens the dialog that chooses where the files of the project are kept. */
+  private openProjectDialog(): void {
+    const dialog = new ProjectDialog({
+      doc: this.doc,
+      mode: this.config.mode,
+      projectDir: this.config.projectDir,
+      storageName: this.storageName,
+      onUseService: () => {
+        void this.switchToService();
+      },
+      onUseEmbedded: () => {
+        void this.switchToEmbedded();
+      },
+      onChooseFolder: () => {
+        void this.openFolderPicker();
+      },
+      onDownload: () => {
+        void this.downloadProjectArchive();
+      },
+      onImport: (file) => {
+        void this.importProjectArchive(file);
+      },
+    });
+    dialog.open();
+  }
+
+  /** The name of the storage the browser offers, for the messages. */
+  private storageName = 'the storage of the browser';
+
+  /**
+   * Works on the files of the machine, reached through the service.
+   *
+   * The embedded project is **not** touched: the user can go back to it.
+   */
+  private async switchToService(): Promise<void> {
+    writeMode('service');
+    this.config = { ...this.config, mode: 'service' };
+    await this.persistConfig();
+    await this.openStore();
+    this.updateProjectPath();
+    await this.refresh();
+  }
+
+  /**
+   * Works on the project that lives in the browser.
+   *
+   * The embedded project is the only one the browser can hold: when the user
+   * imports an archive, the current one is discarded completely.
+   */
+  private async switchToEmbedded(): Promise<void> {
+    writeMode('embedded');
+    this.config = { ...this.config, mode: 'embedded' };
+    await this.persistConfig();
+    await this.openStore();
+    this.updateProjectPath();
+    await this.refresh();
+  }
+
+  /** Downloads the files of the project as a ZIP archive. */
+  private async downloadProjectArchive(): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      showToast({
+        doc: this.doc,
+        message: 'There is no project to download yet.',
+        kind: 'error',
+      });
+      return;
+    }
+    try {
+      const files = await store.listFiles();
+      const archive = createZip(files);
+      const blob = new Blob([archive.slice().buffer], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
+      const link = this.doc.createElement('a');
+      link.href = url;
+      link.download = 'project.zip';
+      this.doc.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast({
+        doc: this.doc,
+        message: `The project was downloaded (${files.length} files).`,
+        kind: 'success',
+      });
+    } catch (error) {
+      showToast({
+        doc: this.doc,
+        message: `Unable to download the project: ${error instanceof Error ? error.message : String(error)}`,
+        kind: 'error',
+      });
+    }
+  }
+
+  /**
+   * Imports a ZIP archive as the embedded project.
+   *
+   * The files of the current embedded project are discarded completely.
+   */
+  private async importProjectArchive(file: File): Promise<void> {
+    writeMode('embedded');
+    this.config = { ...this.config, mode: 'embedded' };
+    try {
+      const buffer = await file.arrayBuffer();
+      const files = readZip(new Uint8Array(buffer));
+      const storage = await createBrowserFileStorage();
+      this.storageName = storage.name;
+      const store = new EmbeddedProjectStore(storage);
+      await store.replaceAll(files);
+      await this.persistConfig();
+      this.store = store;
+      this.page = 1;
+      this.query = '';
+      this.searchInput.value = '';
+      this.updateProjectPath();
+      await this.refresh();
+      showToast({
+        doc: this.doc,
+        message: `The archive was imported (${files.length} files).`,
+        kind: 'success',
+      });
+    } catch (error) {
+      showToast({
+        doc: this.doc,
+        message: `Unable to import the archive: ${error instanceof Error ? error.message : String(error)}`,
+        kind: 'error',
+      });
+    }
+  }
+
   // ---------------------------------------------------------------- tasks --
 
   private async refresh(): Promise<void> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
+    if (this.store === null) {
       this.tasks = [];
       this.info = computePageInfo(1, this.pageSize, 0);
       this.treeRows = [];
@@ -581,13 +804,13 @@ export class App {
     this.setBusy(true);
     try {
       if (this.viewMode === 'tree') {
-        await this.refreshTree(projectDir);
+        await this.refreshTree();
       } else if (this.viewMode === 'kanban') {
-        await this.refreshKanban(projectDir);
+        await this.refreshKanban();
       } else if (this.viewMode === 'gantt') {
-        await this.refreshGantt(projectDir);
+        await this.refreshGantt();
       } else {
-        await this.refreshList(projectDir);
+        await this.refreshList();
       }
       this.setServiceState('online');
       this.renderCurrentView();
@@ -599,35 +822,68 @@ export class App {
   }
 
   /** Loads one page of the flat list of the tasks. */
-  private async refreshList(projectDir: string): Promise<void> {
-    const [page, childCounts] = await Promise.all([
-      this.repository.getPage(projectDir, {
-        page: this.page,
-        pageSize: this.pageSize,
-        query: this.query,
-      }),
-      this.repository.childCounts(projectDir).catch(() => new Map<number, number>()),
-    ]);
-    this.tasks = [...page.tasks];
-    this.info = page.info;
-    this.page = page.info.page;
-    this.childCounts = childCounts;
+  private async refreshList(): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      this.tasks = [];
+      this.info = computePageInfo(1, this.pageSize, 0);
+      return;
+    }
+    const paths =
+      this.query.length === 0
+        ? await store.listTaskPaths()
+        : await store.searchTaskPaths(this.query);
+
+    const info = computePageInfo(this.page, this.pageSize, paths.length);
+    const start = (info.page - 1) * this.pageSize;
+    const pagePaths = paths.slice(start, start + this.pageSize);
+
+    const tasks: Task[] = [];
+    for (const path of pagePaths) {
+      try {
+        tasks.push(await store.readTask(path));
+      } catch (error) {
+        // The file disappeared between the listing and the read: skip it.
+        if (error instanceof ApiError && error.status === 404) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    const childCounts = await store.childCounts().catch(() => new Map<number, number>());
+    this.tasks = tasks;
+    this.info = info;
+    this.page = info.page;
+    this.childCounts = new Map(childCounts);
   }
 
   /**
    * Reads the structure of the tasks and the tasks that are displayed.
    *
-   * The hierarchy is read with a single `grep` of the `parent=` lines: the
-   * content of the files never reaches the browser here.
+   * The content of the files never reaches the browser here: only the metadata
+   * of the tasks is read.
    */
-  private async refreshTree(projectDir: string): Promise<void> {
-    const hierarchy = await this.repository.readHierarchy(projectDir);
-    this.treeHierarchy = hierarchy;
-    this.treeStructure = buildTaskTree(hierarchy.parents);
+  private async refreshTree(): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      this.treeHierarchy = null;
+      this.treeStructure = null;
+      return;
+    }
+    const summaries = await store.listTasks();
+    this.applyHierarchy(summaries);
 
     if (this.query.length > 0) {
-      const paths = await this.repository.searchTaskFilePaths(projectDir, this.query);
-      this.treeMatches = new Set(extractTaskIds(paths));
+      const paths = await store.searchTaskPaths(this.query);
+      const ids = new Set<number>();
+      for (const path of paths) {
+        const id = parseTaskIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
+        if (id !== null) {
+          ids.add(id);
+        }
+      }
+      this.treeMatches = ids;
     } else {
       this.treeMatches = null;
     }
@@ -638,29 +894,57 @@ export class App {
   /**
    * Reads the cards of the board.
    *
-   * Only the tasks that have **no child** belong to the board: one command
-   * reads the parent, the status, the title and the tags of every task.
+   * Only the tasks that have **no child** belong to the board.
    */
-  private async refreshKanban(projectDir: string): Promise<void> {
-    this.kanbanCards = await this.repository.readLeafTasks(projectDir);
+  private async refreshKanban(): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      this.kanbanCards = [];
+      return;
+    }
+    const summaries = await store.listTasks();
+    const parents = new Set<number>();
+    for (const task of summaries) {
+      if (task.parentId !== null) {
+        parents.add(task.parentId);
+      }
+    }
+    this.kanbanCards = summaries
+      .filter((task) => !parents.has(task.id))
+      .map((task) => ({
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        parentId: task.parentId,
+        tags: task.tags,
+        path: task.path,
+      }));
   }
 
   /**
    * Reads the metadata of the tasks for the Gantt chart.
    *
-   * One command returns the parent, the status, the title and the dates of
-   * every task: the chart needs all of them.
+   * The chart needs the parent, the status, the title and the dates of every
+   * task.
    */
-  private async refreshGantt(projectDir: string): Promise<void> {
-    const metadata = await this.repository.readTaskMetadata(projectDir);
-    this.ganttMetadata = metadata;
+  private async refreshGantt(): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      this.ganttMetadata = new Map<number, TaskSummary>();
+      return;
+    }
+    const summaries = await store.listTasks();
+    this.applyHierarchy(summaries);
+    this.ganttMetadata = new Map<number, TaskSummary>(
+      summaries.map((task) => [task.id, task]),
+    );
+  }
 
-    // The chart shows the same tree as the tree view: the structure, the focus
-    // and the expansion are shared, so a branch expanded in one view is
-    // expanded in the other one.
+  /** Builds the hierarchy of the tasks from their metadata. */
+  private applyHierarchy(summaries: readonly TaskSummary[]): void {
     const parents = new Map<number, number | null>();
     const paths = new Map<number, string>();
-    for (const task of metadata.values()) {
+    for (const task of summaries) {
       parents.set(task.id, task.parentId);
       paths.set(task.id, task.path);
     }
@@ -735,7 +1019,10 @@ export class App {
           continue;
         }
         try {
-          loaded.set(id, await this.repository.loadTask(path));
+          const task = await this.store?.readTask(path);
+          if (task !== undefined) {
+            loaded.set(id, task);
+          }
         } catch (error) {
           if (error instanceof ApiError && error.status === 404) {
             // The file disappeared between the listing and the read: skip it.
@@ -988,15 +1275,35 @@ export class App {
    * The dates are dragged on the chart of the Gantt view.
    */
   private async changeTaskDates(taskId: number, start: string, end: string): Promise<void> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
+    await this.updateTaskFields(taskId, (task) => withDates(task, start, end, new Date()));
+  }
+
+  /** The path of the file of a task, relative to the project folder. */
+  private pathOfTask(taskId: number): string {
+    return (
+      this.treeHierarchy?.paths.get(taskId) ?? this.store?.taskPath(taskId) ?? `task_${taskId}.txt`
+    );
+  }
+
+  /**
+   * Reads a task, applies a change to it and writes it back.
+   *
+   * The file of the task is the only thing that is touched: the change is the
+   * same in the service mode and in the embedded mode.
+   */
+  private async updateTaskFields(
+    taskId: number,
+    change: (task: Task) => Task,
+  ): Promise<void> {
+    const store = this.store;
+    if (store === null) {
       return;
     }
-    const path =
-      this.treeHierarchy?.paths.get(taskId) ?? this.repository.taskPath(projectDir, taskId);
+    const path = this.pathOfTask(taskId);
     this.setBusy(true);
     try {
-      await this.repository.setDates(path, start, end);
+      const task = await store.readTask(path);
+      await store.writeTask(path, change(task));
       await this.refresh();
     } catch (error) {
       this.handleError(error);
@@ -1374,10 +1681,6 @@ export class App {
    * descendants, that would build a cycle.
    */
   private async reparentTask(taskId: number, targetId: number | null): Promise<void> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
-      return;
-    }
     const structure = this.treeStructure;
     if (structure !== null) {
       if (targetId !== null && subtreeOf(structure, taskId).includes(targetId)) {
@@ -1394,24 +1697,15 @@ export class App {
       }
     }
 
-    const path = this.treeHierarchy?.paths.get(taskId) ?? this.repository.taskPath(projectDir, taskId);
-    this.setBusy(true);
-    try {
-      await this.repository.setParent(path, targetId);
-      showToast({
-        doc: this.doc,
-        message:
-          targetId === null
-            ? `The task #${taskId} is now a root task.`
-            : `The task #${taskId} is now a child of the task #${targetId}.`,
-        kind: 'success',
-      });
-      await this.refresh();
-    } catch (error) {
-      this.handleError(error);
-    } finally {
-      this.setBusy(false);
-    }
+    showToast({
+      doc: this.doc,
+      message:
+        targetId === null
+          ? `The task #${taskId} is now a root task.`
+          : `The task #${taskId} is now a child of the task #${targetId}.`,
+      kind: 'success',
+    });
+    await this.updateTaskFields(taskId, (task) => withParent(task, targetId, new Date()));
   }
 
   /**
@@ -1421,29 +1715,17 @@ export class App {
    * its file is rewritten.
    */
   private async changeTaskStatus(taskId: number, status: TaskStatus): Promise<void> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
-      return;
-    }
     const card = this.kanbanCards.find((candidate) => candidate.id === taskId);
     if (card === undefined || card.status === status) {
       // The task is not on the board any more, or it is already there.
       return;
     }
-    this.setBusy(true);
-    try {
-      await this.repository.setStatus(card.path, status);
-      showToast({
-        doc: this.doc,
-        message: `The task #${taskId} is now ${STATUS_LABELS[status]}.`,
-        kind: 'success',
-      });
-      await this.refresh();
-    } catch (error) {
-      this.handleError(error);
-    } finally {
-      this.setBusy(false);
-    }
+    showToast({
+      doc: this.doc,
+      message: `The task #${taskId} is now ${STATUS_LABELS[status]}.`,
+      kind: 'success',
+    });
+    await this.updateTaskFields(taskId, (task) => withStatus(task, status, new Date()));
   }
 
   /** Opens the editor of a task that is only known by its id. */
@@ -1456,21 +1738,13 @@ export class App {
   }
 
   /** The comments of a task, the most recent first. */
-  private async loadTaskComments(taskId: number): Promise<TaskComment[]> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
-      return [];
-    }
-    return this.repository.listComments(projectDir, taskId);
+  private async loadTaskComments(taskId: number): Promise<readonly TaskComment[]> {
+    return this.store?.listComments(taskId) ?? [];
   }
 
   /** Adds a comment to a task. */
   private async addTaskComment(taskId: number, text: string): Promise<void> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
-      return;
-    }
-    await this.repository.createComment(projectDir, taskId, text);
+    await this.store?.createComment(taskId, text);
   }
 
   /** Changes the text of a comment. */
@@ -1479,38 +1753,39 @@ export class App {
     commentId: number,
     text: string,
   ): Promise<void> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
+    const store = this.store;
+    if (store === null) {
       return;
     }
-    await this.repository.updateComment(this.commentPath(projectDir, commentId), text);
+    const comment = await store
+      .listComments(_taskId)
+      .then((comments) => comments.find((entry) => entry.id === commentId));
+    if (comment === undefined) {
+      return;
+    }
+    await store.writeComment({ ...comment, text, updated: formatTaskTimestamp(new Date()) });
   }
 
   /** Deletes a comment of a task. */
   private async deleteTaskComment(_taskId: number, commentId: number): Promise<void> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
-      return;
-    }
-    await this.repository.deleteComment(this.commentPath(projectDir, commentId));
+    await this.store?.deleteComment(this.commentPath(commentId));
   }
 
-  /** The path of the file of a comment. */
-  private commentPath(projectDir: string, commentId: number): string {
-    return joinPath(projectDir, commentFileName(commentId));
+  /** The path of the file of a comment, relative to the project folder. */
+  private commentPath(commentId: number): string {
+    return this.store?.commentPath(commentId) ?? commentFileName(commentId);
   }
 
-  /** Reads a task from the disk, `null` when it cannot be read. */
+  /** Reads a task from the project, `null` when it cannot be read. */
   private async loadTaskById(id: number): Promise<Task | null> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
+    const store = this.store;
+    if (store === null) {
       return null;
     }
     const card = this.kanbanCards.find((candidate) => candidate.id === id);
-    const path =
-      card?.path ?? this.treeHierarchy?.paths.get(id) ?? this.repository.taskPath(projectDir, id);
+    const path = card?.path ?? this.pathOfTask(id);
     try {
-      return await this.repository.loadTask(path);
+      return await store.readTask(path);
     } catch (error) {
       this.handleError(error);
       return null;
@@ -1555,6 +1830,8 @@ export class App {
     this.searchInput.value = '';
     this.updateProjectPath();
     await this.persistConfig();
+    // The store follows the folder of the project.
+    await this.openStore();
     await this.refresh();
     showToast({ doc: this.doc, message: `Tasks folder set to ${path}`, kind: 'success' });
   }
@@ -1652,25 +1929,39 @@ export class App {
     await this.openViewDialog(task);
   }
 
-  /** The children of a task, loaded from the disk. */
+  /** The children of a task, loaded from the project. */
   private async loadChildren(parentId: number): Promise<Task[]> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
+    const store = this.store;
+    if (store === null) {
       return [];
     }
     try {
-      return await this.repository.findChildren(projectDir, parentId);
+      const summaries = await store.listTasks();
+      const children: Task[] = [];
+      for (const summary of summaries) {
+        if (summary.parentId !== parentId) {
+          continue;
+        }
+        try {
+          children.push(await store.readTask(summary.path));
+        } catch {
+          // The file disappeared: skip it.
+        }
+      }
+      return children;
     } catch {
       return [];
     }
   }
 
   private async createTask(taskInput: TaskInput, parentId: number | null): Promise<void> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
-      throw new Error('No project folder selected');
+    const store = this.store;
+    if (store === null) {
+      throw new Error('No project selected');
     }
-    const task = await this.repository.createTask(projectDir, taskInput, parentId);
+    const id = await store.nextTaskId();
+    const task = buildTask(taskInput, id, new Date(), parentId);
+    await store.createTaskFile(store.taskPath(id), task);
     showToast({
       doc: this.doc,
       message:
@@ -1683,23 +1974,24 @@ export class App {
   }
 
   private async updateTask(task: Task, taskInput: TaskInput): Promise<void> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
-      throw new Error('No project folder selected');
+    const store = this.store;
+    if (store === null) {
+      throw new Error('No project selected');
     }
-    const path = this.repository.taskPath(projectDir, task.id);
-    await this.repository.updateTask(path, taskInput);
+    const path = this.pathOfTask(task.id);
+    const current = await store.readTask(path);
+    const updated = applyTaskInput(current, taskInput, new Date());
+    await store.writeTask(path, updated);
     showToast({ doc: this.doc, message: `Task #${task.id} updated.`, kind: 'success' });
     await this.refresh();
   }
 
   private async deleteTask(task: Task): Promise<void> {
-    const projectDir = this.config.projectDir;
-    if (projectDir === null) {
-      throw new Error('No project folder selected');
+    const store = this.store;
+    if (store === null) {
+      throw new Error('No project selected');
     }
-    const path = this.repository.taskPath(projectDir, task.id);
-    await this.repository.deleteTask(path);
+    await store.deleteFile(this.pathOfTask(task.id));
     showToast({ doc: this.doc, message: `Task #${task.id} deleted.`, kind: 'success' });
     await this.refresh();
   }

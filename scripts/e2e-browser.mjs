@@ -17,7 +17,7 @@
  */
 
 import { spawn, execFileSync } from 'node:child_process';
-import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -1132,6 +1132,255 @@ async function runChecks() {
   check(enteredPath.endsWith('/tasks'), 'Enter enters the selected folder', enteredPath);
 
   await evaluate(`document.querySelector('.modal-close').click()`);
+
+  await checkEmbeddedProject();
+}
+
+/**
+ * Checks the embedded project: the switch to the browser, the creation of a
+ * task, the export of a ZIP archive and the import of that archive.
+ */
+async function checkEmbeddedProject() {
+  // --- the dialog of the project --------------------------------------------
+
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Project…');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.project-choice').length === 2`);
+  const choices = await evaluate(
+    `[...document.querySelectorAll('.project-choice-title')].map((node) => node.textContent).join(' | ')`,
+  );
+  check(
+    typeof choices === 'string' && choices.includes('embedded'),
+    'the dialog of the project offers the embedded project',
+    String(choices),
+  );
+  await capture('project-dialog');
+
+  // --- the switch to the embedded project -----------------------------------
+
+  await evaluate(`(() => {
+    const choices = [...document.querySelectorAll('.project-choice')];
+    choices[1].click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.project-path')?.textContent === 'Embedded project'`);
+  check(true, 'the project is now the embedded project');
+
+  const folderPickerHidden = await evaluate(`(() => {
+    const button = [...document.querySelectorAll('.topbar-project button')]
+      .find((node) => node.textContent.trim() === 'Choose folder…');
+    return button === undefined || button.hasAttribute('hidden');
+  })()`);
+  check(folderPickerHidden === true, 'the folder picker is hidden in the embedded mode');
+
+  // --- a task of the embedded project ---------------------------------------
+
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'New task');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('#task-title') !== null`);
+  await evaluate(`(() => {
+    document.querySelector('#task-title').value = 'A task of the embedded project';
+    return true;
+  })()`);
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Create task');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.task-table tbody tr').length === 1`);
+  const embeddedTitle = await evaluate(`document.querySelector('.task-title-button')?.textContent`);
+  check(
+    embeddedTitle === 'A task of the embedded project',
+    'the task of the embedded project is listed',
+    String(embeddedTitle),
+  );
+
+  // The file of the task lives in the storage of the browser.
+  const storedFile = await evaluate(`(async () => {
+    const root = await navigator.storage.getDirectory();
+    const handle = await root.getFileHandle('task_1.txt');
+    const file = await handle.getFile();
+    return await file.text();
+  })()`);
+  check(
+    typeof storedFile === 'string' && storedFile.includes('title=A task of the embedded project'),
+    'the file of the task is in the storage of the browser',
+  );
+
+  // --- the export of the ZIP archive ----------------------------------------
+
+  const downloadDirectory = resolve(workDirectory, 'downloads');
+  await mkdir(downloadDirectory, { recursive: true });
+  await session.send('Browser.setDownloadBehavior', {
+    behavior: 'allow',
+    downloadPath: downloadDirectory,
+  });
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Project…');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.project-choice').length === 2`);
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Download the project');
+    button.click();
+    return true;
+  })()`);
+
+  const archivePath = resolve(downloadDirectory, 'project.zip');
+  let archive = null;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    archive = await readFile(archivePath).catch(() => null);
+    if (archive !== null) {
+      break;
+    }
+    await delay(250);
+  }
+  check(archive !== null, 'the ZIP archive of the project was downloaded');
+
+  if (archive !== null) {
+    const entries = listZipEntries(archive);
+    check(
+      entries.includes('task_1.txt'),
+      'the archive holds the file of the task',
+      entries.join(', '),
+    );
+    const content = readZipEntry(archive, 'task_1.txt');
+    check(
+      content !== null && content.includes('title=A task of the embedded project'),
+      'the file of the archive holds the same content as the file of the browser',
+    );
+  }
+
+  // --- the import of the ZIP archive ----------------------------------------
+
+  // A second task, that the import is going to discard.
+  await evaluate(`document.querySelector('.modal-close')?.click()`);
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'New task');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('#task-title') !== null`);
+  await evaluate(`(() => {
+    document.querySelector('#task-title').value = 'A task that will be discarded';
+    return true;
+  })()`);
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Create task');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.task-table tbody tr').length === 2`);
+  check(true, 'the embedded project holds two tasks');
+
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Project…');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.project-file-input') !== null`);
+  await session.send('DOM.enable');
+  const document_ = await session.send('DOM.getDocument');
+  const input_ = await session.send('DOM.querySelector', {
+    nodeId: document_.result.root.nodeId,
+    selector: '.project-file-input',
+  });
+  await session.send('DOM.setFileInputFiles', {
+    files: [archivePath],
+    nodeId: input_.result.nodeId,
+  });
+
+  await waitFor(`document.querySelectorAll('.task-table tbody tr').length === 1`);
+  const importedTitle = await evaluate(`document.querySelector('.task-title-button')?.textContent`);
+  check(
+    importedTitle === 'A task of the embedded project',
+    'the import of the archive replaces the whole embedded project',
+    String(importedTitle),
+  );
+
+  // --- the switch back to the service ---------------------------------------
+
+  await evaluate(`document.querySelector('.modal-close')?.click()`);
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Project…');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.project-choice').length === 2`);
+  await evaluate(`(() => {
+    const choices = [...document.querySelectorAll('.project-choice')];
+    choices[0].click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.project-path')?.getAttribute('title') === ${JSON.stringify(taskDirectory)}`);
+  const serviceRows = await evaluate(`document.querySelectorAll('.task-table tbody tr').length`);
+  check(serviceRows === 10, 'the tasks of the service are shown again', `got ${serviceRows}`);
+  await evaluate(`document.querySelector('.modal-close')?.click()`);
+}
+
+/** The names of the files of a ZIP archive. */
+function listZipEntries(archive) {
+  const names = [];
+  let position = archive.length - 22;
+  while (position >= 0) {
+    if (archive.readUInt32LE(position) === 0x06054b50) {
+      const count = archive.readUInt16LE(position + 10);
+      let entry = archive.readUInt32LE(position + 16);
+      for (let index = 0; index < count; index += 1) {
+        if (archive.readUInt32LE(entry) !== 0x02014b50) {
+          break;
+        }
+        const nameLength = archive.readUInt16LE(entry + 28);
+        const extraLength = archive.readUInt16LE(entry + 30);
+        const commentLength = archive.readUInt16LE(entry + 32);
+        names.push(archive.subarray(entry + 46, entry + 46 + nameLength).toString('utf8'));
+        entry += 46 + nameLength + extraLength + commentLength;
+      }
+      break;
+    }
+    position -= 1;
+  }
+  return names;
+}
+
+/** The content of a file of a ZIP archive, `null` when it is not there. */
+function readZipEntry(archive, name) {
+  const entries = listZipEntries(archive);
+  if (!entries.includes(name)) {
+    return null;
+  }
+  let position = archive.length - 22;
+  while (position >= 0) {
+    if (archive.readUInt32LE(position) === 0x06054b50) {
+      const count = archive.readUInt16LE(position + 10);
+      let entry = archive.readUInt32LE(position + 16);
+      for (let index = 0; index < count; index += 1) {
+        const nameLength = archive.readUInt16LE(entry + 28);
+        const extraLength = archive.readUInt16LE(entry + 30);
+        const commentLength = archive.readUInt16LE(entry + 32);
+        const size = archive.readUInt32LE(entry + 24);
+        const localOffset = archive.readUInt32LE(entry + 42);
+        const entryName = archive.subarray(entry + 46, entry + 46 + nameLength).toString('utf8');
+        if (entryName === name) {
+          const localNameLength = archive.readUInt16LE(localOffset + 26);
+          const localExtraLength = archive.readUInt16LE(localOffset + 28);
+          const start = localOffset + 30 + localNameLength + localExtraLength;
+          return archive.subarray(start, start + size).toString('utf8');
+        }
+        entry += 46 + nameLength + extraLength + commentLength;
+      }
+      break;
+    }
+    position -= 1;
+  }
+  return null;
 }
 
 async function capture(name) {

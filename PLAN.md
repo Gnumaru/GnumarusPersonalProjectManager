@@ -19,7 +19,11 @@ Browser (SPA, no framework, strict TypeScript)
   |
   |-- src/api/client.ts        REST client for the GnumarusOSBridge API (token aware)
   |-- src/core/task.ts         task file format: parse / serialize
-  |-- src/core/taskRepository.ts  data access (find, grep, read, create, update, delete)
+  |-- src/core/projectStore.ts the storage facade: the interface the application uses
+  |-- src/core/serviceStore.ts the implementation over the service (find, grep, read, write)
+  |-- src/core/embeddedStore.ts the implementation over the storage of the browser
+  |-- src/core/browserStorage.ts the OPFS, with an IndexedDB fallback
+  |-- src/core/zip.ts          the reader and the writer of the ZIP archives
   |-- src/core/taskTree.ts     tree of the tasks: build / flatten (pure)
   |-- src/core/pagination.ts   pure pagination math
   |-- src/core/config.ts       ~/.config/GnumarusProjectManager/config.json
@@ -85,7 +89,7 @@ an `Authorization` header it does not have.
 
 ### Pagination and memory
 
-Only the tasks of the current page are loaded into memory. The repository first
+Only the tasks of the current page are loaded into memory. The store first
 resolves the *paths* of the matching task files, slices the requested page out of
 them and only then reads those 10 files. Switching pages discards the previous page.
 
@@ -215,11 +219,37 @@ The data comes from **one** command that reads the parent, the status, the
 title and the dates of every task, so the chart costs two round trips and
 reads no file.
 
+## Batch 9 - The embedded project
+
+The files of the project can live in the **browser** instead of the disk of the
+machine: the application then works on an *embedded project* and never calls
+the low level service.
+
+Since the shell of the service is not available in the browser, everything is
+computed in JavaScript. The application therefore goes through a **facade**,
+`ProjectStore`, with two implementations:
+
+| Implementation | Where the files live | How the queries are made |
+| -------------- | -------------------- | ----------------------- |
+| `ServiceProjectStore` | the disk, through the service | `find` and `grep` |
+| `EmbeddedProjectStore` | the browser | in JavaScript, over the files |
+
+The storage of the browser is the **Origin Private File System** when the browser
+offers it, and an **IndexedDB** database otherwise. Only **one** embedded project
+can live in a browser.
+
+The embedded project can be **downloaded as a ZIP archive** (the files are
+exactly the ones that would be on the disk) and a ZIP archive can be **imported**,
+which replaces the whole embedded project.
+
+The ZIP archives are written and read by the application itself (the "stored"
+method, without compression), so no dependency is needed.
+
 ## Steps
 
 1. [x] Scaffold the project (package.json, tsconfig, vite config, index.html).
 2. [x] Implement and unit test the task file format (parse/serialize).
-3. [x] Implement and unit test the API client and the repository (find/grep/read/write).
+3. [x] Implement and unit test the API client and the store of the service (find/grep/read/write).
 4. [x] Implement the paginated task listing UI (10 per page, first/prev/next/last).
 5. [x] Implement create / edit / view / delete of root tasks.
 6. [x] Implement the recursive search (grep through the bridge).
@@ -258,6 +288,8 @@ reads no file.
     written in the file and edited in the editor.
 24. [x] The comments of a task: a file `comment_<id>.txt` per comment, listed in
     the editor of the task.
+25. [x] The embedded project: the files live in the browser, the project can be
+    downloaded as a ZIP archive and imported from a ZIP archive.
 
 ## Verification commands
 
@@ -266,7 +298,8 @@ npm run typecheck      # tsc --noEmit, strictest flags
 npm test               # vitest: unit + integration (live bridge when the token is exported)
 npm run build          # type check + production build
 npm run e2e            # headless Chrome renders the app at the root and at a nested path
-npm run e2e:browser    # a real browser drives pagination, search, create, edit and delete
+npm run e2e:browser    # a real browser drives pagination, search, create, edit, delete
+                       # and the embedded project (export and import of the ZIP)
 npm run verify         # all of the above, in order
 npm run deploy         # build and publish to /var/www/html/GnumarusProjectManager
 ```
@@ -279,3 +312,5 @@ not running.
 
 * Grand children in the user interface (the format supports them).
 * Multi project management, task ordering by hand, due dates, attachments.
+* Several embedded projects in the same browser: the browser holds **one**
+  embedded project, and importing an archive replaces it completely.

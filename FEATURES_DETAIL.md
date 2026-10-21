@@ -107,10 +107,10 @@ tests, including a round trip test.
 
 ## 2. Listing, pagination and memory usage
 
-**Files:** `src/core/pagination.ts`, `src/core/taskRepository.ts`, `src/ui/paginationBar.ts`
+**Files:** `src/core/pagination.ts`, `src/core/projectStore.ts`, `src/ui/paginationBar.ts`
 
 * The page size is **10 tasks per page** (`DEFAULT_PAGE_SIZE`).
-* The repository first resolves the *paths* of the matching task files, slices
+* The store first resolves the *paths* of the matching task files, slices
   the requested page out of that list and only then reads the files of the
   page. The files of the previous page are released as soon as the new page is
   loaded, so at most ten task files are held in memory.
@@ -128,9 +128,12 @@ with their own unit tests.
 
 ## 3. Search
 
-**Files:** `src/core/taskRepository.ts`
+**Files:** `src/core/projectStore.ts`
 
-The search is a **recursive grep** executed by the bridge service:
+The search is **recursive** and looks at the whole file, so it matches the
+title, the tags and the description. It is **case insensitive**.
+
+In the **service** mode, the search is a `grep` executed by the bridge service:
 
 ```
 grep -rIl --fixed-strings --ignore-case --include='task_*.txt' \
@@ -139,11 +142,14 @@ grep -rIl --fixed-strings --ignore-case --include='task_*.txt' \
 
 * The pattern is sent through **stdin** (`-f -`), never through the command
   line, so no quoting or escaping problem can happen whatever the user types.
-* The search is **case insensitive** and looks at the whole file, so it matches
-  the title, the tags and the description.
 * `grep` exits with `1` when nothing matched; that is not an error and yields an
   empty result.
-* An empty search box lists every task (the listing uses `find`).
+
+In the **embedded** mode, the shell is not available: the same search is done in
+JavaScript, over the files of the storage of the browser.
+
+An empty search box lists every task (the listing uses `find` in the service
+mode, and the paths of the storage in the embedded mode).
 
 The listing uses the same recursive behaviour, so a task file inside a
 subfolder of the project is found as well:
@@ -156,7 +162,7 @@ find . -type f -name 'task_*.txt' -not -path '*/.git/*' ... -print
 
 ## 4. Creating, editing, viewing and deleting
 
-**Files:** `src/ui/taskDialog.ts`, `src/core/taskRepository.ts`, `src/api/client.ts`
+**Files:** `src/ui/taskDialog.ts`, `src/core/projectStore.ts`, `src/api/client.ts`
 
 | Action | What happens |
 | ------ | ------------ |
@@ -169,11 +175,14 @@ The dialog works in three modes (`view`, `edit`, `create`) and validates the
 title before saving. Errors raised by the service are shown inside the dialog
 instead of closing it.
 
+The same actions work the same way with the **embedded project**: the store of
+the browser writes the very same files, in the very same format.
+
 ---
 
 ## 5. Child tasks
 
-**Files:** `src/core/taskRepository.ts`, `src/ui/taskTable.ts`, `src/ui/taskDialog.ts`
+**Files:** `src/core/projectStore.ts`, `src/ui/taskTable.ts`, `src/ui/taskDialog.ts`
 
 A task can have **0 or 1 parent**. The link is stored in the metadata of the
 child file:
@@ -202,7 +211,7 @@ database schema`), so it is impossible to create a child without knowing which
 task it belongs to. When the file is written, the `parent=<id>` key is added
 and the id is allocated exactly like for a root task.
 
-The repository refuses to create a child of a task that does not exist
+The store refuses to create a child of a task that does not exist
 (`The parent task #9999 does not exist in "<folder>".`).
 
 ### Seeing the relations
@@ -228,7 +237,9 @@ The children of one task are listed with:
 grep -rl --include='task_*.txt' ... -e '^parent=<id>$' .
 ```
 
-Both commands are executed by the bridge service, in the project folder.
+Both commands are executed by the bridge service, in the project folder. In the
+embedded mode, the same numbers are computed in JavaScript, over the files of
+the storage of the browser.
 
 The hierarchy is one level deep in the flat list (the format would allow
 more), and the search, the pagination and the listing treat the children like
@@ -238,7 +249,7 @@ any other task. The **tree view** shows the whole hierarchy.
 
 ## 5 bis. The tree view
 
-**Files:** `src/core/taskTree.ts`, `src/core/taskRepository.ts`, `src/ui/taskTreeView.ts`, `src/ui/treeDrag.ts`, `src/ui/app.ts`
+**Files:** `src/core/taskTree.ts`, `src/core/projectStore.ts`, `src/ui/taskTreeView.ts`, `src/ui/treeDrag.ts`, `src/ui/app.ts`
 
 The toolbar holds a **List / Tree** toggle. The flat list stays exactly as it
 was; the tree is the second way of showing the tasks.
@@ -348,7 +359,7 @@ expanded, so a match is never hidden behind a collapsed task.
 
 ## 5 ter. The board of the tasks
 
-**Files:** `src/core/task.ts`, `src/core/taskRepository.ts`, `src/ui/kanbanBoard.ts`, `src/ui/kanbanDrag.ts`, `src/ui/app.ts`
+**Files:** `src/core/task.ts`, `src/core/projectStore.ts`, `src/ui/kanbanBoard.ts`, `src/ui/kanbanDrag.ts`, `src/ui/app.ts`
 
 The third display mode is a **board**: one column per status, with the cards
 of the tasks that have **no child**. A task that has children is represented by
@@ -388,7 +399,7 @@ cards of the board.
 
 ## 5 quater. The Gantt chart
 
-**Files:** `src/core/gantt.ts`, `src/core/taskRepository.ts`, `src/ui/ganttView.ts`, `src/ui/app.ts`
+**Files:** `src/core/gantt.ts`, `src/core/projectStore.ts`, `src/ui/ganttView.ts`, `src/ui/app.ts`
 
 The fourth display mode is a **Gantt chart**. The window is split in two:
 
@@ -488,7 +499,7 @@ latest one, widened to whole weeks.
 
 ## 5 ter. The comments of a task
 
-**Files:** `src/core/comment.ts`, `src/core/taskRepository.ts`, `src/ui/taskDialog.ts`
+**Files:** `src/core/comment.ts`, `src/core/projectStore.ts`, `src/ui/taskDialog.ts`
 
 A task can have **0 or more comments**. Every comment is a text file of its
 own, stored in the project folder, named `comment_<id>.txt`. The format is the
@@ -520,7 +531,63 @@ comment files of that task are read.
 
 ---
 
-## 6. The bridge service
+## 6. The project of the user
+
+**Files:** `src/core/projectStore.ts`, `src/core/serviceStore.ts`, `src/core/embeddedStore.ts`, `src/core/browserStorage.ts`, `src/core/zip.ts`, `src/ui/projectDialog.ts`
+
+The files of the project can live in two places:
+
+* **the Gnumarus OS Bridge service**: the files are on the disk of the machine;
+* an **embedded project**: the files are kept in the browser.
+
+The dialog of the project (the button **Project…** of the top bar) chooses
+between them, and offers the export and the import of a ZIP archive.
+
+### The facade
+
+The shell of the service (`find`, `grep`) is not available in the browser, so
+the application never talks to the storage directly: it goes through the
+`ProjectStore` interface, which has two implementations.
+
+| | `ServiceProjectStore` | `EmbeddedProjectStore` |
+|---|---|---|
+| The files | on the disk, through the service | in the browser |
+| The listing | `find` | the paths of the storage |
+| The search | `grep` | the content of the files, in JavaScript |
+| The hierarchy | `grep` on the `parent=` keys | the metadata of the files, in JavaScript |
+
+The paths are always **relative** to the project folder, so the two
+implementations agree on the names of the files.
+
+### The storage of the browser
+
+The **Origin Private File System** is used when the browser offers it: it is a
+real file system, the paths of the project are kept as they are and the export
+to a ZIP archive is a straight copy.
+
+When the OPFS is not available (an old browser, a page that is not in a secure
+context), the files fall back to an **IndexedDB** database, which stores the
+same paths and the same contents.
+
+When the browser offers neither, the files are kept in the **memory of the
+page**: the project is then lost when the page is closed, and the application
+warns the user that the ZIP archive is the only way to keep it.
+
+Only **one** embedded project can live in a browser.
+
+### The ZIP archives
+
+The archive holds the files of the project, **exactly as they would be on the
+disk**: `task_1.txt` for a task, `comment_1.txt` for a comment.
+
+The archives are written and read by the application itself (the "stored"
+method of the ZIP format, without compression), so that no dependency is needed.
+The export downloads the archive, the import reads it and **replaces the whole
+embedded project**: the files of the current one are discarded completely.
+
+---
+
+## 7. The bridge service
 
 **Files:** `src/api/client.ts`, `src/ui/app.ts`
 
@@ -571,7 +638,7 @@ What the application does with the policy:
 
 ---
 
-## 7. Configuration file
+## 8. Configuration file
 
 **Files:** `src/core/config.ts`
 
@@ -581,9 +648,15 @@ service, so the choice survives a browser cache wipe and can be shared by
 different browsers. The browser only stores the token, which changes every time
 the service restarts, and only when the service demands one.
 
+The **kind of storage** of the project (the service or the embedded project) is
+a choice of the browser, not of the machine: it is kept in the local storage,
+under the key `gnumarus-project-manager.mode`. The configuration of an embedded
+project (only the page size) is kept under
+`gnumarus-project-manager.config`.
+
 ---
 
-## 8. The folder picker
+## 9. The folder picker
 
 **Files:** `src/ui/fileDialog.ts`
 
@@ -607,7 +680,7 @@ be entered with a double click.
 
 ---
 
-## 9. Layout and responsiveness
+## 10. Layout and responsiveness
 
 **Files:** `src/styles.css`, `src/ui/app.ts`
 
@@ -623,7 +696,7 @@ be entered with a double click.
 
 ---
 
-## 10. Tests
+## 11. Tests
 
 | Suite | What it covers |
 | ----- | -------------- |
@@ -632,7 +705,10 @@ be entered with a double click.
 | `src/core/taskTree.test.ts` | The tree of the tasks: roots, children, orphan tasks, cycles, focus, expansion, search and subtree of a task. |
 | `src/core/config.test.ts` | Configuration parsing and serialization. |
 | `src/api/client.test.ts` | Tagged values, headers, error handling, shell calls, authentication policy of the service (mocked `fetch`). |
-| `src/core/taskRepository.test.ts` | The repository against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
+| `src/core/serviceStore.test.ts` | The store of the service against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
+| `src/core/zip.test.ts` | The ZIP archives: the checksum, the round trip, the empty archive, the damaged file and the unicode characters. |
+| `src/core/embeddedStore.test.ts` | The embedded project: the creation of a task, the metadata, the search, the children, the comments, the export and the import. |
+| `src/core/browserStorage.test.ts` | The storage of the browser: the storages the browser offers, and the files it keeps. |
 | `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons) and the pagination bar (jsdom). |
 | `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token, the tree view and the board. |
 | `src/ui/kanbanBoard.test.ts` | The board: the columns and their order, the cards, their tags and their actions. |
@@ -642,7 +718,7 @@ be entered with a double click.
 | `src/ui/treeDrag.test.ts` | The drag and drop of the rows of the tree: the drop target, the thresholds, the buttons that never start a drag, the click that ends the drag and the detachment of a task. |
 | `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
-| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. |
+| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. It also drives the **embedded project**: the switch, the creation of a task, the export of the ZIP archive and its import. |
 
 Commands:
 
@@ -655,7 +731,7 @@ npm run verify      # everything, in order
 
 ---
 
-## 11. Deployment
+## 12. Deployment
 
 **File:** `scripts/deploy.mjs`
 

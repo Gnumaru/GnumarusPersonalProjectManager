@@ -21,7 +21,7 @@
 
 ### Bridge access
 - [x] `src/api/client.ts` - token aware REST client, tagged scalar decoding
-- [x] `src/core/taskRepository.ts` - find / grep / read / create / update / delete
+- [x] `src/core/serviceStore.ts` - find / grep / read / create / update / delete
 
 ### UI
 - [x] Top bar: project directory, service status, token, refresh
@@ -42,7 +42,7 @@
 - [x] `src/core/pagination.test.ts` - pagination math
 - [x] `src/core/config.test.ts` - config load/save
 - [x] `src/api/client.test.ts` - client against a mocked `fetch`
-- [x] `src/core/taskRepository.test.ts` - integration against the live bridge
+- [x] `src/core/serviceStore.test.ts` - integration against the live bridge
 - [x] `src/ui/widgets.test.ts` - task table and pagination bar (jsdom)
 - [x] `src/ui/widgets.test.ts` - the badge of every status
 - [x] `src/ui/app.test.ts` - the whole application against a fake bridge (jsdom)
@@ -81,7 +81,7 @@
 
 ### Tests
 - [x] `src/core/task.test.ts` - a child task is built and parsed back
-- [x] `src/core/taskRepository.test.ts` - creation, counting and listing of the children (live bridge)
+- [x] `src/core/serviceStore.test.ts` - creation, counting and listing of the children (live bridge)
 - [x] `src/ui/widgets.test.ts` - parent column, children badge and action buttons
 - [x] `src/ui/app.test.ts` - creation of a child from the interface and navigation between the parent and its children
 - [x] `scripts/e2e-browser.mjs` - creation of a child in a real browser, checked against the file on the disk
@@ -112,7 +112,7 @@
 - [x] `src/ui/app.test.ts` - no token dialog without a token, token dialog when the
       service demands one
 - [x] `src/test-support/fakeBridge.ts` - the fake announces and enforces the policy
-- [x] `src/core/taskRepository.test.ts` - the integration suite also runs against a
+- [x] `src/core/serviceStore.test.ts` - the integration suite also runs against a
       service started without the token requirement
 
 ### Build / deploy
@@ -130,9 +130,9 @@
 - [x] The ancestors of a task (the breadcrumb)
 
 ### Data layer
-- [x] `TaskRepository.readHierarchy` reads the structure with one `grep` of the
-      `parent=` lines (`src/core/taskRepository.ts`)
-- [x] `TaskRepository.setParent` rewrites the `parent=` key of a task
+- [x] `ServiceProjectStore.listTasks` reads the structure with one `grep` of the
+      metadata keys (`src/core/serviceStore.ts`)
+- [x] `withParent` rewrites the `parent=` key of a task
 - [x] `withParent` moves a task under another parent (`src/core/task.ts`)
 - [x] Only the files of the displayed rows are read (a few at a time)
 
@@ -162,7 +162,7 @@
 - [x] `src/ui/app.test.ts` - the tree in the application (expansion, focus,
       breadcrumb, dialogs, search, recursive expansion with a ctrl+click, drag
       and drop)
-- [x] `src/core/taskRepository.test.ts` - the hierarchy read from the live bridge
+- [x] `src/core/serviceStore.test.ts` - the hierarchy read from the live bridge
 - [x] `scripts/e2e-browser.mjs` - the tree driven by a real browser
 
 ### Build / deploy
@@ -172,9 +172,9 @@
 ## Batch 5 - Board of the tasks
 
 ### Data layer
-- [x] `TaskRepository.readLeafTasks` reads the cards with one command
+- [x] `ServiceProjectStore.listTasks` reads the cards with one command
       (`id`, `parent`, `status`, `title` and `tags` of every task)
-- [x] `TaskRepository.setStatus` rewrites the `status=` key of a task
+- [x] `withStatus` rewrites the `status=` key of a task
 - [x] `BOARD_STATUSES` - the order of the columns of the board
 - [x] `withStatus` changes the status of a task (`src/core/task.ts`)
 
@@ -220,7 +220,7 @@
 - [x] `src/core/task.test.ts` - the compact format, the migration of the old
       format, the start and the end dates, the conversion for the date pickers,
       the blocking and the related tasks
-- [x] `src/core/taskRepository.test.ts` - the file written by the live bridge
+- [x] `src/core/serviceStore.test.ts` - the file written by the live bridge
 - [x] `src/ui/widgets.test.ts`, `src/ui/app.test.ts` - the fixtures, the date
       pickers of the editor, the blocking and the related tasks
 
@@ -247,7 +247,7 @@
       end date
 
 ### Data layer
-- [x] `TaskRepository.readTaskMetadata` reads the parent, the status, the title
+- [x] `ServiceProjectStore.listTasks` reads the parent, the status, the title
       and the dates of every task with one command
 - [x] The board and the Gantt chart share that command
 
@@ -283,9 +283,9 @@
 - [x] The comments are sorted by creation, the most recent first
 
 ### Data layer
-- [x] `TaskRepository.listComments` finds the comments of a task with a `grep`
+- [x] `ServiceProjectStore.listComments` finds the comments of a task with a `grep`
       on the `task=` key
-- [x] `TaskRepository.createComment`, `updateComment` and `deleteComment`
+- [x] `ServiceProjectStore.createComment`, `writeComment` and `deleteComment`
 
 ### User interface
 - [x] The editor of a task shows the comments, the most recent first
@@ -293,9 +293,43 @@
 
 ### Tests
 - [x] `src/core/comment.test.ts` - the format, the names and the order
-- [x] `src/core/taskRepository.test.ts` - the comments against the live bridge
+- [x] `src/core/serviceStore.test.ts` - the comments against the live bridge
 - [x] `src/ui/app.test.ts` - the comments in the editor
 - [x] `scripts/e2e-browser.mjs` - a comment written by a real browser
+
+### Build / deploy
+- [x] `npm run verify`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
+## Batch 9 - The embedded project
+
+### The facade
+- [x] `src/core/projectStore.ts` - the interface the application uses
+- [x] `src/core/serviceStore.ts` - the implementation over the low level service
+- [x] `src/core/embeddedStore.ts` - the implementation over the browser storage
+- [x] The paths are relative to the project folder in both implementations
+
+### The storage of the browser
+- [x] `src/core/browserStorage.ts` - the OPFS, with an IndexedDB fallback
+- [x] The memory of the page is the last resort, and the user is warned
+
+### The ZIP archives
+- [x] `src/core/zip.ts` - the reader and the writer, without any dependency
+- [x] The export downloads the files of the project
+- [x] The import replaces the whole embedded project
+
+### User interface
+- [x] The dialog of the project chooses where the files are kept
+- [x] The folder picker is hidden in the embedded mode
+
+### Tests
+- [x] `src/core/zip.test.ts` - the archives
+- [x] `src/core/embeddedStore.test.ts` - the embedded project
+- [x] `src/core/browserStorage.test.ts` - the storage of the browser
+- [x] `src/core/serviceStore.test.ts` - the project of the service
+- [x] `scripts/e2e-browser.mjs` - the embedded project driven by a real browser:
+      the switch, the creation of a task, the export and the import of the ZIP
+      archive
 
 ### Build / deploy
 - [x] `npm run verify`
