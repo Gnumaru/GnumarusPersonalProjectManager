@@ -1,0 +1,216 @@
+# Features Detail
+
+This document explains how every implemented feature works, with pointers to the
+code that implements it.
+
+---
+
+## 1. The task file format
+
+**Files:** `src/core/task.ts`
+
+A task is a single plain text file named `task_<id>.txt` inside the project
+folder. The file starts with a metadata block made of `key=value` lines, exactly
+like an `.ini` file, and the block is terminated by a line containing only four
+hyphens. Everything after that line is the description, which is free text.
+
+```
+id=12
+title=Implement pagination
+status=todo
+tags=frontend ui
+created=2026-10-20T10:00:00.000Z
+updated=2026-10-20T10:00:00.000Z
+----
+The description of the task.
+It can have as many lines as needed.
+```
+
+Rules:
+
+* `id` - unique incremental integer, also encoded in the file name.
+* `title` - mandatory, single line (new lines are replaced by spaces on write).
+* `status` - one of `todo`, `doing`, `done`. Anything else falls back to `todo`.
+* `parent` - **absent for a root task**. Present only for a child task, holding
+  the id of its parent. The parser and the writer already support it, the user
+  interface does not expose it yet.
+* `tags` - the tags separated by white spaces. A tag can never contain a white
+  space, so white space is an unambiguous separator. Duplicated tags are removed
+  while the original order is kept.
+* `created` / `updated` - ISO 8601 timestamps.
+
+Parsing is tolerant: a file without a separator keeps its `key=value` lines as
+metadata and uses the remaining lines as the description; Windows line endings
+are handled; a `----` line inside the description is kept as part of the text.
+
+The functions `parseTask` and `serializeTask` are pure and are covered by unit
+tests, including a round trip test.
+
+---
+
+## 2. Listing, pagination and memory usage
+
+**Files:** `src/core/pagination.ts`, `src/core/taskRepository.ts`, `src/ui/paginationBar.ts`
+
+* The page size is **10 tasks per page** (`DEFAULT_PAGE_SIZE`).
+* The repository first resolves the *paths* of the matching task files, slices
+  the requested page out of that list and only then reads the files of the
+  page. The files of the previous page are released as soon as the new page is
+  loaded, so at most ten task files are held in memory.
+* The pagination bar shows the four buttons required by the specification:
+  **first page**, **previous page**, **next page** and **last page**, plus the
+  counter (`Page 2 of 5`) and the summary (`Showing 11-20 of 47`).
+* The buttons are disabled when they would not change the page, and the page
+  number is clamped to the available range, so a deletion on the last page
+  cannot leave the user on an empty page.
+
+`totalPages`, `clampPage`, `computePageInfo` and `pageSlice` are pure functions
+with their own unit tests.
+
+---
+
+## 3. Search
+
+**Files:** `src/core/taskRepository.ts`
+
+The search is a **recursive grep** executed by the bridge service:
+
+```
+grep -rIl --fixed-strings --ignore-case --include='task_*.txt' \
+    --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -f - .
+```
+
+* The pattern is sent through **stdin** (`-f -`), never through the command
+  line, so no quoting or escaping problem can happen whatever the user types.
+* The search is **case insensitive** and looks at the whole file, so it matches
+  the title, the tags and the description.
+* `grep` exits with `1` when nothing matched; that is not an error and yields an
+  empty result.
+* An empty search box lists every task (the listing uses `find`).
+
+The listing uses the same recursive behaviour, so a task file inside a
+subfolder of the project is found as well:
+
+```
+find . -type f -name 'task_*.txt' -not -path '*/.git/*' ... -print
+```
+
+---
+
+## 4. Creating, editing, viewing and deleting
+
+**Files:** `src/ui/taskDialog.ts`, `src/core/taskRepository.ts`, `src/api/client.ts`
+
+| Action | What happens |
+| ------ | ------------ |
+| Create | The next free id is computed from the highest existing `task_<id>.txt`, the file is written with `POST /api/file`. If the file already exists the id is increased and the write is retried. |
+| Edit | The file is read, the user input is applied (id and creation time are kept), the update timestamp is refreshed and the file is overwritten with `PUT /api/file`. |
+| View | A read only dialog shows the status, the tags, the timestamps and the description. |
+| Delete | The file is removed with `DELETE /api/file` after an explicit confirmation ("Delete this task permanently? Yes, delete / Keep it"). |
+
+The dialog works in three modes (`view`, `edit`, `create`) and validates the
+title before saving. Errors raised by the service are shown inside the dialog
+instead of closing it.
+
+---
+
+## 5. The bridge service
+
+**Files:** `src/api/client.ts`, `src/ui/app.ts`
+
+* The base URL is `http://127.0.0.1:1423`.
+* Every endpoint except `/api/help` needs the token generated when the service
+  starts. The user pastes it in the **API token** dialog of the top bar; the
+  token is kept in `localStorage` (ephemeral data, the same nature as the RAM
+  of a desktop application).
+* The service uses a tagged convention on the wire (`i:12`, `f:1.5`, `b:true`,
+  `null`); the client decodes it in `decodeTagged` and encodes the numbers it
+  sends back with `encodeTaggedNumber`.
+* When the service cannot be reached, a banner explains the situation and the
+  application pings it **every five seconds**; when the service comes back the
+  application reloads the configuration and the tasks by itself.
+* A rejected token shows a dedicated banner and opens the token dialog.
+
+---
+
+## 6. Configuration file
+
+**Files:** `src/core/config.ts`
+
+The selected project folder and the page size are stored in
+`~/.config/GnumarusProjectManager/config.json`, written through the bridge
+service, so the choice survives a browser cache wipe and can be shared by
+different browsers. The browser only stores the token, which changes every time
+the service restarts.
+
+---
+
+## 7. The folder picker
+
+**Files:** `src/ui/fileDialog.ts`
+
+A dialog that behaves like the file dialogs of an operating system:
+
+* **Back** and **forward** through the navigation history.
+* **Up** to the parent folder.
+* The **root** of the file system and the **drives** (the real mount points,
+  read from `/proc/mounts`, pseudo file systems filtered out).
+* The **home** folder and the usual `Desktop`, `Documents`, `Downloads` and
+  `Pictures` folders (read from `~/.config/user-dirs.dirs`).
+* A **path box**: type a path and press `Enter` or `Go`.
+* **New folder**: creates the directory and enters it.
+* Double click a folder to enter it, single click to select it.
+
+---
+
+## 8. Layout and responsiveness
+
+**Files:** `src/styles.css`, `src/ui/app.ts`
+
+* The window is split into a top bar, an optional banner, a toolbar, the task
+  table (the only scrolling area) and the pagination bar: no vertical space is
+  wasted and the table always fills the window.
+* The interface is designed for a desktop (1366x768 and above) with the mouse
+  and the keyboard, and it adapts to narrower or shorter windows (the tag
+  column and the updated column disappear first, the toolbar wraps).
+* Both colour schemes are supported (`prefers-color-scheme`).
+* Shortcuts: `Ctrl+F` focuses the search box, `Enter` searches, `Escape`
+  clears the search, `Escape` closes a dialog.
+
+---
+
+## 9. Tests
+
+| Suite | What it covers |
+| ----- | -------------- |
+| `src/core/task.test.ts` | Format, parsing, serialization, round trip, tags. |
+| `src/core/pagination.test.ts` | Page count, clamping, slicing, page information. |
+| `src/core/config.test.ts` | Configuration parsing and serialization. |
+| `src/api/client.test.ts` | Tagged values, headers, error handling, shell calls (mocked `fetch`). |
+| `src/core/taskRepository.test.ts` | The repository against the **running bridge**: creation, listing, pagination, recursive search, update, deletion. Skipped when `GNUMARUS_API_TOKEN` is not set. |
+| `src/ui/widgets.test.ts` | The task table and the pagination bar (jsdom). |
+| `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom). |
+| `src/ui/fileDialog.test.ts` | Path helpers and sorting of the file list. |
+| `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
+| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition and deletion, checked against the files on disk. |
+
+Commands:
+
+```bash
+npm test            # the unit and integration test suites
+npm run e2e         # the headless render test
+npm run e2e:browser # the browser end to end test
+npm run verify      # everything, in order
+```
+
+---
+
+## 10. Deployment
+
+**File:** `scripts/deploy.mjs`
+
+`npm run deploy` builds the application and copies `dist` to
+`/var/www/html/GnumarusProjectManager`, replacing the previous copy. The
+application is built with `base: './'`, so the relative asset URLs work at the
+domain root (`http://localhost/`) and at any nested path
+(`http://localhost/my/web/app/path`).

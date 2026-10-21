@@ -1,0 +1,26 @@
+
+====
+crie a versão inicial do app de gerenciamento de projetos. por enquanto crie apenas funcionalidades para criar, editar, visualizar, excluir e pesquisar tarefas "raiz" (tarefas que não tem pai). as tarefas devem poder ser pesquisadas (como cada tarefa é um arquivo txt individual voce pode usar um grep recursivo no diretorio pra acha-las) e a listagem de tarefas deve ser paginada com 10 tarefas por pagina. devem haver botoes para avancar e voltar nas paginas da listagem bem como ir para a primeira ou ultima pagina da listagem.
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
