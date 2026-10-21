@@ -257,4 +257,36 @@ describeLive('TaskRepository against the live service', () => {
     expect(hierarchy.paths.get(root.id)).toContain(`task_${root.id}.txt`);
     expect(hierarchy.paths.size).toBe(hierarchy.parents.size);
   });
+
+  it('moves a task under another parent', async () => {
+    const first = await repository.createTask(testDirectory, {
+      title: 'First parent',
+      description: '',
+      status: 'todo',
+      tags: [],
+    });
+    const second = await repository.createTask(testDirectory, {
+      title: 'Second parent',
+      description: '',
+      status: 'todo',
+      tags: [],
+    });
+    const child = await repository.createTask(
+      testDirectory,
+      { title: 'Moved child', description: '', status: 'todo', tags: [] },
+      first.id,
+    );
+
+    const path = repository.taskPath(testDirectory, child.id);
+    await repository.setParent(path, second.id);
+
+    const file = await api.readFile(path);
+    expect(file.content).toContain(`parent=${second.id}`);
+    expect(file.content).not.toContain(`parent=${first.id}`);
+
+    const reloaded = await repository.loadTask(path);
+    expect(reloaded.parentId).toBe(second.id);
+    expect(reloaded.id).toBe(child.id);
+    expect(reloaded.title).toBe('Moved child');
+  });
 });

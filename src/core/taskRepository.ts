@@ -15,6 +15,7 @@ import {
   parseTaskIdFromFileName,
   serializeTask,
   taskFileName,
+  withParent,
   type Task,
   type TaskInput,
 } from './task.js';
@@ -330,6 +331,19 @@ export class TaskRepository {
   async updateTask(path: string, changes: TaskInput): Promise<Task> {
     const current = await this.loadTask(path);
     const updated = applyTaskInput(current, changes, new Date());
+    await this.api.overwriteFile(path, serializeTask(updated));
+    return updated;
+  }
+
+  /**
+   * Moves a task under another parent.
+   *
+   * A `null` parent makes the task a root task again. Only the `parent=` key of
+   * the file changes, the rest of the task is kept.
+   */
+  async setParent(path: string, parentId: number | null): Promise<Task> {
+    const current = await this.loadTask(path);
+    const updated = withParent(current, parentId, new Date());
     await this.api.overwriteFile(path, serializeTask(updated));
     return updated;
   }

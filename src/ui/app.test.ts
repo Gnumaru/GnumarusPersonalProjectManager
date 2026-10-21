@@ -123,6 +123,25 @@ function ctrlClick(element: Element | null | undefined, dom: JSDOM): void {
   element.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, ctrlKey: true }));
 }
 
+/** Drags a row of the tree onto another one, as the mouse would do. */
+function dragTask(harness: Harness, draggedId: number, targetId: number): void {
+  const source = harness.root.querySelector<HTMLElement>(
+    `.tree-row[data-task-id="${draggedId}"] .tree-title`,
+  );
+  const target = harness.root.querySelector<HTMLElement>(`.tree-row[data-task-id="${targetId}"]`);
+  if (source === null || target === null) {
+    return;
+  }
+  const event = (type: string, node: HTMLElement, x: number, y: number): void => {
+    node.dispatchEvent(
+      new harness.dom.window.MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 }),
+    );
+  };
+  event('mousedown', source, 10, 10);
+  event('mousemove', target, 60, 60);
+  event('mouseup', target, 60, 60);
+}
+
 function buttonByText(doc: Document, text: string): HTMLButtonElement | null {
   const buttons = [...doc.querySelectorAll('button')];
   return buttons.find((button) => button.textContent?.trim() === text) ?? null;
@@ -638,6 +657,59 @@ describe('App and the tree view', () => {
     // The breadcrumb shows the ancestors of the focused task.
     const crumbs = [...harness.root.querySelectorAll('.tree-crumb')];
     expect(crumbs.map((crumb) => crumb.textContent)).toEqual(['General root', '#1', 'Task 2']);
+
+    harness.app.dispose();
+  });
+
+  it('moves a task under another one when it is dropped on it', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    // The task 4 is a child of the task 2: the branch is expanded so that it
+    // can be dragged.
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'));
+    await flush();
+    click(harness.root.querySelectorAll<HTMLButtonElement>('.tree-row .tree-twisty')[1]);
+    await flush();
+    expect(treeRow(harness, 4)).not.toBeNull();
+
+    // The task 4 is dropped on the task 3.
+    dragTask(harness, 4, 3);
+    await flush();
+
+    // The file on the disk carries the new parent.
+    const file = harness.bridge.files.get('/home/user/projects/task_4.txt');
+    expect(file).toContain('parent=3');
+    expect(file).not.toContain('parent=2');
+
+    // The tree shows the task 4 under the task 3.
+    click(treeRow(harness, 3)?.querySelector<HTMLButtonElement>('.tree-twisty') ?? null);
+    await flush();
+    expect(treeRow(harness, 4)?.dataset['depth']).toBe('2');
+    expect(treeRow(harness, 4)?.querySelector('.tree-title')?.textContent).toBe('Task 4');
+
+    harness.app.dispose();
+  });
+
+  it('refuses to move a task under one of its own descendants', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    // The task 4 is a child of the task 2: the branch is expanded so that it
+    // can be used as a drop target.
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'));
+    await flush();
+    click(harness.root.querySelectorAll<HTMLButtonElement>('.tree-row .tree-twisty')[1]);
+    await flush();
+
+    // The task 2 is the parent of the task 4: it cannot become its child.
+    dragTask(harness, 2, 4);
+    await flush();
+
+    const file = harness.bridge.files.get('/home/user/projects/task_2.txt');
+    expect(file).not.toContain('parent=4');
+    const toast = harness.doc.querySelector('.toast-error');
+    expect(toast?.textContent).toContain('descendant');
 
     harness.app.dispose();
   });

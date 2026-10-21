@@ -128,6 +128,20 @@ nothing else.
 * A **ctrl+click** on the twisty collapses or expands the **whole branch**: the
   task and every one of its descendants, at any depth.
 
+### Drag and drop
+
+A task can be **dragged onto another task** to become its child: the `parent=`
+key of its file is rewritten and the task leaves its previous parent.
+
+The drag is driven by the mouse (not by the native HTML5 drag and drop) so the
+application controls the feedback: the dragged row is dimmed, the row under the
+pointer is highlighted and a chip with the name of the task follows the pointer.
+A simple click is not a drag: the pointer has to travel a few pixels first, so
+the name of the task still opens the task and the twisty still expands it.
+
+A task can never become a child of one of its own descendants: that would
+build a cycle, and the application refuses the move with a message.
+
 ### The pure part
 
 `src/core/taskTree.ts` builds the tree from the `id -> parent` mapping and
@@ -161,6 +175,8 @@ flattens it into the rows to display:
     task and the focus on the general root.
 14. [x] Folder picker: `Enter` enters the selected folder and the scroll of the
     list is not reset when an item is selected.
+15. [x] Drag and drop in the tree view: a task dropped on another one becomes
+    its child.
 
 ## Verification commands
 

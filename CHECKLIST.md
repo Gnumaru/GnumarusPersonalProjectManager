@@ -125,6 +125,8 @@
 ### Data layer
 - [x] `TaskRepository.readHierarchy` reads the structure with one `grep` of the
       `parent=` lines (`src/core/taskRepository.ts`)
+- [x] `TaskRepository.setParent` rewrites the `parent=` key of a task
+- [x] `withParent` moves a task under another parent (`src/core/task.ts`)
 - [x] Only the files of the displayed rows are read (a few at a time)
 
 ### User interface
@@ -134,6 +136,10 @@
 - [x] A simple click keeps the state of the children of the task
 - [x] A ctrl+click collapses or expands the whole branch (the task and all its
       descendants)
+- [x] Drag and drop: a task dropped on another one becomes its child
+- [x] The dragged row is dimmed, the drop target is highlighted and a chip
+      follows the pointer
+- [x] A task is never moved under one of its own descendants
 - [x] An action to focus the tree on a task
 - [x] The breadcrumb of the focused task, with the **General root** button
 - [x] The view and the edit dialogs are opened from a row of the tree
@@ -143,8 +149,10 @@
 ### Tests
 - [x] `src/core/taskTree.test.ts` - the tree of the tasks (roots, children, cycles,
       focus, search, subtree of a task)
+- [x] `src/ui/treeDrag.test.ts` - the drag and drop of the rows of the tree
 - [x] `src/ui/app.test.ts` - the tree in the application (expansion, focus,
-      breadcrumb, dialogs, search, recursive expansion with a ctrl+click)
+      breadcrumb, dialogs, search, recursive expansion with a ctrl+click, drag
+      and drop)
 - [x] `src/core/taskRepository.test.ts` - the hierarchy read from the live bridge
 - [x] `scripts/e2e-browser.mjs` - the tree driven by a real browser
 

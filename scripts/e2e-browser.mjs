@@ -671,6 +671,54 @@ async function runChecks() {
   );
   await evaluate(`document.querySelector('.modal-close').click()`);
 
+  // --- drag and drop --------------------------------------------------------
+
+  // The grand child (14) is dragged onto the second task (2).
+  const dragPoints = await evaluate(`(() => {
+    const source = document.querySelector('.tree-row[data-task-id="14"] .tree-title').getBoundingClientRect();
+    const target = document.querySelector('.tree-row[data-task-id="2"] .tree-title').getBoundingClientRect();
+    return {
+      sx: source.left + 12,
+      sy: source.top + source.height / 2,
+      tx: target.left + 12,
+      ty: target.top + target.height / 2,
+    };
+  })()`);
+
+  const dispatchMouse = (type, x, y) =>
+    session.send('Input.dispatchMouseEvent', {
+      type,
+      x,
+      y,
+      button: 'left',
+      buttons: type === 'mouseReleased' ? 0 : 1,
+      clickCount: 1,
+    });
+
+  await dispatchMouse('mousePressed', dragPoints.sx, dragPoints.sy);
+  await delay(150);
+  await dispatchMouse('mouseMoved', dragPoints.sx + 30, dragPoints.sy - 20);
+  await delay(150);
+  await dispatchMouse('mouseMoved', dragPoints.tx, dragPoints.ty);
+  await delay(400);
+
+  const dropTarget = await evaluate(
+    `document.querySelector('.tree-row.tree-drop-target')?.dataset['taskId'] ?? ''`,
+  );
+  check(dropTarget === '2', 'the row under the pointer is the drop target', dropTarget);
+
+  await dispatchMouse('mouseReleased', dragPoints.tx, dragPoints.ty);
+  await delay(1500);
+
+  const movedContent = await apiRequest(
+    `/api/file?path=${encodeURIComponent(`${taskDirectory}/task_14.txt`)}`,
+  );
+  check(
+    movedContent.content.includes('parent=2'),
+    'the dragged task is now a child of the task it was dropped on',
+    movedContent.content,
+  );
+
   // Back to the flat list for the rest of the test.
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'List');

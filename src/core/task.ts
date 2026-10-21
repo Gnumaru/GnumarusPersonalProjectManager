@@ -235,3 +235,17 @@ export function applyTaskInput(task: Task, input: TaskInput, now: Date): Task {
     description: input.description,
   };
 }
+
+/**
+ * Returns a copy of the task under another parent.
+ *
+ * A `null` parent makes the task a root task again. The id, the title and the
+ * creation time are kept, only the relation and the update time change.
+ */
+export function withParent(task: Task, parentId: number | null, now: Date): Task {
+  return {
+    ...task,
+    parentId,
+    updated: now.toISOString(),
+  };
+}

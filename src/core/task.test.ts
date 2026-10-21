@@ -10,6 +10,7 @@ import {
   parseTaskIdFromFileName,
   serializeTask,
   taskFileName,
+  withParent,
 } from './task.js';
 
 describe('task file names', () => {
@@ -262,5 +263,33 @@ describe('buildTask and applyTaskInput', () => {
     expect(updated.title).toBe('Second');
     expect(updated.status).toBe('done');
     expect(updated.tags).toEqual(['t']);
+  });
+});
+
+describe('withParent', () => {
+  const original = buildTask(
+    { title: 'Movable', description: 'body', status: 'todo', tags: ['t'] },
+    7,
+    new Date('2026-01-01T00:00:00.000Z'),
+    3,
+  );
+
+  it('moves a task under another parent', () => {
+    const moved = withParent(original, 5, new Date('2026-05-05T10:00:00.000Z'));
+
+    expect(moved.parentId).toBe(5);
+    expect(moved.id).toBe(7);
+    expect(moved.title).toBe('Movable');
+    expect(moved.tags).toEqual(['t']);
+    expect(moved.created).toBe('2026-01-01T00:00:00.000Z');
+    expect(moved.updated).toBe('2026-05-05T10:00:00.000Z');
+    expect(serializeTask(moved)).toContain('parent=5');
+  });
+
+  it('makes a task a root task again', () => {
+    const moved = withParent(original, null, new Date('2026-05-05T10:00:00.000Z'));
+
+    expect(moved.parentId).toBeNull();
+    expect(serializeTask(moved)).not.toContain('parent=');
   });
 });

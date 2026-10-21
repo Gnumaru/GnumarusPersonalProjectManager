@@ -181,7 +181,7 @@ any other task. The **tree view** shows the whole hierarchy.
 
 ## 5 bis. The tree view
 
-**Files:** `src/core/taskTree.ts`, `src/core/taskRepository.ts`, `src/ui/taskTreeView.ts`, `src/ui/app.ts`
+**Files:** `src/core/taskTree.ts`, `src/core/taskRepository.ts`, `src/ui/taskTreeView.ts`, `src/ui/treeDrag.ts`, `src/ui/app.ts`
 
 The toolbar holds a **List / Tree** toggle. The flat list stays exactly as it
 was; the tree is the second way of showing the tasks.
@@ -242,6 +242,36 @@ that is displayed and nothing else.
   parent of `a`) is broken: the task that closes the cycle becomes a root;
 * the traversal remembers the ids of the current path, so a cycle can never
   make it loop forever.
+
+### Drag and drop
+
+A task can be **dragged onto another task** to become its child. The `parent=`
+key of its file is rewritten and the task leaves its previous parent:
+
+```
+A          A
+-B    -->  -B
+--C        --C
+-D         ---E
+--E        -D
+```
+
+The drag is driven by the mouse (and not by the native HTML5 drag and drop) so
+that the application controls the whole feedback:
+
+* the dragged row is **dimmed**;
+* the row under the pointer is **highlighted** (it is the drop target);
+* a **chip** with the name of the task follows the pointer;
+* the click that ends the drag is swallowed, so no dialog opens by accident.
+
+A simple click is not a drag: the pointer has to travel a few pixels
+(`DRAG_THRESHOLD_PX`) before the drag starts, so the name of the task still
+opens the task and the twisty still expands it. The twisty and the actions of
+the row never start a drag.
+
+A task can **never** become a child of one of its own descendants: that would
+build a cycle, so the move is refused with a message and the file is left
+alone.
 
 ### The search
 
@@ -358,7 +388,7 @@ be entered with a double click.
 
 | Suite | What it covers |
 | ----- | -------------- |
-| `src/core/task.test.ts` | Format, parsing, serialization, round trip, tags. |
+| `src/core/task.test.ts` | Format, parsing, serialization, round trip, tags, moving a task under another parent. |
 | `src/core/pagination.test.ts` | Page count, clamping, slicing, page information. |
 | `src/core/taskTree.test.ts` | The tree of the tasks: roots, children, orphan tasks, cycles, focus, expansion, search and subtree of a task. |
 | `src/core/config.test.ts` | Configuration parsing and serialization. |
@@ -366,6 +396,7 @@ be entered with a double click.
 | `src/core/taskRepository.test.ts` | The repository against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
 | `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons) and the pagination bar (jsdom). |
 | `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token and the tree view. |
+| `src/ui/treeDrag.test.ts` | The drag and drop of the rows of the tree: the drop target, the thresholds, the buttons that never start a drag and the click that ends the drag. |
 | `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
 | `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. |

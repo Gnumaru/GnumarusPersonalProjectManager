@@ -18,6 +18,7 @@ import {
   ancestorsOf,
   buildTaskTree,
   flattenTaskTree,
+  parentOf,
   subtreeOf,
   type TaskTree,
   type TreeRow,
@@ -31,6 +32,7 @@ import { renderPaginationBar } from './paginationBar.js';
 import { TaskDialog } from './taskDialog.js';
 import { renderTaskRows } from './taskTable.js';
 import { renderTreeRows } from './taskTreeView.js';
+import { TreeDragController } from './treeDrag.js';
 import { showToast } from './toast.js';
 
 export const TOKEN_STORAGE_KEY = 'gnumarus-project-manager.token';
@@ -121,6 +123,7 @@ export class App {
   private treeWrapElement!: HTMLElement;
   private treeHeaderElement!: HTMLElement;
   private treeRowsElement!: HTMLElement;
+  private treeDrag: TreeDragController | null = null;
   private rowsElement!: HTMLTableSectionElement;
   private emptyStateElement!: HTMLElement;
   private paginationElement!: HTMLElement;
@@ -326,6 +329,15 @@ export class App {
       this.treeHeaderElement,
       this.treeRowsElement,
     ]);
+
+    this.treeDrag?.dispose();
+    this.treeDrag = new TreeDragController({
+      doc: this.doc,
+      container: this.treeRowsElement,
+      onDrop: (draggedId, targetId) => {
+        void this.reparentTask(draggedId, targetId);
+      },
+    });
 
     const content = el(this.doc, 'main', { class: 'content' }, [
       this.tableWrapElement,
@@ -971,6 +983,51 @@ export class App {
     try {
       await this.updateTreeRows();
       this.renderCurrentView();
+    } catch (error) {
+      this.handleError(error);
+    } finally {
+      this.setBusy(false);
+    }
+  }
+
+  /**
+   * Moves a task under another one.
+   *
+   * The task is dropped on the target task: it becomes its child and leaves
+   * its previous parent. A task can never become a child of one of its own
+   * descendants, that would build a cycle.
+   */
+  private async reparentTask(taskId: number, targetId: number): Promise<void> {
+    const projectDir = this.config.projectDir;
+    if (projectDir === null) {
+      return;
+    }
+    const structure = this.treeStructure;
+    if (structure !== null) {
+      if (subtreeOf(structure, taskId).includes(targetId)) {
+        showToast({
+          doc: this.doc,
+          message: `The task #${taskId} cannot become a child of the task #${targetId}: it is one of its own descendants.`,
+          kind: 'error',
+        });
+        return;
+      }
+      if (parentOf(structure, taskId) === targetId) {
+        // The task is already the child of the target: nothing to do.
+        return;
+      }
+    }
+
+    const path = this.treeHierarchy?.paths.get(taskId) ?? this.repository.taskPath(projectDir, taskId);
+    this.setBusy(true);
+    try {
+      await this.repository.setParent(path, targetId);
+      showToast({
+        doc: this.doc,
+        message: `The task #${taskId} is now a child of the task #${targetId}.`,
+        kind: 'success',
+      });
+      await this.refresh();
     } catch (error) {
       this.handleError(error);
     } finally {

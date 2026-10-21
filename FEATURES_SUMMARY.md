@@ -29,6 +29,7 @@ list or as a tree.
 | **One row per task, with its name and its tags** | Done | `src/ui/taskTreeView.ts` |
 | **Collapse and expand the children of a task** | Done | `src/ui/taskTreeView.ts`, `src/core/taskTree.ts` |
 | **Ctrl+click collapses or expands the whole branch** | Done | `src/ui/app.ts`, `src/core/taskTree.ts` |
+| **Drag and drop: a task dropped on another one becomes its child** | Done | `src/ui/treeDrag.ts`, `src/ui/app.ts` |
 | **Focus the tree on a task (it becomes the root of the tree)** | Done | `src/ui/app.ts` |
 | **Focus the general root (every task without a parent)** | Done | `src/ui/app.ts` |
 | **Breadcrumb of the focused task** | Done | `src/ui/app.ts` |
@@ -46,6 +47,7 @@ list or as a tree.
 | Unique incremental task id | Done | `src/core/taskRepository.ts` |
 | Automatic id allocation, collision safe | Done | `src/core/taskRepository.ts` |
 | `parent=<id>` key written and read for the child tasks | Done | `src/core/task.ts` |
+| **A task moved under another one (drag and drop)** | Done | `src/core/task.ts`, `src/core/taskRepository.ts` |
 | Amount of children per task (read with `grep`) | Done | `src/core/taskRepository.ts` |
 
 ## Bridge integration
