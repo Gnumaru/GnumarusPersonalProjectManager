@@ -13,7 +13,7 @@
 import { ApiClient, ApiError, ApiUnavailableError } from '../api/client.js';
 import { loadConfig, saveConfig, type AppConfig } from '../core/config.js';
 import { DEFAULT_PAGE_SIZE, computePageInfo, type PageInfo } from '../core/pagination.js';
-import { TaskRepository, extractTaskIds, type TaskHierarchy } from '../core/taskRepository.js';
+import { TaskRepository, extractTaskIds, type TaskHierarchy, type TaskMetadata } from '../core/taskRepository.js';
 import {
   ancestorsOf,
   buildTaskTree,
@@ -24,6 +24,15 @@ import {
   type TreeRow,
 } from '../core/taskTree.js';
 import {
+  barOf,
+  buildLayout,
+  buildSchedule,
+  dayOfTimestamp,
+  daysBetween,
+  type GanttLayout,
+  type GanttSchedule,
+} from '../core/gantt.js';
+import {
   STATUS_LABELS,
   type Task,
   type TaskCard,
@@ -32,6 +41,7 @@ import {
 } from '../core/task.js';
 import { button, clear, el, input, type Child } from './dom.js';
 import { FileDialog } from './fileDialog.js';
+import { renderGanttView, type GanttTask } from './ganttView.js';
 import { createIcon } from './icons.js';
 import { KanbanDragController } from './kanbanDrag.js';
 import { renderKanbanBoard } from './kanbanBoard.js';
@@ -58,8 +68,8 @@ export interface TokenStorage {
 
 export type ServiceState = 'checking' | 'online' | 'offline' | 'unauthorized';
 
-/** The three ways the tasks can be displayed. */
-export type ViewMode = 'list' | 'tree' | 'kanban';
+/** The four ways the tasks can be displayed. */
+export type ViewMode = 'list' | 'tree' | 'kanban' | 'gantt';
 
 export interface AppOptions {
   readonly doc: Document;
@@ -118,6 +128,10 @@ export class App {
   private treeMatches: Set<number> | null = null;
   /** The cards of the board: the tasks that have no child. */
   private kanbanCards: TaskCard[] = [];
+  /** The metadata of the tasks, read for the Gantt chart. */
+  private ganttMetadata = new Map<number, TaskMetadata>();
+  /** The weeks and the months that are collapsed in the Gantt chart. */
+  private ganttCollapsed = new Set<string>();
 
   private projectPathElement!: HTMLElement;
   private serviceTextElement!: HTMLElement;
@@ -130,11 +144,13 @@ export class App {
   private listViewButton!: HTMLButtonElement;
   private treeViewButton!: HTMLButtonElement;
   private kanbanViewButton!: HTMLButtonElement;
+  private ganttViewButton!: HTMLButtonElement;
   private tableWrapElement!: HTMLElement;
   private treeWrapElement!: HTMLElement;
   private treeHeaderElement!: HTMLElement;
   private treeRowsElement!: HTMLElement;
   private kanbanElement!: HTMLElement;
+  private ganttElement!: HTMLElement;
   private treeDrag: TreeDragController | null = null;
   private kanbanDrag: KanbanDragController | null = null;
   private rowsElement!: HTMLTableSectionElement;
@@ -310,11 +326,20 @@ export class App {
     });
     this.kanbanViewButton.dataset['viewMode'] = 'kanban';
 
+    this.ganttViewButton = button(this.doc, 'Gantt', {
+      class: 'view-toggle-button',
+      title: 'Show the tasks as a Gantt chart of their start and end dates',
+      onClick: () => {
+        void this.setViewMode('gantt');
+      },
+    });
+    this.ganttViewButton.dataset['viewMode'] = 'gantt';
+
     const viewToggle = el(
       this.doc,
       'div',
       { class: 'view-toggle', attrs: { role: 'group', 'aria-label': 'The way the tasks are displayed' } },
-      [this.listViewButton, this.treeViewButton, this.kanbanViewButton],
+      [this.listViewButton, this.treeViewButton, this.kanbanViewButton, this.ganttViewButton],
     );
 
     const toolbar = el(this.doc, 'div', { class: 'toolbar' }, [
@@ -374,10 +399,13 @@ export class App {
       },
     });
 
+    this.ganttElement = el(this.doc, 'div', { class: 'gantt-container', attrs: { hidden: 'hidden' } });
+
     const content = el(this.doc, 'main', { class: 'content' }, [
       this.tableWrapElement,
       this.treeWrapElement,
       this.kanbanElement,
+      this.ganttElement,
       this.emptyStateElement,
     ]);
 
@@ -536,6 +564,8 @@ export class App {
         await this.refreshTree(projectDir);
       } else if (this.viewMode === 'kanban') {
         await this.refreshKanban(projectDir);
+      } else if (this.viewMode === 'gantt') {
+        await this.refreshGantt(projectDir);
       } else {
         await this.refreshList(projectDir);
       }
@@ -593,6 +623,16 @@ export class App {
    */
   private async refreshKanban(projectDir: string): Promise<void> {
     this.kanbanCards = await this.repository.readLeafTasks(projectDir);
+  }
+
+  /**
+   * Reads the metadata of the tasks for the Gantt chart.
+   *
+   * One command returns the parent, the status, the title and the dates of
+   * every task: the chart needs all of them.
+   */
+  private async refreshGantt(projectDir: string): Promise<void> {
+    this.ganttMetadata = await this.repository.readTaskMetadata(projectDir);
   }
 
   /** Recomputes the rows of the tree and loads the tasks that are shown. */
@@ -732,11 +772,14 @@ export class App {
     this.tableWrapElement.toggleAttribute('hidden', mode !== 'list');
     this.treeWrapElement.toggleAttribute('hidden', mode !== 'tree');
     this.kanbanElement.toggleAttribute('hidden', mode !== 'kanban');
+    this.ganttElement.toggleAttribute('hidden', mode !== 'gantt');
     this.paginationElement.toggleAttribute('hidden', mode !== 'list');
     if (mode === 'tree') {
       this.renderTree();
     } else if (mode === 'kanban') {
       this.renderKanban();
+    } else if (mode === 'gantt') {
+      this.renderGantt();
     } else {
       this.renderList();
     }
@@ -812,7 +855,7 @@ export class App {
     this.updateToolbarState();
   }
 
-  /** Draws the board of the tasks: one column per status. */
+    /** Draws the board of the tasks: one column per status. */
   private renderKanban(): void {
     clear(this.kanbanElement);
     this.kanbanElement.append(
@@ -832,6 +875,146 @@ export class App {
     this.updateEmptyState(this.kanbanCards.length === 0);
     this.resultCountElement.textContent = this.buildResultCount();
     this.updateToolbarState();
+  }
+
+  /** Draws the Gantt chart of the tasks. */
+  private renderGantt(): void {
+    clear(this.ganttElement);
+
+    const rows = this.ganttRows();
+    const schedule = this.ganttSchedule();
+    if (schedule === null) {
+      this.ganttElement.append(
+        el(this.doc, 'div', { class: 'gantt-empty', text: 'No task has a start or an end date yet.' }),
+      );
+      this.updateEmptyState(false);
+      this.resultCountElement.textContent = this.buildResultCount();
+      this.updateToolbarState();
+      return;
+    }
+
+    const layout = buildLayout(schedule, this.ganttCollapsed);
+    const tasks = this.ganttTasks(rows, layout, schedule);
+
+    this.ganttElement.append(
+      renderGanttView(
+        {
+          doc: this.doc,
+          rows,
+          tasks,
+          schedule,
+          layout,
+        },
+        {
+          onToggle: (id, recursive) => {
+            void this.toggleTreeNode(id, recursive);
+          },
+          onOpen: (id) => {
+            void this.openTaskById(id);
+          },
+          onEdit: (id) => {
+            void this.openEditTaskById(id);
+          },
+          onToggleWeek: (key) => {
+            this.toggleGanttPeriod(key);
+          },
+          onToggleMonth: (key) => {
+            this.toggleGanttPeriod(key);
+          },
+        },
+      ),
+    );
+
+    this.updateEmptyState(rows.length === 0);
+    this.resultCountElement.textContent = this.buildResultCount();
+    this.updateToolbarState();
+  }
+
+  /** The rows of the Gantt chart: the visible rows of the tree. */
+  private ganttRows(): TreeRow[] {
+    const parents = new Map<number, number | null>();
+    for (const task of this.ganttMetadata.values()) {
+      parents.set(task.id, task.parentId);
+    }
+    const structure = buildTaskTree(parents);
+    return flattenTaskTree(structure, {
+      focusId: this.treeFocusId,
+      expanded: this.treeExpanded,
+    });
+  }
+
+  /** The days of the schedule, from the dates of the tasks. */
+  private ganttSchedule(): GanttSchedule | null {
+    let from: Date | null = null;
+    let to: Date | null = null;
+
+    for (const task of this.ganttMetadata.values()) {
+      const start = dayOfTimestamp(task.start);
+      const end = dayOfTimestamp(task.end);
+      for (const date of [start, end]) {
+        if (date === null) {
+          continue;
+        }
+        if (from === null || date.getTime() < from.getTime()) {
+          from = date;
+        }
+        if (to === null || date.getTime() > to.getTime()) {
+          to = date;
+        }
+      }
+    }
+
+    if (from === null || to === null) {
+      return null;
+    }
+    return buildSchedule(from, to);
+  }
+
+  /** The tasks of the chart, with their bar. */
+  private ganttTasks(
+    rows: readonly TreeRow[],
+    layout: GanttLayout,
+    schedule: GanttSchedule,
+  ): Map<number, GanttTask> {
+    const tasks = new Map<number, GanttTask>();
+    const structure = buildTaskTree(
+      new Map([...this.ganttMetadata].map(([id, task]) => [id, task.parentId] as const)),
+    );
+
+    for (const row of rows) {
+      const metadata = this.ganttMetadata.get(row.id);
+      if (metadata === undefined) {
+        continue;
+      }
+      const start = dayOfTimestamp(metadata.start);
+      const end = dayOfTimestamp(metadata.end);
+      const bar =
+        start === null && end === null
+          ? null
+          : barOf(
+              layout.columns,
+              start === null ? null : daysBetween(schedule.start, start),
+              end === null ? null : daysBetween(schedule.start, end),
+            );
+      tasks.set(row.id, {
+        id: metadata.id,
+        title: metadata.title,
+        status: metadata.status,
+        bar,
+        hasChildren: (structure.children.get(metadata.id) ?? []).length > 0,
+      });
+    }
+    return tasks;
+  }
+
+  /** Collapses or expands a week (or a month) of the chart. */
+  private toggleGanttPeriod(key: string): void {
+    if (this.ganttCollapsed.has(key)) {
+      this.ganttCollapsed.delete(key);
+    } else {
+      this.ganttCollapsed.add(key);
+    }
+    this.renderGantt();
   }
 
   /**
@@ -940,6 +1123,10 @@ export class App {
       const count = this.kanbanCards.length;
       return `${count} card${count === 1 ? '' : 's'}`;
     }
+    if (this.viewMode === 'gantt') {
+      const count = this.ganttMetadata.size;
+      return `${count} task${count === 1 ? '' : 's'}`;
+    }
     if (this.viewMode === 'tree') {
       const total = this.treeHierarchy?.parents.size ?? 0;
       const shown = this.treeRows.length;
@@ -1000,9 +1187,11 @@ export class App {
     this.listViewButton.classList.toggle('is-active', this.viewMode === 'list');
     this.treeViewButton.classList.toggle('is-active', this.viewMode === 'tree');
     this.kanbanViewButton.classList.toggle('is-active', this.viewMode === 'kanban');
+    this.ganttViewButton.classList.toggle('is-active', this.viewMode === 'gantt');
     this.listViewButton.setAttribute('aria-pressed', this.viewMode === 'list' ? 'true' : 'false');
     this.treeViewButton.setAttribute('aria-pressed', this.viewMode === 'tree' ? 'true' : 'false');
     this.kanbanViewButton.setAttribute('aria-pressed', this.viewMode === 'kanban' ? 'true' : 'false');
+    this.ganttViewButton.setAttribute('aria-pressed', this.viewMode === 'gantt' ? 'true' : 'false');
   }
 
   /**

@@ -216,13 +216,19 @@ async function run() {
   await mkdir(taskDirectory, { recursive: true });
 
   for (let id = 1; id <= 12; id += 1) {
+    // The tasks have a start and an end date, so the Gantt chart has a
+    // schedule to draw.
+    const start = `202610${String(id + 1).padStart(2, '0')}090000000`;
+    const end = `202610${String(id + 6).padStart(2, '0')}180000000`;
     const content = [
       `id=${id}`,
       `title=Browser test task ${id}`,
       'status=todo',
       'tags=browser sample',
-      'created=2026-10-01T10:00:00.000Z',
-      'updated=2026-10-02T10:00:00.000Z',
+      'created=20261001100000000',
+      'updated=20261002100000000',
+      `start=${start}`,
+      `end=${end}`,
       '----',
       `unique-marker-${id}`,
     ].join('\n');
@@ -815,6 +821,55 @@ async function runChecks() {
     'the card dropped on a column changes the status of the task',
     movedStatus.content,
   );
+
+  // --- gantt chart ----------------------------------------------------------
+
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Gantt');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.gantt-wrap') !== null`);
+
+  const ganttMonths = await evaluate(
+    `[...document.querySelectorAll('.gantt-month')].map((node) => node.textContent).join('|')`,
+  );
+  check(
+    /^1[A-Z]/.test(ganttMonths),
+    'the months of the Gantt chart are numbered and named from one',
+    ganttMonths,
+  );
+
+  const ganttWeeks = await evaluate(
+    `[...document.querySelectorAll('.gantt-week')].map((node) => node.textContent).join('|')`,
+  );
+  check(
+    /^1[A-Z]/.test(ganttWeeks),
+    'the weeks of the Gantt chart are numbered and named from one',
+    ganttWeeks,
+  );
+
+  const ganttBars = await evaluate(`document.querySelectorAll('.gantt-bar').length`);
+  check(ganttBars > 0, 'the Gantt chart draws a bar for every task', `${ganttBars}`);
+
+  const ganttRows = await evaluate(`document.querySelectorAll('.gantt-row').length`);
+  check(ganttRows > 0, 'the Gantt chart shows the tasks on the left', `${ganttRows}`);
+
+  // A week can be collapsed: its days are not drawn any more.
+  const daysBefore = await evaluate(`document.querySelectorAll('.gantt-day').length`);
+  await evaluate(`document.querySelector('.gantt-week').click()`);
+  await delay(500);
+  const daysAfter = await evaluate(`document.querySelectorAll('.gantt-day').length`);
+  check(
+    daysAfter < daysBefore,
+    'collapsing a week hides its days',
+    `${daysBefore} -> ${daysAfter}`,
+  );
+
+  await evaluate(`document.querySelector('.gantt-week').click()`);
+  await delay(500);
+  const daysAgain = await evaluate(`document.querySelectorAll('.gantt-day').length`);
+  check(daysAgain === daysBefore, 'expanding the week shows its days again', `${daysAgain}`);
 
   // Back to the flat list for the rest of the test.
   await evaluate(`(() => {

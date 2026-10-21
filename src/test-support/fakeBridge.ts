@@ -215,7 +215,7 @@ export class FakeBridge {
           if (line.trim() === '----') {
             break;
           }
-          if (/^(id|parent|status|title|tags)=/u.test(line)) {
+          if (/^(id|parent|status|title|tags|start|end)=/u.test(line)) {
             lines.push(`${relative}:${line}`);
           }
         }

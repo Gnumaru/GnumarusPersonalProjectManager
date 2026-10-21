@@ -185,6 +185,26 @@ The data is read with **one** command that returns the parent, the status, the
 title and the tags of every task, so the whole board costs two round trips
 (the listing of the files and that command) and no file is read.
 
+## Batch 7 - Gantt chart
+
+The fourth display mode is a **Gantt chart**. The window is split in two: the
+rows of the tasks on the left, the chart on the right.
+
+The chart has **one column per day**; the days are grouped by **week** and the
+weeks by **month**. The weeks and the months are **numbered and named**,
+counting from one (`1 October`, `2 November`, `1 · Oct 5`...).
+
+A **bar** is drawn for every task, from the day of its `start=` date to the day
+of its `end=` date. A week (or a month) can be **collapsed**: its days are not
+drawn any more and the whole period becomes a single column.
+
+The rows of the left panel are the visible rows of the tree (the twisty
+collapses and expands the children of a task, the ctrl+click works the same).
+
+The data comes from **one** command that reads the parent, the status, the
+title and the dates of every task, so the chart costs two round trips and
+reads no file.
+
 ## Steps
 
 1. [x] Scaffold the project (package.json, tsconfig, vite config, index.html).
@@ -214,6 +234,9 @@ title and the tags of every task, so the whole board costs two round trips
     child, and the drag and drop that changes the status.
 18. [x] The dates are stored in the compact format `YYYYMMDDHHNNSSIII` (local
     time, no timezone) and the tasks carry a start and an end date.
+19. [x] Gantt chart: the rows of the tasks on the left, the chart on the right,
+    one column per day, the weeks and the months numbered and named, and the
+    bars drawn from the start date to the end date.
 
 ## Verification commands
 

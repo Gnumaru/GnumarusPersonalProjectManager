@@ -218,3 +218,36 @@
 ### Build / deploy
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
+## Batch 7 - Gantt chart
+
+### Core (pure, unit tested)
+- [x] `src/core/gantt.ts` - the days, the weeks and the months of a schedule
+- [x] The weeks and the months are numbered and named, counting from one
+- [x] `buildLayout` - the columns of the chart and the headers
+- [x] A collapsed week or month becomes a single column
+- [x] `barOf` and `barGeometry` - the bar of a task, from its start date to its
+      end date
+
+### Data layer
+- [x] `TaskRepository.readTaskMetadata` reads the parent, the status, the title
+      and the dates of every task with one command
+- [x] The board and the Gantt chart share that command
+
+### User interface
+- [x] A fourth view mode: **List / Tree / Kanban / Gantt**
+- [x] The rows of the tasks on the left, the chart on the right
+- [x] One column per day, the days grouped by week and the weeks by month
+- [x] The bars are drawn from the start date to the end date of the task
+- [x] The bars carry the colour of the status
+- [x] The weeks and the months are collapsed and expanded by clicking them
+- [x] The rows of the left panel collapse and expand the children of a task
+
+### Tests
+- [x] `src/core/gantt.test.ts` - the schedule, the columns and the bars
+- [x] `src/ui/app.test.ts` - the chart in the application and the collapse
+- [x] `scripts/e2e-browser.mjs` - the chart driven by a real browser
+
+### Build / deploy
+- [x] `npm run verify`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`

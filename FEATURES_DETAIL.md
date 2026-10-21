@@ -355,6 +355,61 @@ cards of the board.
 
 ---
 
+## 5 quater. The Gantt chart
+
+**Files:** `src/core/gantt.ts`, `src/core/taskRepository.ts`, `src/ui/ganttView.ts`, `src/ui/app.ts`
+
+The fourth display mode is a **Gantt chart**. The window is split in two:
+
+* on the **left**, the rows of the tasks: the same rows as the tree view (the
+  twisty collapses and expands the children of a task, the ctrl+click works the
+  same way);
+* on the **right**, the chart.
+
+The chart has **one column per day**. The days are grouped by **week** and the
+weeks by **month**, with three rows of headers:
+
+```
++-----------+--------------------------------------------------+
+| Task      | 1 August            | 2 September                |
+|           | 1 Aug 31 | 2 Sep 7  | 3 Sep 14 | 4 Sep 21     |
+|           | 31 1 2 3 | 4 5 6 7  | 8 9 10 11 | 12 13 14 15  |
++-----------+--------------------------------------------------+
+| Plan the  | [=================]                              |
+| release   |                                                 |
++-----------+--------------------------------------------------+
+```
+
+The weeks and the months are **numbered and named**, counting from one: the
+first month of the schedule is `1`, the first week is `1`.
+
+### The bars
+
+A bar is drawn for every task, from the day of its `start=` date to the day of
+its `end=` date. The bar carries the colour of the status of the task and the
+name of the task. A task without an end date goes until the end of the
+schedule, a task without a start date begins with it.
+
+### Collapsing
+
+A **week** (or a **month**) can be collapsed by clicking its header: its days
+are not drawn any more and the whole period becomes a single narrow column.
+Clicking it again expands it.
+
+### Where the data comes from
+
+The whole chart costs **two** round trips and reads no file at all:
+
+```
+GET  (find)      every task file below the project folder  -> the ids
+POST /api/shell  grep -rH -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' -e '^start=' -e '^end=' .
+```
+
+The range of the schedule goes from the earliest date of the tasks to the
+latest one, widened to whole weeks.
+
+---
+
 ## 6. The bridge service
 
 **Files:** `src/api/client.ts`, `src/ui/app.ts`
@@ -472,6 +527,7 @@ be entered with a double click.
 | `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token, the tree view and the board. |
 | `src/ui/kanbanBoard.test.ts` | The board: the columns and their order, the cards, their tags and their actions. |
 | `src/ui/kanbanDrag.test.ts` | The drag and drop of the cards of the board between the columns. |
+| `src/core/gantt.test.ts` | The schedule of the Gantt chart: the days, the weeks, the months, the columns and the bars. |
 | `src/ui/treeDrag.test.ts` | The drag and drop of the rows of the tree: the drop target, the thresholds, the buttons that never start a drag, the click that ends the drag and the detachment of a task. |
 | `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |

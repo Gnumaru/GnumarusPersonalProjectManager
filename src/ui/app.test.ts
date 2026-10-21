@@ -951,6 +951,126 @@ describe('App and the board', () => {
   });
 });
 
+describe('App and the Gantt chart', () => {
+  async function createGanttHarness(): Promise<Harness> {
+    return createHarness(0, {
+      tasks: [
+        { id: 1 },
+        { id: 2, parentId: 1 },
+        { id: 3, parentId: 1 },
+      ],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+  }
+
+  /** Adds the dates of a task on the fake disk. */
+  function setDates(harness: Harness, id: number, start: string, end: string): void {
+    const path = `/home/user/projects/task_${id}.txt`;
+    const content = harness.bridge.files.get(path);
+    if (content === undefined) {
+      return;
+    }
+    harness.bridge.files.set(
+      path,
+      content
+        .replace('start=', `start=${start}`)
+        .replace('end=', `end=${end}`),
+    );
+  }
+
+  async function switchToGantt(harness: Harness): Promise<void> {
+    click(buttonByText(harness.doc, 'Gantt'));
+    await flush();
+  }
+
+  it('shows the tasks on the left and the chart on the right', async () => {
+    const harness = await createGanttHarness();
+    setDates(harness, 1, '20261019100000000', '20261023180000000');
+    await switchToGantt(harness);
+
+    // The rows of the tasks are on the left: the tree is collapsed, so only
+    // the task without a parent is shown.
+    const rows = [...harness.root.querySelectorAll('.gantt-row')];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.querySelector('.gantt-row-name')?.textContent).toBe('Task 1');
+
+    // The chart has one column per day of the schedule.
+    const days = [...harness.root.querySelectorAll('.gantt-day')];
+    expect(days).toHaveLength(7);
+    expect(harness.root.querySelector('.gantt-bar')).not.toBeNull();
+
+    // Expanding the task shows its children on the left.
+    click(harness.root.querySelector<HTMLButtonElement>('.gantt-twisty'));
+    await flush();
+    expect(harness.root.querySelectorAll('.gantt-row')).toHaveLength(3);
+
+    harness.app.dispose();
+  });
+
+  it('draws a bar from the start day to the end day of a task', async () => {
+    const harness = await createGanttHarness();
+    setDates(harness, 1, '20261019100000000', '20261023180000000');
+    setDates(harness, 2, '20261021100000000', '20261022120000000');
+    await switchToGantt(harness);
+
+    // The task 1 goes from the 19th to the 23rd of October: five days.
+    const bars = [...harness.root.querySelectorAll<HTMLElement>('.gantt-bar')];
+    expect(bars).toHaveLength(1);
+    expect(bars[0]?.style.width).toBe('138px');
+    expect(bars[0]?.style.left).toBe('0px');
+
+    harness.app.dispose();
+  });
+
+  it('numbers and names the weeks and the months', async () => {
+    const harness = await createGanttHarness();
+    setDates(harness, 1, '20261019100000000', '20261110180000000');
+    await switchToGantt(harness);
+
+    const months = [...harness.root.querySelectorAll('.gantt-month')];
+    expect(months.map((cell) => cell.textContent)).toEqual(['1October', '2November']);
+    expect(months[0]?.querySelector('.gantt-header-number')?.textContent).toBe('1');
+    expect(months[0]?.querySelector('.gantt-header-label')?.textContent).toBe('October');
+
+    const weeks = [...harness.root.querySelectorAll('.gantt-week')];
+    expect(weeks.length).toBeGreaterThan(1);
+    expect(weeks[0]?.textContent).toContain('1');
+
+    harness.app.dispose();
+  });
+
+  it('collapses and expands a week', async () => {
+    const harness = await createGanttHarness();
+    setDates(harness, 1, '20261019100000000', '20261023180000000');
+    await switchToGantt(harness);
+
+    const daysBefore = harness.root.querySelectorAll('.gantt-day').length;
+
+    click(harness.root.querySelector<HTMLButtonElement>('.gantt-week'));
+    await flush();
+
+    // The days of the collapsed week are not drawn any more.
+    expect(harness.root.querySelectorAll('.gantt-day').length).toBeLessThan(daysBefore);
+    expect(harness.root.querySelector('.gantt-week')?.classList.contains('is-collapsed')).toBe(true);
+
+    // Clicking again expands it.
+    click(harness.root.querySelector<HTMLButtonElement>('.gantt-week'));
+    await flush();
+    expect(harness.root.querySelectorAll('.gantt-day')).toHaveLength(daysBefore);
+
+    harness.app.dispose();
+  });
+
+  it('explains that no task has a date', async () => {
+    const harness = await createGanttHarness();
+    await switchToGantt(harness);
+
+    expect(harness.root.querySelector('.gantt-empty')?.textContent).toContain('start or an end date');
+
+    harness.app.dispose();
+  });
+});
+
 async function selectFolder(harness: Harness): Promise<void> {
   click(buttonByText(harness.doc, 'Choose folder…'));
   await flush();

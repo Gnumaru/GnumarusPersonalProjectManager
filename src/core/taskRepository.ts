@@ -59,17 +59,29 @@ export const READ_PARENTS_COMMAND =
   "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^parent=' .";
 
 /**
- * Command used to read the cards of the board.
+ * Command used to read the metadata of every task.
  *
- * Everything the board needs is read in one command: the parent of every task
- * (to know the tasks that have no child), its status, its title and its tags.
+ * Everything the board and the Gantt chart need is read in one command: the
+ * parent of every task, its status, its title, its tags and its dates.
  */
-export const READ_CARDS_COMMAND =
-  "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' .";
+export const READ_METADATA_COMMAND =
+  "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' -e '^start=' -e '^end=' .";
 
 /** Command used to list the task files that are children of a given task. */
 export function childrenCommand(parentId: number): string {
   return `grep -rl --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^parent=${parentId}$' .`;
+}
+
+/** The metadata of a task, as it is read in one command. */
+export interface TaskMetadata {
+  readonly id: number;
+  readonly title: string;
+  readonly status: TaskStatus;
+  readonly parentId: number | null;
+  readonly start: string;
+  readonly end: string;
+  readonly tags: readonly string[];
+  readonly path: string;
 }
 
 /** The structure of the tasks of a project folder. */
@@ -80,11 +92,13 @@ export interface TaskHierarchy {
   readonly paths: ReadonlyMap<number, string>;
 }
 
-/** The metadata of a task, as it is read for the board. */
-interface CardMetadata {
+/** The metadata of a task, while it is being read. */
+interface MutableMetadata {
   title: string;
   status: TaskStatus;
   parentId: number | null;
+  start: string;
+  end: string;
   tags: string[];
 }
 
@@ -358,18 +372,17 @@ export class TaskRepository {
   }
 
   /**
-   * Reads the cards of the board: the tasks that have **no child**.
+   * Reads the metadata of every task of the project folder.
    *
-   * Two commands are needed: the listing of the task files (the id of a task
-   * is encoded in its file name) and a `grep` of the metadata of the tasks.
-   * The content of the files never reaches the browser here, only the status,
-   * the title and the tags of the tasks that have no child.
+   * Two calls are needed: the listing of the task files (the id of a task is
+   * encoded in its file name) and a `grep` of the metadata of the tasks. The
+   * content of the files never reaches the browser here, only the metadata.
    */
-  async readLeafTasks(projectDir: string): Promise<TaskCard[]> {
+  async readTaskMetadata(projectDir: string): Promise<Map<number, TaskMetadata>> {
     const [paths, result] = await Promise.all([
       this.listTaskFilePaths(projectDir),
       this.api.execShell({
-        command: READ_CARDS_COMMAND,
+        command: READ_METADATA_COMMAND,
         cwd: projectDir,
         timeout: 60,
       }),
@@ -380,7 +393,42 @@ export class TaskRepository {
       );
     }
 
-    const metadata = this.parseCardMetadata(result.stdout, projectDir);
+    const metadata = this.parseMetadata(result.stdout, projectDir);
+    const tasks = new Map<number, TaskMetadata>();
+
+    for (const path of paths) {
+      const id = parseTaskIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
+      if (id === null) {
+        continue;
+      }
+      const values = metadata.get(path);
+      if (values === undefined) {
+        continue;
+      }
+      tasks.set(id, {
+        id,
+        title: values.title,
+        status: values.status,
+        parentId: values.parentId,
+        start: values.start,
+        end: values.end,
+        tags: values.tags,
+        path,
+      });
+    }
+    return tasks;
+  }
+
+  /**
+   * Reads the cards of the board: the tasks that have **no child**.
+   *
+   * The metadata of every task is read in one command: the content of the
+   * files never reaches the browser here, only the status, the title and the
+   * tags of the tasks that have no child.
+   */
+  async readLeafTasks(projectDir: string): Promise<TaskCard[]> {
+    const metadata = await this.readTaskMetadata(projectDir);
+
     const parents = new Set<number>();
     for (const values of metadata.values()) {
       if (values.parentId !== null) {
@@ -389,26 +437,18 @@ export class TaskRepository {
     }
 
     const cards: TaskCard[] = [];
-    for (const path of paths) {
-      const id = parseTaskIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
-      if (id === null) {
-        continue;
-      }
-      if (parents.has(id)) {
+    for (const values of metadata.values()) {
+      if (parents.has(values.id)) {
         // The task has a child: it does not belong to the board.
         continue;
       }
-      const values = metadata.get(path);
-      if (values === undefined) {
-        continue;
-      }
       cards.push({
-        id,
+        id: values.id,
         title: values.title,
         status: values.status,
         parentId: values.parentId,
         tags: values.tags,
-        path,
+        path: values.path,
       });
     }
     return cards;
@@ -456,20 +496,20 @@ export class TaskRepository {
   }
 
   /**
-   * Parses the output of the command that reads the cards of the board.
+   * Parses the output of the command that reads the metadata of the tasks.
    *
    * Every line looks like `./task_5.txt:title=The task`. The path may contain
    * a colon, so the last colon that is followed by a known key is the
    * separator.
    */
-  private parseCardMetadata(stdout: string, projectDir: string): Map<string, CardMetadata> {
-    const metadata = new Map<string, CardMetadata>();
+  private parseMetadata(stdout: string, projectDir: string): Map<string, MutableMetadata> {
+    const metadata = new Map<string, MutableMetadata>();
     for (const line of stdout.split('\n')) {
       const trimmed = line.trim();
       if (trimmed.length === 0) {
         continue;
       }
-      const match = /^(.*):(id|parent|status|title|tags)=(.*)$/u.exec(trimmed);
+      const match = /^(.*):(id|parent|status|title|tags|start|end)=(.*)$/u.exec(trimmed);
       if (match === null) {
         continue;
       }
@@ -480,7 +520,14 @@ export class TaskRepository {
         continue;
       }
       const path = joinPath(projectDir, relative);
-      const current = metadata.get(path) ?? { title: '', status: 'todo', parentId: null, tags: [] };
+      const current = metadata.get(path) ?? {
+        title: '',
+        status: 'todo',
+        parentId: null,
+        start: '',
+        end: '',
+        tags: [],
+      };
       if (key === 'title') {
         current.title = value;
       } else if (key === 'status') {
@@ -490,6 +537,10 @@ export class TaskRepository {
         current.parentId = Number.isSafeInteger(parentId) ? parentId : null;
       } else if (key === 'tags') {
         current.tags = normalizeTags(value);
+      } else if (key === 'start') {
+        current.start = value;
+      } else if (key === 'end') {
+        current.end = value;
       }
       metadata.set(path, current);
     }

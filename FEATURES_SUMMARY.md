@@ -25,7 +25,7 @@ list or as a tree.
 
 | Feature | Status | Where |
 | ------- | ------ | ----- |
-| **List / Tree / Kanban toggle** | Done | `src/ui/app.ts` |
+| **List / Tree / Kanban / Gantt toggle** | Done | `src/ui/app.ts` |
 | **One row per task, with its name and its tags** | Done | `src/ui/taskTreeView.ts` |
 | **Collapse and expand the children of a task** | Done | `src/ui/taskTreeView.ts`, `src/core/taskTree.ts` |
 | **Ctrl+click collapses or expands the whole branch** | Done | `src/ui/app.ts`, `src/core/taskTree.ts` |
@@ -74,6 +74,18 @@ list or as a tree.
 | **Only the tasks that have no child are on the board** | Done | `src/core/taskRepository.ts` |
 | **Drag and drop between the columns changes the status** | Done | `src/ui/kanbanDrag.ts` |
 | **A card opens the task and its editor** | Done | `src/ui/kanbanBoard.ts` |
+
+## Gantt chart
+
+| Feature | Status | Where |
+| ------- | ------ | ----- |
+| **Gantt chart: the tasks on the left, the chart on the right** | Done | `src/ui/ganttView.ts` |
+| **One column per day** | Done | `src/core/gantt.ts` |
+| **The days grouped by week and the weeks by month** | Done | `src/core/gantt.ts` |
+| **The weeks and the months numbered and named, counting from one** | Done | `src/core/gantt.ts` |
+| **The weeks and the months can be collapsed and expanded** | Done | `src/ui/ganttView.ts` |
+| **A bar from the start date to the end date of the task** | Done | `src/core/gantt.ts` |
+| **The bars carry the colour of the status** | Done | `src/styles.css` |
 
 ## User interface
 

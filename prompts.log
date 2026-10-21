@@ -36,19 +36,20 @@ created=2026-10-21T02:45:29.365Z
 updated=2026-10-21T02:45:29.365Z
 eu quero que, ao invez disso, passemos a guardar apenas no formato YYYYMMDDHHNNSSIII (Y ano, M mes, D dia, H hora, N minuto, S segundo, I milisegundo), sem guardar informacao de timezone. alem disso as tarefas devem ter, alem de data de criacao e atualizacao, a data de inicio e de fim, que serao utilizadas futuramente.
 ====
+crie um novo modo de visualizacao das tarefas, de grafico gantt. ele será similar a visualização em árvore mas terá uma divisão horizontal na tela, do lado esquerdo ficam as linhas das tarefas e do lado direito fica o grafico gantt. o grafico gantt tera uma coluna por dia, um agrupamento de dias por semana e outro por mes. como acontece em graficos gantt, as datas de inicio e fim das tarefas serão utilizadas para desenhar barras horizontais comecando no dia de inicio e terminando na data de fim da tarefa. deve ser possivel colapsar e expandir as semanas. as semanas e os meses devem ser numeradas e nomeados contando a partir de 1.
+====
+====
+====
+====
 ====
 ====
 
-calendario
 ====
-crie um novo modo de visualizacao das tarefas, de grafico gantt. ele deverá ter uma linha para cada tarefa, e similar ao modo arvore as tarefas serao exibidas em arvore de parentesco e podem ser expandidas e colapsadas. o grafico gantt tera uma coluna por dia, um agrupamento de dias por semana e outro por mes. como acontece em graficos gantt, as datas de inicio e fim das tarefas serão utilizadas para desenhar barras horizontais comecando no dia de inicio e terminando na data de fim da tarefa
-gantt
+permita que o usuario possa escolher abrir a raiz do sistema OPFS do navegador ao invez de um diretorio nativo pela api do webservice de baixo nivel. escolhendo OPFS todos os arquivos serão salvos dentro do OPFS ao inves de fazer chamadas a api do webservice. admito que isso é uma mudança grande de paradigma e muito do nosso codigo vai ter de ser generalizado em uma fachada generica/abstrata para funcionar tanto em opfs quanto acessando o webservice já que não podemos usar comandos shell dentro do opfs pra facilitar consulta
 ====
+crie nos arquivos de tarefas um metadado para guardar ids de outras tarefas que bloqueiam esta tarefa. uma tarefa pode ter 0 ou mais tarefas bloqueadoras que impedem o cumprimento desta. crie também nos arquivos de tarefas um metadado para guardar ids de tarefas relacionadas. uma tarefa relacionada é uma tarefa que o usuário quer explicitar que tenha relação com esta, mas não é nem uma relação de bloqueio nem uma relacao de pai ou filho.
 ====
-====
-====
-====
-====
+visualizacao calendario
 ====
 ====
 ====
