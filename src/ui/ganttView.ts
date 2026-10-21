@@ -28,6 +28,10 @@ export interface GanttTask {
   readonly status: TaskStatus;
   /** The bar of the task, `null` when it has no date. */
   readonly bar: GanttBar | null;
+  /** The index of the first day of the bar in the schedule. */
+  readonly startDay: number | null;
+  /** The index of the last day of the bar in the schedule. */
+  readonly endDay: number | null;
   /** `true` when the task has children. */
   readonly hasChildren: boolean;
 }
@@ -92,6 +96,7 @@ export function renderGanttView(
 
   const side = el(doc, 'div', { class: 'gantt-side' });
   const chart = el(doc, 'div', { class: 'gantt-chart' });
+  chart.append(renderStripes(doc, layout));
 
   for (const row of options.rows) {
     const task = options.tasks.get(row.id);
@@ -101,6 +106,25 @@ export function renderGanttView(
 
   const grid = el(doc, 'div', { class: 'gantt-grid' }, [corner, heads, side, chart]);
   return el(doc, 'div', { class: 'gantt-wrap' }, [grid]);
+}
+
+/**
+ * The stripes of the chart: the columns alternate between a white and a very
+ * light grey background.
+ */
+function renderStripes(doc: Document, layout: GanttLayout): HTMLElement {
+  const stripes = el(doc, 'div', { class: 'gantt-stripes' });
+  let left = 0;
+  for (const column of layout.columns) {
+    if (column.alternate) {
+      const stripe = el(doc, 'div', { class: 'gantt-stripe' });
+      stripe.style.left = `${left}px`;
+      stripe.style.width = `${column.width}px`;
+      stripes.append(stripe);
+    }
+    left += column.width;
+  }
+  return stripes;
 }
 
 /** The rows of the tasks, on the left of the chart. */
@@ -170,7 +194,19 @@ function renderChartRow(
   bar.style.left = `${geometry.left}px`;
   bar.style.width = `${Math.max(geometry.width - 2, 4)}px`;
   bar.dataset['status'] = task.status;
-  bar.append(el(doc, 'span', { class: 'gantt-bar-label', text: task.title }));
+  bar.dataset['taskId'] = String(task.id);
+  if (task.startDay !== null) {
+    bar.dataset['startDay'] = String(task.startDay);
+  }
+  if (task.endDay !== null) {
+    bar.dataset['endDay'] = String(task.endDay);
+  }
+  // The handles move the start and the end of the task.
+  bar.append(
+    el(doc, 'span', { class: 'gantt-handle gantt-handle-start' }),
+    el(doc, 'span', { class: 'gantt-bar-label', text: task.title }),
+    el(doc, 'span', { class: 'gantt-handle gantt-handle-end' }),
+  );
   row.append(bar);
   return row;
 }
@@ -196,10 +232,14 @@ function headerCell(
 
 /** A cell of the header of the chart: a day. */
 function dayCell(doc: Document, column: GanttColumn): HTMLElement {
-  const cell = el(doc, 'div', {
-    class: `gantt-day${column.weekend ? ' is-weekend' : ''}`,
-    title: column.title,
-  });
+  const classes = ['gantt-day'];
+  if (column.alternate) {
+    classes.push('is-alt');
+  }
+  if (column.weekend) {
+    classes.push('is-weekend');
+  }
+  const cell = el(doc, 'div', { class: classes.join(' '), title: column.title });
   cell.style.width = `${column.width}px`;
   if (column.kind === 'day') {
     cell.append(el(doc, 'span', { class: 'gantt-day-number', text: column.label }));

@@ -27,8 +27,11 @@ import {
   barOf,
   buildLayout,
   buildSchedule,
+  dayOfIndex,
   dayOfTimestamp,
   daysBetween,
+  isoDate,
+  startOfMonth,
   type GanttLayout,
   type GanttSchedule,
 } from '../core/gantt.js';
@@ -42,6 +45,7 @@ import {
 import { button, clear, el, input, type Child } from './dom.js';
 import { FileDialog } from './fileDialog.js';
 import { renderGanttView, type GanttTask } from './ganttView.js';
+import { GanttDragController, type GanttDragContext } from './ganttDrag.js';
 import { createIcon } from './icons.js';
 import { KanbanDragController } from './kanbanDrag.js';
 import { renderKanbanBoard } from './kanbanBoard.js';
@@ -132,6 +136,10 @@ export class App {
   private ganttMetadata = new Map<number, TaskMetadata>();
   /** The weeks and the months that are collapsed in the Gantt chart. */
   private ganttCollapsed = new Set<string>();
+  /** The schedule of the chart currently drawn. */
+  private ganttScheduleState: GanttSchedule | null = null;
+  /** The columns of the chart currently drawn. */
+  private ganttLayoutState: GanttLayout | null = null;
 
   private projectPathElement!: HTMLElement;
   private serviceTextElement!: HTMLElement;
@@ -151,6 +159,8 @@ export class App {
   private treeRowsElement!: HTMLElement;
   private kanbanElement!: HTMLElement;
   private ganttElement!: HTMLElement;
+  private ganttChartElement!: HTMLElement;
+  private ganttDrag: GanttDragController | null = null;
   private treeDrag: TreeDragController | null = null;
   private kanbanDrag: KanbanDragController | null = null;
   private rowsElement!: HTMLTableSectionElement;
@@ -400,6 +410,15 @@ export class App {
     });
 
     this.ganttElement = el(this.doc, 'div', { class: 'gantt-container', attrs: { hidden: 'hidden' } });
+    this.ganttDrag?.dispose();
+    this.ganttDrag = new GanttDragController({
+      doc: this.doc,
+      container: this.ganttElement,
+      context: () => this.ganttDragContext(),
+      onChange: (taskId, start, end) => {
+        void this.changeTaskDates(taskId, start, end);
+      },
+    });
 
     const content = el(this.doc, 'main', { class: 'content' }, [
       this.tableWrapElement,
@@ -932,15 +951,57 @@ export class App {
             this.toggleGanttPeriod(key);
           },
           onToggleMonth: (key) => {
-            this.toggleGanttPeriod(key);
+            this.toggleGanttMonth(key);
           },
         },
       ),
     );
 
+    // The drag of the bars needs the chart that is on the screen.
+    this.ganttScheduleState = schedule;
+    this.ganttLayoutState = layout;
+    this.ganttChartElement = this.ganttElement.querySelector<HTMLElement>('.gantt-chart') ?? this.ganttElement;
+
     this.updateEmptyState(rows.length === 0);
     this.resultCountElement.textContent = this.buildResultCount();
     this.updateToolbarState();
+  }
+
+  /** The chart currently drawn, `null` when there is none. */
+  private ganttDragContext(): GanttDragContext | null {
+    const schedule = this.ganttScheduleState;
+    const layout = this.ganttLayoutState;
+    if (schedule === null || layout === null || this.ganttChartElement === null) {
+      return null;
+    }
+    return {
+      columns: layout.columns,
+      schedule,
+      chart: this.ganttChartElement,
+    };
+  }
+
+  /**
+   * Changes the start and the end date of a task.
+   *
+   * The dates are dragged on the chart of the Gantt view.
+   */
+  private async changeTaskDates(taskId: number, start: string, end: string): Promise<void> {
+    const projectDir = this.config.projectDir;
+    if (projectDir === null) {
+      return;
+    }
+    const path =
+      this.treeHierarchy?.paths.get(taskId) ?? this.repository.taskPath(projectDir, taskId);
+    this.setBusy(true);
+    try {
+      await this.repository.setDates(path, start, end);
+      await this.refresh();
+    } catch (error) {
+      this.handleError(error);
+    } finally {
+      this.setBusy(false);
+    }
   }
 
   /** The rows of the Gantt chart: the visible rows of the tree. */
@@ -1000,19 +1061,19 @@ export class App {
       }
       const start = dayOfTimestamp(metadata.start);
       const end = dayOfTimestamp(metadata.end);
+      const startDay = start === null ? null : daysBetween(schedule.start, start);
+      const endDay = end === null ? null : daysBetween(schedule.start, end);
       const bar =
-        start === null && end === null
+        startDay === null && endDay === null
           ? null
-          : barOf(
-              layout.columns,
-              start === null ? null : daysBetween(schedule.start, start),
-              end === null ? null : daysBetween(schedule.start, end),
-            );
+          : barOf(layout.columns, startDay, endDay);
       tasks.set(row.id, {
         id: metadata.id,
         title: metadata.title,
         status: metadata.status,
         bar,
+        startDay,
+        endDay,
         hasChildren: (structure.children.get(metadata.id) ?? []).length > 0,
       });
     }
@@ -1025,6 +1086,36 @@ export class App {
       this.ganttCollapsed.delete(key);
     } else {
       this.ganttCollapsed.add(key);
+    }
+    this.renderGantt();
+  }
+
+  /**
+   * Collapses or expands every week of a month.
+   *
+   * The months are not collapsed themselves: they follow the days, so they
+   * cannot be drawn as a single column. Clicking a month is a shortcut for
+   * the weeks that hold at least one day of that month.
+   */
+  private toggleGanttMonth(monthKey: string): void {
+    const schedule = this.ganttScheduleState;
+    if (schedule === null) {
+      return;
+    }
+    const weeks = schedule.weeks.filter((week) => {
+      const date = dayOfIndex(schedule, week.firstDayIndex);
+      return isoDate(startOfMonth(date)) === monthKey;
+    });
+    if (weeks.length === 0) {
+      return;
+    }
+    const expand = weeks.some((week) => this.ganttCollapsed.has(week.key));
+    for (const week of weeks) {
+      if (expand) {
+        this.ganttCollapsed.delete(week.key);
+      } else {
+        this.ganttCollapsed.add(week.key);
+      }
     }
     this.renderGantt();
   }

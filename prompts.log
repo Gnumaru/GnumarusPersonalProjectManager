@@ -43,14 +43,19 @@ a modal de edicao de tarefas ainda nao tem campos que permitam editar as datas d
 no modo gantt o ctrl+click para expandir e colapsar recursivamente não está funcionando. quando eu faço ctrl+click no icone de colapsar/expandir ele não faz nada, nem colapsa nem expande, nem na tarefa clicada nem nas filhas. mas se eu usar clique normal ele funciona como esperado.
 além disso, quero que a semana seja contada a partir do domingo, não da segunda.
 ====
+na visualização gantt faça com que seja possível alterar as datas da tarefa arrastando a barra do intervalo de datas. se o usuario arrastar a barra pelo meio ele irá deslocar e alterar tanto a data de inicio quanto fim. se ele deslocar pelas pontas poderá alterar apenas a data de inicio ou de fim. nao deve ser possivel arrastar a data de fim para ficar no mesmo dia ou antes da data de inicio (no minimo deve ficar no dia seguinte) nem deve ser possivel arrastar a data de inicio pra ficar no mesmo dia ou depois da data de fim (no maximo deve ficar no dia anterior)
 ====
+- a numeração de semanas e meses está contando a partir dos meses visiveis na interface. isto está errado. as semanas e meses devem ser contadas a partir do inicio do ano. então se a tarefa com menor data de inicio começa em dezembro, o mes deve ser contabilizado como 12, e não como 1 (que é o que aparece hoje). no caso das semanas elas também devem contar a partir do primeiro dia do ano. se o primeiro dia do ano não coincidir com o primeiro dia da semana (ou seja, se não for domingo), a primeira semana do ano será compartilhada com a ultima semana do ano anterior. o mesmo vale para o ultimo dia do ano (a semana sera compartilhada com o ano seguinte se o ultimo dia não for sabado).
+- além disso, os inicios e fim dos meses não estão alinhando com o primeiro e ultimo dia do mes, estao alinhando com o comeco e fim da primeira e ultima semana. isso esta errado. faça com que os meses se alinhem com os dias, nao com as semanas. por causa disso os meses não podem mais ser colapsados ou expandidos, apenas as semanas. contudo, clicar no mes será um atalho para colapsar ou expandir todas as semanas que tenham ao menos um dia naquele mes.
+- alem disso, faca com que as colunas de dia tenham background com cores alternadas para cada dia. um dia com background branco 100%, outro com background cinza bem claro
 ====
+crie nos arquivos de tarefas um metadado para guardar ids de outras tarefas que bloqueiam esta tarefa. uma tarefa pode ter 0 ou mais tarefas bloqueadoras que impedem a conclusao desta. crie também nos arquivos de tarefas um metadado para guardar ids de tarefas relacionadas. uma tarefa relacionada é uma tarefa que o usuário quer explicitar que tenha relação com esta, mas não é nem uma relação de bloqueio nem uma relacao de pai ou filho. crie na modal de edicao de tarefas uma funcionalidade que permita adicionar tarefas bloqueadoras e tarefas relacionadas.
 ====
 
 ====
 	permita que o usuario possa escolher abrir a raiz do sistema OPFS do navegador ao invez de um diretorio nativo pela api do webservice de baixo nivel. escolhendo OPFS todos os arquivos serão salvos dentro do OPFS ao inves de fazer chamadas a api do webservice. admito que isso é uma mudança grande de paradigma e muito do nosso codigo vai ter de ser generalizado em uma fachada generica/abstrata para funcionar tanto em opfs quanto acessando o webservice já que não podemos usar comandos shell dentro do opfs pra facilitar consulta
 ====
-crie nos arquivos de tarefas um metadado para guardar ids de outras tarefas que bloqueiam esta tarefa. uma tarefa pode ter 0 ou mais tarefas bloqueadoras que impedem o cumprimento desta. crie também nos arquivos de tarefas um metadado para guardar ids de tarefas relacionadas. uma tarefa relacionada é uma tarefa que o usuário quer explicitar que tenha relação com esta, mas não é nem uma relação de bloqueio nem uma relacao de pai ou filho.
+
 ====
 	crie um novo modo de visualização de tarefas, de calendario. o usuario pode escolher visualizar apenas uma semana especifica
 ====

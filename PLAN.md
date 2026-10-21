@@ -191,8 +191,11 @@ The fourth display mode is a **Gantt chart**. The window is split in two: the
 rows of the tasks on the left, the chart on the right.
 
 The chart has **one column per day**; the days are grouped by **week** (from
-Sunday to Saturday) and the weeks by **month**. The weeks and the months are
-**numbered and named**, counting from one (`1 October`, `2 November`, `1 · Oct 5`...).
+Sunday to Saturday) and the weeks by **month**. The **months** are numbered
+with the number of the month of the year (a task that starts in December shows
+`12`) and the **weeks** are numbered from the first day of the year (the week
+that holds the first of January is the week 1, even when it starts in December
+of the year before).
 
 A **bar** is drawn for every task, from the day of its `start=` date to the day
 of its `end=` date. A week (or a month) can be **collapsed**: its days are not
@@ -239,6 +242,11 @@ reads no file.
     bars drawn from the start date to the end date.
 20. [x] Date pickers in the editor: the user chooses the start date and the end
     date of a task.
+21. [x] The bars of the Gantt chart can be dragged: the middle of a bar moves
+    the task, its handles change the start or the end date.
+22. [x] The Gantt chart: the months follow the days (and cannot be collapsed any
+    more), the weeks are numbered from the year and the day columns alternate
+    between two colours.
 
 ## Verification commands
 

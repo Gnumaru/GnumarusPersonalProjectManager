@@ -385,18 +385,44 @@ weeks by **month**, with three rows of headers:
 
 ```
 +-----------+--------------------------------------------------+
-| Task      | 1 August            | 2 September                |
-|           | 1 Aug 30 | 2 Sep 6  | 3 Sep 13 | 4 Sep 20     |
-|           | 30 31 1 2 | 3 4 5 6 7 | 8 9 10 11 | 12 13 14 15  |
+| Task      | 11 November       | 12 December               |
+|           | 48 Nov 22 | 49 Nov 29 | 50 Dec 6 | 51 Dec 13      |
+|           | 22 23 24 25 | 26 27 28 29 30 | 1 2 3 4 5 | 6 7 8 9 10   |
 +-----------+--------------------------------------------------+
 | Plan the  | [=================]                              |
 | release   |                                                 |
 +-----------+--------------------------------------------------+
 ```
 
-The weeks start on **Sunday** and end on Saturday. The weeks and the months
-are **numbered and named**, counting from one: the first month of the schedule
-is `1`, the first week is `1`.
+The weeks start on **Sunday** and end on Saturday.
+
+### The numbering
+
+The numbering does **not** depend on the part of the schedule that is shown:
+
+* the **months** keep the number of the month of the year: a task that starts
+  in December shows `12 December`, whatever the schedule covers;
+* the **weeks** are counted from the first day of the year: the week that holds
+  the first of January is the **week 1**, even when it starts in December of
+  the year before. The last week of a year is the week that holds its 31st of
+  December: it is shared with the first week of the next year when the 31st of
+  December is not a Saturday.
+
+### The months follow the days
+
+A month ends exactly where the next one begins, even when a week crosses the
+boundary of two months: the header of the months is cut on the days, not on the
+weeks.
+
+The months can therefore **not** be collapsed any more (a month is not always
+a whole number of columns). Clicking a month is a shortcut that collapses (or
+expands) **every week that holds at least one day of that month**.
+
+### The colours of the days
+
+The day columns alternate between a **white** and a **very light grey**
+background, so the days are easy to count. The weekends keep a slightly
+darker grey.
 
 ### The bars
 
@@ -405,11 +431,29 @@ its `end=` date. The bar carries the colour of the status of the task and the
 name of the task. A task without an end date goes until the end of the
 schedule, a task without a start date begins with it.
 
+### Dragging the bars
+
+The dates of a task are changed by dragging its bar:
+
+| What the user grabs | What happens |
+| ------------------- | ------------ |
+| The **middle** of the bar | The task moves: the start and the end are shifted by the same number of days. |
+| The **left handle** of the bar | Only the start date changes. |
+| The **right handle** of the bar | Only the end date changes. |
+
+The bar follows the pointer while it is dragged and the new dates are written
+in the file when the user releases the button.
+
+A task always lasts **at least one day**: the end date cannot be dragged to
+the day of the start (or before) and the start date cannot be dragged to the
+day of the end (or after). The bar cannot leave the schedule either.
+
 ### Collapsing
 
-A **week** (or a **month**) can be collapsed by clicking its header: its days
-are not drawn any more and the whole period becomes a single narrow column.
-Clicking it again expands it.
+A **week** can be collapsed by clicking its header: its days are not drawn any
+more and the whole period becomes a single narrow column. Clicking it again
+expands it. The **months** cannot be collapsed (they follow the days), but
+clicking a month collapses or expands every week that holds a day of it.
 
 ### Where the data comes from
 
@@ -543,6 +587,7 @@ be entered with a double click.
 | `src/ui/kanbanBoard.test.ts` | The board: the columns and their order, the cards, their tags and their actions. |
 | `src/ui/kanbanDrag.test.ts` | The drag and drop of the cards of the board between the columns. |
 | `src/core/gantt.test.ts` | The schedule of the Gantt chart: the days, the weeks, the months, the columns and the bars. |
+| `src/ui/ganttDrag.test.ts` | The drag of the bars of the Gantt chart: moving a task, changing one of its dates and the limits. |
 | `src/ui/treeDrag.test.ts` | The drag and drop of the rows of the tree: the drop target, the thresholds, the buttons that never start a drag, the click that ends the drag and the detachment of a task. |
 | `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |

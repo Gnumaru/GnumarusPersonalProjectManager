@@ -17,6 +17,7 @@ import {
   parseTaskIdFromFileName,
   serializeTask,
   taskFileName,
+  withDates,
   withParent,
   withStatus,
   type Task,
@@ -471,6 +472,14 @@ export class TaskRepository {
   async setStatus(path: string, status: TaskStatus): Promise<Task> {
     const current = await this.loadTask(path);
     const updated = withStatus(current, status, new Date());
+    await this.api.overwriteFile(path, serializeTask(updated));
+    return updated;
+  }
+
+  /** Changes the start and the end date of a task. */
+  async setDates(path: string, start: string, end: string): Promise<Task> {
+    const current = await this.loadTask(path);
+    const updated = withDates(current, start, end, new Date());
     await this.api.overwriteFile(path, serializeTask(updated));
     return updated;
   }

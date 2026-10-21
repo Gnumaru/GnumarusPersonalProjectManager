@@ -69,17 +69,42 @@ describe('buildSchedule', () => {
     expect(schedule.days).toHaveLength(14);
   });
 
-  it('numbers the weeks and the months from one', () => {
+  it('numbers the weeks from the first day of the year and the months from the calendar', () => {
     const schedule = buildSchedule(new Date(2026, 9, 21), new Date(2026, 11, 10));
 
-    expect(schedule.weeks[0]?.number).toBe(1);
-    expect(schedule.weeks[1]?.number).toBe(2);
-    expect(schedule.months[0]?.number).toBe(1);
+    // The weeks are counted from the week that holds the first of January.
+    expect(schedule.weeks[0]?.number).toBe(43);
+    expect(schedule.weeks[1]?.number).toBe(44);
+
+    // The months keep the number of the month of the year.
+    expect(schedule.months[0]?.number).toBe(10);
     expect(schedule.months[0]?.name).toBe('October');
-    expect(schedule.months[1]?.number).toBe(2);
+    expect(schedule.months[1]?.number).toBe(11);
     expect(schedule.months[1]?.name).toBe('November');
-    expect(schedule.days[0]?.week).toBe(1);
-    expect(schedule.days[0]?.month).toBe(1);
+
+    expect(schedule.days[0]?.week).toBe(43);
+    expect(schedule.days[0]?.month).toBe(10);
+  });
+
+  it('shares the first week of a year with the last week of the year before', () => {
+    // The week that holds the first of January 2027 starts on the 27th of
+    // December 2026: it is the first week of 2027.
+    const schedule = buildSchedule(new Date(2026, 11, 20), new Date(2027, 0, 20));
+    const numbers = schedule.weeks.map((week) => week.number);
+
+    expect(numbers[0]).toBe(52);
+    expect(numbers[1]).toBe(1);
+    expect(numbers[2]).toBe(2);
+  });
+
+  it('shares the last week of a year with the first week of the next year', () => {
+    // The week that holds the 31st of December 2026 ends on the 2nd of January
+    // 2027: it is the first week of 2027.
+    const schedule = buildSchedule(new Date(2026, 10, 20), new Date(2027, 0, 20));
+    const numbers = schedule.weeks.map((week) => week.number);
+
+    expect(numbers).toContain(52);
+    expect(numbers).toContain(1);
   });
 
   it('marks the weekends', () => {
@@ -107,11 +132,25 @@ describe('buildLayout', () => {
   it('numbers and names the months and the weeks', () => {
     const layout = buildLayout(schedule, new Set<string>());
 
-    expect(layout.months.map((cell) => cell.number)).toEqual([1, 2]);
+    expect(layout.months.map((cell) => cell.number)).toEqual([10, 11]);
     expect(layout.months[0]?.label).toBe('October');
     expect(layout.months[1]?.label).toBe('November');
-    expect(layout.weeks[0]?.number).toBe(1);
+    expect(layout.weeks[0]?.number).toBe(43);
     expect(layout.weeks[0]?.label).toContain('Oct');
+  });
+
+  it('cuts the months where the days say so, not where the weeks end', () => {
+    // The week of the 30th of August 2026 ends on the 5th of September: the
+    // month of September starts on the 1st, in the middle of the week.
+    const across = buildSchedule(new Date(2026, 7, 25), new Date(2026, 8, 6));
+    const layout = buildLayout(across, new Set<string>());
+
+    expect(layout.months.map((cell) => cell.number)).toEqual([8, 9]);
+    // The schedule covers the 23rd of August to the 12th of September: the
+    // month of August holds the 9 first days, the one of September the 12
+    // others. The month of September does not wait for the end of the week.
+    expect(layout.months[0]?.width).toBe(9 * DAY_WIDTH_PX);
+    expect(layout.months[1]?.width).toBe(12 * DAY_WIDTH_PX);
   });
 
   it('hides the days of a collapsed week', () => {
@@ -129,7 +168,7 @@ describe('buildLayout', () => {
     expect(layout.columns).toHaveLength(schedule.days.length - 6);
   });
 
-  it('hides the weeks and the days of a collapsed month', () => {
+  it('does not collapse the months any more', () => {
     const month = schedule.months[0];
     expect(month).toBeDefined();
     if (month === undefined) {
@@ -137,11 +176,9 @@ describe('buildLayout', () => {
     }
     const layout = buildLayout(schedule, new Set([month.key]));
 
-    const collapsed = layout.columns.filter((column) => column.kind === 'month');
-    expect(collapsed).toHaveLength(1);
-    expect(collapsed[0]?.days).toBe(month.days);
-    // The weeks of the collapsed month are not drawn any more.
-    expect(layout.weeks.every((cell) => cell.number > 2)).toBe(true);
+    // The months follow the days: nothing changes when a month is "collapsed".
+    expect(layout.columns.filter((column) => column.kind === 'month')).toHaveLength(0);
+    expect(layout.columns).toHaveLength(schedule.days.length);
   });
 
   it('keeps the width of the headers and of the columns in sync', () => {

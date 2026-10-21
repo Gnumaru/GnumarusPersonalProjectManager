@@ -434,3 +434,13 @@ export function withStatus(task: Task, status: TaskStatus, now: Date): Task {
     updated: formatTaskTimestamp(now),
   };
 }
+
+/** Returns a copy of the task with another start and end date. */
+export function withDates(task: Task, start: string, end: string, now: Date): Task {
+  return {
+    ...task,
+    start,
+    end,
+    updated: formatTaskTimestamp(now),
+  };
+}

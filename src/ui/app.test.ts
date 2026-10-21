@@ -1085,8 +1085,8 @@ describe('App and the Gantt chart', () => {
     await switchToGantt(harness);
 
     const months = [...harness.root.querySelectorAll('.gantt-month')];
-    expect(months.map((cell) => cell.textContent)).toEqual(['1October', '2November']);
-    expect(months[0]?.querySelector('.gantt-header-number')?.textContent).toBe('1');
+    expect(months.map((cell) => cell.textContent)).toEqual(['10October', '11November']);
+    expect(months[0]?.querySelector('.gantt-header-number')?.textContent).toBe('10');
     expect(months[0]?.querySelector('.gantt-header-label')?.textContent).toBe('October');
 
     const weeks = [...harness.root.querySelectorAll('.gantt-week')];
@@ -1118,6 +1118,47 @@ describe('App and the Gantt chart', () => {
     harness.app.dispose();
   });
 
+  it('collapses and expands every week of a month when the month is clicked', async () => {
+    const harness = await createGanttHarness();
+    setDates(harness, 1, '20261019100000000', '20261110180000000');
+    await switchToGantt(harness);
+
+    const daysBefore = harness.root.querySelectorAll('.gantt-day').length;
+
+    // Clicking the month collapses every week that holds a day of it.
+    click(harness.root.querySelector<HTMLButtonElement>('.gantt-month'));
+    await flush();
+    expect(harness.root.querySelectorAll('.gantt-day').length).toBeLessThan(daysBefore);
+    // The months are not collapsed themselves.
+    expect(harness.root.querySelectorAll('.gantt-month.is-collapsed')).toHaveLength(0);
+
+    // Clicking it again expands them.
+    click(harness.root.querySelector<HTMLButtonElement>('.gantt-month'));
+    await flush();
+    expect(harness.root.querySelectorAll('.gantt-day')).toHaveLength(daysBefore);
+
+    harness.app.dispose();
+  });
+
+  it('alternates the background of the day columns', async () => {
+    const harness = await createGanttHarness();
+    setDates(harness, 1, '20261019100000000', '20261023180000000');
+    await switchToGantt(harness);
+
+    const days = [...harness.root.querySelectorAll('.gantt-day')];
+    expect(days.length).toBeGreaterThan(2);
+    // The days alternate between the two colours.
+    expect(days[0]?.classList.contains('is-alt')).toBe(false);
+    expect(days[1]?.classList.contains('is-alt')).toBe(true);
+    expect(days[2]?.classList.contains('is-alt')).toBe(false);
+
+    // The body of the chart is striped the same way.
+    const stripes = harness.root.querySelectorAll('.gantt-stripe');
+    expect(stripes).toHaveLength(Math.floor(days.length / 2));
+
+    harness.app.dispose();
+  });
+
   it('expands the whole branch of a task with a ctrl+click', async () => {
     const harness = await createGanttHarness();
     setDates(harness, 1, '20261019100000000', '20261023180000000');
@@ -1144,6 +1185,58 @@ describe('App and the Gantt chart', () => {
     await switchToGantt(harness);
 
     expect(harness.root.querySelector('.gantt-empty')?.textContent).toContain('start or an end date');
+
+    harness.app.dispose();
+  });
+
+  it('changes the dates of a task when its bar is dragged', async () => {
+    const harness = await createGanttHarness();
+    setDates(harness, 1, '20261019100000000', '20261023180000000');
+    await switchToGantt(harness);
+
+    const bar = harness.root.querySelector<HTMLElement>('.gantt-bar');
+    expect(bar).not.toBeNull();
+    if (bar === null) {
+      return;
+    }
+    const label = bar.querySelector<HTMLElement>('.gantt-bar-label');
+    if (label === null) {
+      return;
+    }
+
+    // The bar is dragged one day to the left: the start and the end are
+    // shifted by the same number of days.
+    const from = 3 * 28 + 4;
+    label.dispatchEvent(
+      new harness.dom.window.MouseEvent('mousedown', {
+        bubbles: true,
+        clientX: from,
+        clientY: 10,
+        button: 0,
+      }),
+    );
+    harness.doc.dispatchEvent(
+      new harness.dom.window.MouseEvent('mousemove', {
+        bubbles: true,
+        clientX: from - 28,
+        clientY: 10,
+        button: 0,
+      }),
+    );
+    harness.doc.dispatchEvent(
+      new harness.dom.window.MouseEvent('mouseup', {
+        bubbles: true,
+        clientX: from - 28,
+        clientY: 10,
+        button: 0,
+      }),
+    );
+    await flush();
+
+    // The dates of the file moved with the bar.
+    const file = harness.bridge.files.get('/home/user/projects/task_1.txt');
+    expect(file).toContain('start=20261018000000000');
+    expect(file).toContain('end=20261022000000000');
 
     harness.app.dispose();
   });

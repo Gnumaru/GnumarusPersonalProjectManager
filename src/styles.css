@@ -1573,12 +1573,32 @@ input[type='date'] {
   color: var(--text-faint);
   font-size: 10.5px;
   font-family: var(--mono);
+  background: var(--bg-elevated);
+}
+
+/* The days alternate between a white and a very light grey background. */
+.gantt-day.is-alt {
   background: var(--bg-subtle);
 }
 
 .gantt-day.is-weekend {
   background: var(--bg-hover);
   color: var(--text-muted);
+}
+
+/* The stripes of the body of the chart follow the days. */
+.gantt-stripes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.gantt-stripe {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--bg-subtle);
 }
 
 .gantt-side {
@@ -1688,6 +1708,7 @@ input[type='date'] {
 
 .gantt-chart-row {
   position: relative;
+  z-index: 1;
   padding: 0;
 }
 
@@ -1705,6 +1726,37 @@ input[type='date'] {
   color: var(--accent-contrast);
   background: var(--accent);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+  cursor: grab;
+  user-select: none;
+}
+
+.gantt-bar.is-dragging {
+  cursor: grabbing;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+  opacity: 0.9;
+}
+
+/* The handles move the start and the end of the task. */
+.gantt-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.001);
+}
+
+.gantt-handle:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.gantt-handle-start {
+  left: 0;
+}
+
+.gantt-handle-end {
+  right: 0;
 }
 
 .gantt-bar-label {

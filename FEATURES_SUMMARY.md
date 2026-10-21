@@ -84,8 +84,14 @@ list or as a tree.
 | **One column per day** | Done | `src/core/gantt.ts` |
 | **The days grouped by week and the weeks by month** | Done | `src/core/gantt.ts` |
 | **The weeks and the months numbered and named, counting from one** | Done | `src/core/gantt.ts` |
+| **The months numbered with the number of the month of the year** | Done | `src/core/gantt.ts` |
+| **The weeks numbered from the first day of the year** | Done | `src/core/gantt.ts` |
+| **The months follow the days and cannot be collapsed any more** | Done | `src/core/gantt.ts` |
+| **Clicking a month collapses every week that holds a day of it** | Done | `src/ui/app.ts` |
+| **The day columns alternate between two colours** | Done | `src/ui/ganttView.ts` |
 | **The weeks and the months can be collapsed and expanded** | Done | `src/ui/ganttView.ts` |
 | **A bar from the start date to the end date of the task** | Done | `src/core/gantt.ts` |
+| **The bars can be dragged to change the dates of a task** | Done | `src/ui/ganttDrag.ts` |
 | **The bars carry the colour of the status** | Done | `src/styles.css` |
 
 ## User interface

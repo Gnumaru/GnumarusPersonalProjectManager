@@ -855,8 +855,8 @@ async function runChecks() {
     `[...document.querySelectorAll('.gantt-month')].map((node) => node.textContent).join('|')`,
   );
   check(
-    /^1[A-Z]/.test(ganttMonths),
-    'the months of the Gantt chart are numbered and named from one',
+    ganttMonths === '9September|10October',
+    'the months are numbered with the number of the month of the year',
     ganttMonths,
   );
 
@@ -864,8 +864,8 @@ async function runChecks() {
     `[...document.querySelectorAll('.gantt-week')].map((node) => node.textContent).join('|')`,
   );
   check(
-    /^1[A-Z]/.test(ganttWeeks),
-    'the weeks of the Gantt chart are numbered and named from one',
+    /^40[A-Z]/.test(ganttWeeks),
+    'the weeks are numbered from the first day of the year',
     ganttWeeks,
   );
 
@@ -935,6 +935,59 @@ async function runChecks() {
   await delay(500);
   const daysAgain = await evaluate(`document.querySelectorAll('.gantt-day').length`);
   check(daysAgain === daysBefore, 'expanding the week shows its days again', `${daysAgain}`);
+
+  // The days alternate between a white and a very light grey background.
+  const stripes = await evaluate(`document.querySelectorAll('.gantt-stripe').length`);
+  const alternateDays = await evaluate(
+    `document.querySelectorAll('.gantt-day.is-alt').length`,
+  );
+  check(
+    stripes > 0 && alternateDays === stripes,
+    'the day columns alternate between two colours',
+    `${alternateDays} of ${daysBefore}`,
+  );
+
+  // Clicking a month collapses every week that holds a day of it.
+  const weeksBefore = await evaluate(`document.querySelectorAll('.gantt-week').length`);
+  await evaluate(`document.querySelector('.gantt-month').click()`);
+  await delay(500);
+  const collapsedWeeks = await evaluate(
+    `document.querySelectorAll('.gantt-week.is-collapsed').length`,
+  );
+  check(
+    collapsedWeeks > 0 && collapsedWeeks < weeksBefore,
+    'clicking a month collapses the weeks that hold a day of it',
+    `${collapsedWeeks} of ${weeksBefore}`,
+  );
+  check(
+    (await evaluate(`document.querySelectorAll('.gantt-month.is-collapsed').length`)) === 0,
+    'the months are not collapsed themselves',
+  );
+  await evaluate(`document.querySelector('.gantt-month').click()`);
+  await delay(500);
+
+  // The bar of a task can be dragged to change its dates.
+  const barPoint = await evaluate(`(() => {
+    const bar = document.querySelector('.gantt-bar[data-task-id="1"]');
+    const box = bar.getBoundingClientRect();
+    return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  })()`);
+  await dispatchMouse('mousePressed', barPoint.x, barPoint.y);
+  await delay(150);
+  await dispatchMouse('mouseMoved', barPoint.x + 2 * 28, barPoint.y);
+  await delay(300);
+  await dispatchMouse('mouseReleased', barPoint.x + 2 * 28, barPoint.y);
+  await delay(1200);
+
+  const dragged = await apiRequest(
+    `/api/file?path=${encodeURIComponent(`${taskDirectory}/task_1.txt`)}`,
+  );
+  check(
+    dragged.content.includes('start=20261004000000000') &&
+      dragged.content.includes('end=20261009000000000'),
+    'dragging a bar moves the dates of the task',
+    dragged.content,
+  );
 
   // Back to the flat list for the rest of the test.
   await evaluate(`(() => {

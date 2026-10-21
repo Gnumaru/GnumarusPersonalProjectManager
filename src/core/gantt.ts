@@ -17,8 +17,6 @@ import { parseTaskTimestamp } from './task.js';
 export const DAY_WIDTH_PX = 28;
 /** The width of a collapsed week, in pixels. */
 export const COLLAPSED_WEEK_WIDTH_PX = 56;
-/** The width of a collapsed month, in pixels. */
-export const COLLAPSED_MONTH_WIDTH_PX = 84;
 
 const MONTH_NAMES = [
   'January',
@@ -106,6 +104,35 @@ export function dayOfTimestamp(value: string): Date | null {
   return date === null ? null : startOfDay(date);
 }
 
+/**
+ * The number of the week of a year, counting from the first day of the year.
+ *
+ * The first week of a year is the week that holds its first of January: it
+ * shares its days with the last week of the year before when the first of
+ * January is not a Sunday. The last week of a year is the week that holds its
+ * 31st of December: it shares its days with the first week of the next year
+ * when the 31st of December is not a Saturday.
+ */
+export function weekNumberOf(week: Date): number {
+  if (holdsFirstOfJanuary(week)) {
+    // The week that holds the first of January is the first week of the year.
+    return 1;
+  }
+  const year = week.getFullYear();
+  const firstWeek = startOfWeek(new Date(year, 0, 1));
+  return Math.round(daysBetween(firstWeek, week) / 7) + 1;
+}
+
+/** True when the week holds the first of January of a year. */
+function holdsFirstOfJanuary(week: Date): boolean {
+  const key = isoDate(week);
+  const year = week.getFullYear();
+  return (
+    isoDate(startOfWeek(new Date(year, 0, 1))) === key ||
+    isoDate(startOfWeek(new Date(year + 1, 0, 1))) === key
+  );
+}
+
 /** One day of the schedule. */
 export interface GanttDay {
   /** The day, at midnight. */
@@ -124,7 +151,15 @@ export interface GanttDay {
 
 /** One week of the schedule. */
 export interface GanttWeek {
-  /** The number of the week, counting from one. */
+  /**
+   * The number of the week, counting from the first day of the year.
+   *
+   * The first week of a year is the week that holds its first of January: it
+   * is shared with the last week of the year before when the first of January
+   * is not a Sunday. The last week of a year is the week that holds its 31st
+   * of December: it is shared with the first week of the next year when the
+   * 31st of December is not a Saturday.
+   */
   readonly number: number;
   /** The first day of the week. */
   readonly firstDay: Date;
@@ -138,7 +173,7 @@ export interface GanttWeek {
 
 /** One month of the schedule. */
 export interface GanttMonth {
-  /** The number of the month, counting from one. */
+  /** The number of the month of the year, from 1 (January) to 12 (December). */
   readonly number: number;
   /** The name of the month. */
   readonly name: string;
@@ -202,13 +237,12 @@ export function buildSchedule(from: Date, to: Date): GanttSchedule {
   let cursor = start;
   let index = 0;
   while (cursor.getTime() <= end.getTime()) {
-    const weekNumber = Math.floor(index / 7) + 1;
     const monthKey = isoDate(startOfMonth(cursor));
 
     let month = mutableMonths[mutableMonths.length - 1];
     if (month === undefined || month.key !== monthKey) {
       month = {
-        number: mutableMonths.length + 1,
+        number: cursor.getMonth() + 1,
         name: MONTH_NAMES[cursor.getMonth()] ?? '',
         year: cursor.getFullYear(),
         firstDay: startOfMonth(cursor),
@@ -220,14 +254,15 @@ export function buildSchedule(from: Date, to: Date): GanttSchedule {
     }
     month.days += 1;
 
+    const weekKey = isoDate(startOfWeek(cursor));
     let week = mutableWeeks[mutableWeeks.length - 1];
-    if (week === undefined || week.number !== weekNumber) {
+    if (week === undefined || week.key !== weekKey) {
       week = {
-        number: weekNumber,
+        number: weekNumberOf(cursor),
         firstDay: cursor,
         firstDayIndex: index,
         days: 0,
-        key: isoDate(cursor),
+        key: weekKey,
       };
       mutableWeeks.push(week);
     }
@@ -238,7 +273,7 @@ export function buildSchedule(from: Date, to: Date): GanttSchedule {
       date: cursor,
       index,
       dayOfMonth: cursor.getDate(),
-      week: weekNumber,
+      week: week.number,
       month: month.number,
       weekend: weekday === 0 || weekday === 6,
     });
@@ -273,13 +308,15 @@ export interface GanttColumn {
   readonly title: string;
   /** `true` for a weekend day. */
   readonly weekend: boolean;
+  /** `true` for the columns that carry the second colour of the stripes. */
+  readonly alternate: boolean;
 }
 
 /** A cell of the header of the chart (a month or a week). */
 export interface GanttHeaderCell {
   /** The key of the cell: the ISO date of the first day of the period. */
   readonly key: string;
-  /** The number of the period, counting from one. */
+  /** The number of the period: the month of the year or the week of the year. */
   readonly number: number;
   /** The name of the period. */
   readonly label: string;
@@ -298,100 +335,100 @@ export interface GanttLayout {
   readonly weeks: readonly GanttHeaderCell[];
 }
 
+/** A cell of the header, while the layout is being built. */
+interface MutableHeaderCell {
+  key: string;
+  number: number;
+  label: string;
+  title: string;
+  width: number;
+  collapsed: boolean;
+}
+
 /**
  * Builds the columns of the chart and its headers.
  *
- * A collapsed month becomes a single column, a collapsed week too: the days
- * they cover are not drawn any more.
+ * The **months follow the days**: a month ends exactly where the next one
+ * begins, even when a week crosses the boundary of two months. Only the weeks
+ * can be collapsed: a collapsed week becomes a single narrow column and its
+ * days are not drawn any more.
  */
 export function buildLayout(
   schedule: GanttSchedule,
   collapsed: ReadonlySet<string>,
 ): GanttLayout {
   const columns: GanttColumn[] = [];
-  const months: GanttHeaderCell[] = [];
+  const mutableMonths: MutableHeaderCell[] = [];
   const weeks: GanttHeaderCell[] = [];
 
-  for (const month of schedule.months) {
-    const monthColumns: GanttColumn[] = [];
-    const isMonthCollapsed = collapsed.has(month.key);
+  for (const week of schedule.weeks) {
+    const isWeekCollapsed = collapsed.has(week.key);
+    const weekColumns: GanttColumn[] = [];
 
-    if (isMonthCollapsed) {
-      monthColumns.push({
-        kind: 'month',
-        key: month.key,
-        firstDayIndex: month.firstDayIndex,
-        days: month.days,
-        width: COLLAPSED_MONTH_WIDTH_PX,
-        label: month.name,
-        title: `${month.name} ${month.year} (month ${month.number})`,
+    if (isWeekCollapsed) {
+      weekColumns.push({
+        kind: 'week',
+        key: week.key,
+        firstDayIndex: week.firstDayIndex,
+        days: week.days,
+        width: COLLAPSED_WEEK_WIDTH_PX,
+        label: String(week.number),
+        title: weekTitle(week),
         weekend: false,
+        alternate: false,
       });
     } else {
-      for (const week of schedule.weeks) {
-        if (
-          week.firstDayIndex < month.firstDayIndex ||
-          week.firstDayIndex >= month.firstDayIndex + month.days
-        ) {
+      for (let index = week.firstDayIndex; index < week.firstDayIndex + week.days; index += 1) {
+        const day = schedule.days[index];
+        if (day === undefined) {
           continue;
         }
-        const weekColumns: GanttColumn[] = [];
-        const isWeekCollapsed = collapsed.has(week.key);
-
-        if (isWeekCollapsed) {
-          weekColumns.push({
-            kind: 'week',
-            key: week.key,
-            firstDayIndex: week.firstDayIndex,
-            days: week.days,
-            width: COLLAPSED_WEEK_WIDTH_PX,
-            label: String(week.number),
-            title: weekTitle(week),
-            weekend: false,
-          });
-        } else {
-          for (let index = week.firstDayIndex; index < week.firstDayIndex + week.days; index += 1) {
-            const day = schedule.days[index];
-            if (day === undefined) {
-              continue;
-            }
-            weekColumns.push({
-              kind: 'day',
-              key: isoDate(day.date),
-              firstDayIndex: day.index,
-              days: 1,
-              width: DAY_WIDTH_PX,
-              label: String(day.dayOfMonth),
-              title: dayTitle(day),
-              weekend: day.weekend,
-            });
-          }
-        }
-
-        weeks.push({
-          key: week.key,
-          number: week.number,
-          label: shortDate(week.firstDay),
-          title: weekTitle(week),
-          width: sumWidth(weekColumns),
-          collapsed: isWeekCollapsed,
+        weekColumns.push({
+          kind: 'day',
+          key: isoDate(day.date),
+          firstDayIndex: day.index,
+          days: 1,
+          width: DAY_WIDTH_PX,
+          label: String(day.dayOfMonth),
+          title: dayTitle(day),
+          weekend: day.weekend,
+          alternate: day.index % 2 === 1,
         });
-        monthColumns.push(...weekColumns);
       }
     }
 
-    months.push({
-      key: month.key,
-      number: month.number,
-      label: month.name,
-      title: `${month.name} ${month.year} (month ${month.number})`,
-      width: sumWidth(monthColumns),
-      collapsed: isMonthCollapsed,
+    weeks.push({
+      key: week.key,
+      number: week.number,
+      label: shortDate(week.firstDay),
+      title: weekTitle(week),
+      width: sumWidth(weekColumns),
+      collapsed: isWeekCollapsed,
     });
-    columns.push(...monthColumns);
+
+    // The months are cut where the days say so, not where the weeks end.
+    for (const column of weekColumns) {
+      const date = dayOfIndex(schedule, column.firstDayIndex);
+      const key = isoDate(startOfMonth(date));
+      let month = mutableMonths[mutableMonths.length - 1];
+      if (month === undefined || month.key !== key) {
+        month = {
+          key,
+          number: date.getMonth() + 1,
+          label: MONTH_NAMES[date.getMonth()] ?? '',
+          title: `${MONTH_NAMES[date.getMonth()] ?? ''} ${date.getFullYear()}`,
+          width: 0,
+          collapsed: false,
+        };
+        mutableMonths.push(month);
+      }
+      month.width += column.width;
+    }
+
+    columns.push(...weekColumns);
   }
 
-  return { columns, months, weeks };
+  return { columns, months: mutableMonths, weeks };
 }
 
 /** The bar of a task, in column indexes. */
@@ -436,6 +473,11 @@ export function columnOfDay(columns: readonly GanttColumn[], dayIndex: number): 
     }
   }
   return null;
+}
+
+/** The day of the schedule at an index, at midnight. */
+export function dayOfIndex(schedule: GanttSchedule, index: number): Date {
+  return addDays(schedule.start, index);
 }
 
 /** The left offset and the width of a bar, in pixels. */

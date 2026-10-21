@@ -228,6 +228,13 @@
 - [x] `src/core/gantt.ts` - the days, the weeks and the months of a schedule
 - [x] The weeks start on **Sunday** and end on Saturday
 - [x] The weeks and the months are numbered and named, counting from one
+- [x] The months keep the number of the month of the year (December is 12)
+- [x] The weeks are counted from the first day of the year: the week that holds
+      the first of January is the week 1
+- [x] The months follow the days: a month ends where the next one begins
+- [x] The months cannot be collapsed any more, only the weeks
+- [x] Clicking a month collapses or expands every week that holds a day of it
+- [x] The day columns alternate between a white and a very light grey
 - [x] `buildLayout` - the columns of the chart and the headers
 - [x] A collapsed week or month becomes a single column
 - [x] `barOf` and `barGeometry` - the bar of a task, from its start date to its
@@ -243,6 +250,9 @@
 - [x] The rows of the tasks on the left, the chart on the right
 - [x] One column per day, the days grouped by week and the weeks by month
 - [x] The bars are drawn from the start date to the end date of the task
+- [x] The middle of a bar can be dragged: the task moves
+- [x] The handles of a bar can be dragged: the start or the end date changes
+- [x] A task always lasts at least one day
 - [x] The bars carry the colour of the status
 - [x] The weeks and the months are collapsed and expanded by clicking them
 - [x] The rows of the left panel collapse and expand the children of a task
@@ -250,7 +260,9 @@
 
 ### Tests
 - [x] `src/core/gantt.test.ts` - the schedule, the columns and the bars
-- [x] `src/ui/app.test.ts` - the chart in the application and the collapse
+- [x] `src/ui/ganttDrag.test.ts` - the drag of the bars of the chart
+- [x] `src/ui/app.test.ts` - the chart in the application, the collapse and the
+      drag of a bar
 - [x] `scripts/e2e-browser.mjs` - the chart driven by a real browser
 
 ### Build / deploy
