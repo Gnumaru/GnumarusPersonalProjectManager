@@ -237,6 +237,23 @@ describeLive('TaskRepository against the live service', () => {
     expect(children.every((child) => child.parentId === parent.id)).toBe(true);
   });
 
+  it('writes the dates in the compact format', async () => {
+    const task = await repository.createTask(testDirectory, {
+      title: 'Dated task',
+      description: '',
+      status: 'todo',
+      tags: [],
+    });
+
+    const file = await api.readFile(repository.taskPath(testDirectory, task.id));
+
+    expect(file.content).toMatch(/^created=\d{17}$/mu);
+    expect(file.content).toMatch(/^updated=\d{17}$/mu);
+    expect(file.content).toMatch(/^start=$/mu);
+    expect(file.content).toMatch(/^end=$/mu);
+    expect(file.content).not.toContain('T');
+  });
+
   it('reads the hierarchy of the tasks', async () => {
     const root = await repository.createTask(testDirectory, {
       title: 'Hierarchy root',

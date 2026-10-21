@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vite-plus/test';
 import {
   applyTaskInput,
   buildTask,
+  formatTaskTimestamp,
   isTaskFileName,
   isTaskStatus,
   isValidTag,
   METADATA_SEPARATOR,
   normalizeTags,
+  normalizeTaskTimestamp,
   parseTask,
   parseTaskIdFromFileName,
+  parseTaskTimestamp,
   serializeTask,
   TASK_STATUSES,
   taskFileName,
@@ -59,6 +62,49 @@ describe('tag handling', () => {
   });
 });
 
+describe('the compact timestamps', () => {
+  it('writes the year, the month, the day, the hour, the minute, the second and the millisecond', () => {
+    const date = new Date(2026, 9, 21, 2, 45, 29, 365);
+
+    expect(formatTaskTimestamp(date)).toBe('20261021024529365');
+    expect(formatTaskTimestamp(date)).toHaveLength(17);
+  });
+
+  it('writes the local time, without any timezone', () => {
+    const date = new Date(2026, 0, 2, 3, 4, 5, 6);
+
+    expect(formatTaskTimestamp(date)).toBe('20260102030405006');
+  });
+
+  it('reads back what it wrote', () => {
+    const date = new Date(2026, 9, 21, 2, 45, 29, 365);
+    const parsed = parseTaskTimestamp(formatTaskTimestamp(date));
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.getTime()).toBe(date.getTime());
+  });
+
+  it('rejects the dates that do not exist', () => {
+    expect(parseTaskTimestamp('20260231000000000')).toBeNull();
+    expect(parseTaskTimestamp('20261301000000000')).toBeNull();
+    expect(parseTaskTimestamp('not a date')).toBeNull();
+    expect(parseTaskTimestamp('')).toBeNull();
+  });
+
+  it('still reads the old ISO format', () => {
+    const parsed = parseTaskTimestamp('2026-10-21T02:45:29.365Z');
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.getTime()).toBe(new Date('2026-10-21T02:45:29.365Z').getTime());
+  });
+
+  it('normalizes an unknown value to an empty string', () => {
+    expect(normalizeTaskTimestamp('')).toBe('');
+    expect(normalizeTaskTimestamp('nonsense')).toBe('');
+    expect(normalizeTaskTimestamp('20261021024529365')).toBe('20261021024529365');
+  });
+});
+
 describe('task statuses', () => {
   it('knows every status of the application', () => {
     expect([...TASK_STATUSES]).toEqual([
@@ -88,8 +134,10 @@ describe('parseTask', () => {
       'title=Write the docs',
       'status=doing',
       'tags=docs writing',
-      'created=2026-10-20T10:00:00.000Z',
-      'updated=2026-10-21T11:30:00.000Z',
+      'created=20261020100000000',
+      'updated=20261021113000000',
+      'start=20261020110000000',
+      'end=20261021120000000',
       METADATA_SEPARATOR,
       'First line',
       '',
@@ -102,9 +150,26 @@ describe('parseTask', () => {
     expect(task.title).toBe('Write the docs');
     expect(task.status).toBe('doing');
     expect(task.tags).toEqual(['docs', 'writing']);
-    expect(task.created).toBe('2026-10-20T10:00:00.000Z');
-    expect(task.updated).toBe('2026-10-21T11:30:00.000Z');
+    expect(task.created).toBe('20261020100000000');
+    expect(task.updated).toBe('20261021113000000');
+    expect(task.start).toBe('20261020110000000');
+    expect(task.end).toBe('20261021120000000');
     expect(task.description).toBe('First line\n\nSecond paragraph');
+  });
+
+  it('reads the dates written in the old ISO format', () => {
+    const task = parseTask('id=1\ncreated=2026-10-20T10:00:00.000Z\n----\nbody');
+
+    expect(task.created).toMatch(/^\d{17}$/u);
+    expect(parseTaskTimestamp(task.created)?.getTime()).toBe(
+      new Date('2026-10-20T10:00:00.000Z').getTime(),
+    );
+  });
+
+  it('leaves the start and the end empty when they are not written', () => {
+    const task = parseTask('id=1\ntitle=T\n----\nbody');
+    expect(task.start).toBe('');
+    expect(task.end).toBe('');
   });
 
   it('treats a task without parent key as a root task', () => {
@@ -164,8 +229,10 @@ describe('serializeTask', () => {
       status: 'todo' as const,
       parentId: null,
       tags: ['frontend', 'ui'],
-      created: '2026-10-20T10:00:00.000Z',
-      updated: '2026-10-20T10:00:00.000Z',
+      created: '20261020100000000',
+      updated: '20261020100000000',
+      start: '20261020110000000',
+      end: '20261021120000000',
       description: 'Some description',
     };
 
@@ -175,8 +242,10 @@ describe('serializeTask', () => {
         'title=Implement pagination',
         'status=todo',
         'tags=frontend ui',
-        'created=2026-10-20T10:00:00.000Z',
-        'updated=2026-10-20T10:00:00.000Z',
+        'created=20261020100000000',
+        'updated=20261020100000000',
+        'start=20261020110000000',
+        'end=20261021120000000',
         METADATA_SEPARATOR,
         'Some description',
         '',
@@ -192,6 +261,8 @@ describe('serializeTask', () => {
       tags: [],
       created: '',
       updated: '',
+      start: '',
+      end: '',
       description: '',
     };
     expect(serializeTask({ ...base, parentId: null })).not.toContain('parent=');
@@ -207,6 +278,8 @@ describe('serializeTask', () => {
       tags: [],
       created: '',
       updated: '',
+      start: '',
+      end: '',
       description: '',
     };
     const content = serializeTask(task);
@@ -223,8 +296,10 @@ describe('round trip', () => {
       status: 'done' as const,
       parentId: null,
       tags: ['a', 'b'],
-      created: '2026-01-01T00:00:00.000Z',
-      updated: '2026-01-02T00:00:00.000Z',
+      created: '20260101000000000',
+      updated: '20260102000000000',
+      start: '20260103000000000',
+      end: '20260104000000000',
       description: 'Line one\nLine two',
     };
 
@@ -241,6 +316,8 @@ describe('round trip', () => {
       tags: [],
       created: '',
       updated: '',
+      start: '',
+      end: '',
       description: 'a=b\nc ---- d',
     };
     expect(parseTask(serializeTask(original))).toEqual(original);
@@ -249,7 +326,7 @@ describe('round trip', () => {
 
 describe('buildTask and applyTaskInput', () => {
   it('stamps the creation and update time', () => {
-    const now = new Date('2026-05-05T10:00:00.000Z');
+    const now = new Date(2026, 4, 5, 10, 0, 0, 0);
     const task = buildTask(
       { title: '  Trimmed  ', description: 'body', status: 'todo', tags: ['x', 'y'] },
       3,
@@ -258,9 +335,11 @@ describe('buildTask and applyTaskInput', () => {
     expect(task.id).toBe(3);
     expect(task.title).toBe('Trimmed');
     expect(task.tags).toEqual(['x', 'y']);
-    expect(task.created).toBe('2026-05-05T10:00:00.000Z');
-    expect(task.updated).toBe('2026-05-05T10:00:00.000Z');
+    expect(task.created).toBe('20260505100000000');
+    expect(task.updated).toBe('20260505100000000');
     expect(task.parentId).toBeNull();
+    expect(task.start).toBe('');
+    expect(task.end).toBe('');
   });
 
   it('builds a child task that points to its parent', () => {
@@ -276,11 +355,11 @@ describe('buildTask and applyTaskInput', () => {
   });
 
   it('keeps the id and the creation time when editing', () => {
-    const now = new Date('2026-05-05T10:00:00.000Z');
+    const now = new Date(2026, 4, 5, 10, 0, 0, 0);
     const original = buildTask(
       { title: 'First', description: 'body', status: 'todo', tags: [] },
       9,
-      new Date('2026-01-01T00:00:00.000Z'),
+      new Date(2026, 0, 1, 0, 0, 0, 0),
     );
     const updated = applyTaskInput(
       original,
@@ -288,8 +367,8 @@ describe('buildTask and applyTaskInput', () => {
       now,
     );
     expect(updated.id).toBe(9);
-    expect(updated.created).toBe('2026-01-01T00:00:00.000Z');
-    expect(updated.updated).toBe('2026-05-05T10:00:00.000Z');
+    expect(updated.created).toBe('20260101000000000');
+    expect(updated.updated).toBe('20260505100000000');
     expect(updated.title).toBe('Second');
     expect(updated.status).toBe('done');
     expect(updated.tags).toEqual(['t']);
@@ -300,24 +379,24 @@ describe('withParent', () => {
   const original = buildTask(
     { title: 'Movable', description: 'body', status: 'todo', tags: ['t'] },
     7,
-    new Date('2026-01-01T00:00:00.000Z'),
+    new Date(2026, 0, 1, 0, 0, 0, 0),
     3,
   );
 
   it('moves a task under another parent', () => {
-    const moved = withParent(original, 5, new Date('2026-05-05T10:00:00.000Z'));
+    const moved = withParent(original, 5, new Date(2026, 4, 5, 10, 0, 0, 0));
 
     expect(moved.parentId).toBe(5);
     expect(moved.id).toBe(7);
     expect(moved.title).toBe('Movable');
     expect(moved.tags).toEqual(['t']);
-    expect(moved.created).toBe('2026-01-01T00:00:00.000Z');
-    expect(moved.updated).toBe('2026-05-05T10:00:00.000Z');
+    expect(moved.created).toBe('20260101000000000');
+    expect(moved.updated).toBe('20260505100000000');
     expect(serializeTask(moved)).toContain('parent=5');
   });
 
   it('makes a task a root task again', () => {
-    const moved = withParent(original, null, new Date('2026-05-05T10:00:00.000Z'));
+    const moved = withParent(original, null, new Date(2026, 4, 5, 10, 0, 0, 0));
 
     expect(moved.parentId).toBeNull();
     expect(serializeTask(moved)).not.toContain('parent=');

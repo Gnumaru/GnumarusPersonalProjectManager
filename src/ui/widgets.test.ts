@@ -16,8 +16,10 @@ const task: Task = {
   status: 'doing',
   parentId: null,
   tags: ['docs', 'urgent'],
-  created: '2026-10-01T10:00:00.000Z',
-  updated: '2026-10-02T11:00:00.000Z',
+  created: '20261001100000000',
+  updated: '20261002110000000',
+  start: '20261003120000000',
+  end: '',
   description: 'The description of the task',
 };
 

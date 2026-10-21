@@ -44,8 +44,10 @@ function taskContent(id: number, parentId: number | null = null): string {
   }
   lines.push(
     `tags=tag${id}`,
-    'created=2026-10-01T10:00:00.000Z',
-    'updated=2026-10-02T10:00:00.000Z',
+    'created=20261001100000000',
+    'updated=20261002100000000',
+    'start=',
+    'end=',
     '----',
     `marker-${id}`,
   );

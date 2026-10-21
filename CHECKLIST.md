@@ -12,6 +12,9 @@
 - [x] `src/core/task.ts` - task file format (parse, serialize, file name helpers)
 - [x] `src/core/task.ts` - the seven statuses: `planning`, `next`, `todo`,
       `doing`, `paused`, `done`, `canceled`
+- [x] `src/core/task.ts` - the compact timestamps `YYYYMMDDHHNNSSIII` (local
+      time, no timezone), the old ISO format is still read
+- [x] `src/core/task.ts` - the `start` and `end` dates of a task
 - [x] `src/core/pagination.ts` - page count, clamping, slicing
 - [x] `src/core/config.ts` - `~/.config/GnumarusProjectManager/config.json`
 
@@ -188,6 +191,29 @@
 - [x] `src/ui/kanbanDrag.test.ts` - the drag and drop between the columns
 - [x] `src/ui/app.test.ts` - the board in the application and the status change
 - [x] `scripts/e2e-browser.mjs` - the board driven by a real browser
+
+### Build / deploy
+- [x] `npm run verify`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
+## Batch 6 - The dates of the tasks
+
+### Core (pure, unit tested)
+- [x] `formatTaskTimestamp` writes `YYYYMMDDHHNNSSIII` in local time
+- [x] `parseTaskTimestamp` reads it back and still accepts the old ISO format
+- [x] `normalizeTaskTimestamp` turns an unknown value into an empty string
+- [x] `created` and `updated` are written in the compact format
+- [x] `start` and `end` are written, read and kept when the task is edited
+
+### User interface
+- [x] The view of a task shows the **Created**, **Updated**, **Start** and
+      **End** dates, formatted for the user
+
+### Tests
+- [x] `src/core/task.test.ts` - the compact format, the migration of the old
+      format, the start and the end dates
+- [x] `src/core/taskRepository.test.ts` - the file written by the live bridge
+- [x] `src/ui/widgets.test.ts`, `src/ui/app.test.ts` - the fixtures
 
 ### Build / deploy
 - [x] `npm run verify`

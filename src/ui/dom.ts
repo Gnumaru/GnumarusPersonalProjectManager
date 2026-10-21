@@ -1,5 +1,7 @@
 /** Small DOM helpers. No framework, no innerHTML with user data. */
 
+import { parseTaskTimestamp } from '../core/task.js';
+
 export type Child = Node | string | null | undefined | false;
 
 export interface ElementOptions {
@@ -221,8 +223,8 @@ export function formatTimestamp(value: string): string {
   if (value.length === 0) {
     return '—';
   }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const date = parseTaskTimestamp(value);
+  if (date === null) {
     return value;
   }
   return date.toLocaleString(undefined, {

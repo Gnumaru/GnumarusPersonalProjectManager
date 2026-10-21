@@ -8,8 +8,10 @@
  * title=Implement pagination
  * status=todo
  * tags=frontend ui
- * created=2026-10-20T22:00:00.000Z
- * updated=2026-10-20T22:00:00.000Z
+ * created=20261020220000000
+ * updated=20261020220000000
+ * start=
+ * end=
  * ----
  * Free text description.
  * ```
@@ -17,6 +19,10 @@
  * The file starts with a metadata block made of `key=value` lines (like an `.ini`
  * file). The block is terminated by a line containing exactly four hyphens.
  * Everything after that line is the description.
+ *
+ * The dates are written in the compact format `YYYYMMDDHHNNSSIII` (year,
+ * month, day, hour, minute, second and millisecond). The time is the local
+ * time of the machine: **no timezone is stored**.
  *
  * Root tasks (the ones without a parent) simply have no `parent` key.
  */
@@ -85,10 +91,14 @@ export interface Task {
   /** `null` for a root task. */
   readonly parentId: number | null;
   readonly tags: readonly string[];
-  /** ISO 8601 timestamp, empty when unknown. */
+  /** Creation timestamp in the compact format, empty when unknown. */
   readonly created: string;
-  /** ISO 8601 timestamp, empty when unknown. */
+  /** Timestamp of the last update in the compact format, empty when unknown. */
   readonly updated: string;
+  /** Timestamp of the start of the task, empty when it has not started. */
+  readonly start: string;
+  /** Timestamp of the end of the task, empty when it is not finished. */
+  readonly end: string;
   readonly description: string;
 }
 
@@ -108,6 +118,73 @@ export const EMPTY_TASK_INPUT: TaskInput = {
 
 export function isTaskStatus(value: string): value is TaskStatus {
   return (TASK_STATUSES as readonly string[]).includes(value);
+}
+
+/** Amount of characters of a compact timestamp: `YYYYMMDDHHNNSSIII`. */
+export const TIMESTAMP_LENGTH = 17;
+
+/**
+ * Formats a date as `YYYYMMDDHHNNSSIII`.
+ *
+ * The date is the **local** date of the machine: the compact format carries no
+ * timezone, so the same moment is written differently on two machines.
+ */
+export function formatTaskTimestamp(date: Date): string {
+  const pad = (value: number, length: number): string =>
+    String(value).padStart(length, '0');
+  return [
+    pad(date.getFullYear(), 4),
+    pad(date.getMonth() + 1, 2),
+    pad(date.getDate(), 2),
+    pad(date.getHours(), 2),
+    pad(date.getMinutes(), 2),
+    pad(date.getSeconds(), 2),
+    pad(date.getMilliseconds(), 3),
+  ].join('');
+}
+
+/**
+ * Reads a timestamp written in the compact format.
+ *
+ * The ISO 8601 format of the tasks written before the change is still
+ * accepted, so their dates are not lost; they are written back in the compact
+ * format the next time the task is saved.
+ */
+export function parseTaskTimestamp(value: string): Date | null {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  if (trimmed.length === TIMESTAMP_LENGTH && /^\d{17}$/u.test(trimmed)) {
+    const year = Number.parseInt(trimmed.slice(0, 4), 10);
+    const month = Number.parseInt(trimmed.slice(4, 6), 10);
+    const day = Number.parseInt(trimmed.slice(6, 8), 10);
+    const hours = Number.parseInt(trimmed.slice(8, 10), 10);
+    const minutes = Number.parseInt(trimmed.slice(10, 12), 10);
+    const seconds = Number.parseInt(trimmed.slice(12, 14), 10);
+    const milliseconds = Number.parseInt(trimmed.slice(14, 17), 10);
+    const date = new Date(year, month - 1, day, hours, minutes, seconds, milliseconds);
+    const valid =
+      date.getFullYear() === year &&
+      date.getMonth() === month - 1 &&
+      date.getDate() === day &&
+      date.getHours() === hours &&
+      date.getMinutes() === minutes &&
+      date.getSeconds() === seconds;
+    return valid ? date : null;
+  }
+  const legacy = new Date(trimmed);
+  return Number.isNaN(legacy.getTime()) ? null : legacy;
+}
+
+/**
+ * Normalizes a timestamp to the compact format.
+ *
+ * An unknown or invalid value becomes an empty string.
+ */
+export function normalizeTaskTimestamp(value: string): string {
+  const date = parseTaskTimestamp(value);
+  return date === null ? '' : formatTaskTimestamp(date);
 }
 
 /** `task_12.txt` for the id `12`. */
@@ -224,8 +301,10 @@ export function parseTask(content: string, idHint?: number): Task {
     status,
     parentId: parseInteger(metadata.get('parent')),
     tags: normalizeTags(metadata.get('tags') ?? ''),
-    created: metadata.get('created') ?? '',
-    updated: metadata.get('updated') ?? '',
+    created: normalizeTaskTimestamp(metadata.get('created') ?? ''),
+    updated: normalizeTaskTimestamp(metadata.get('updated') ?? ''),
+    start: normalizeTaskTimestamp(metadata.get('start') ?? ''),
+    end: normalizeTaskTimestamp(metadata.get('end') ?? ''),
     description,
   };
 }
@@ -245,6 +324,8 @@ export function serializeTask(task: Task): string {
   lines.push(`tags=${task.tags.map((tag) => sanitizeMetaValue(tag)).join(' ')}`);
   lines.push(`created=${sanitizeMetaValue(task.created)}`);
   lines.push(`updated=${sanitizeMetaValue(task.updated)}`);
+  lines.push(`start=${sanitizeMetaValue(task.start)}`);
+  lines.push(`end=${sanitizeMetaValue(task.end)}`);
   lines.push(METADATA_SEPARATOR);
 
   const description = task.description.replace(/\r\n/gu, '\n').replace(/^\n+/u, '').replace(/\s+$/u, '');
@@ -258,7 +339,7 @@ export function buildTask(
   now: Date,
   parentId: number | null = null,
 ): Task {
-  const timestamp = now.toISOString();
+  const timestamp = formatTaskTimestamp(now);
   return {
     id,
     title: input.title.trim(),
@@ -267,6 +348,8 @@ export function buildTask(
     tags: normalizeTags(input.tags),
     created: timestamp,
     updated: timestamp,
+    start: '',
+    end: '',
     description: input.description,
   };
 }
@@ -278,7 +361,7 @@ export function applyTaskInput(task: Task, input: TaskInput, now: Date): Task {
     title: input.title.trim(),
     status: input.status,
     tags: normalizeTags(input.tags),
-    updated: now.toISOString(),
+    updated: formatTaskTimestamp(now),
     description: input.description,
   };
 }
@@ -293,7 +376,7 @@ export function withParent(task: Task, parentId: number | null, now: Date): Task
   return {
     ...task,
     parentId,
-    updated: now.toISOString(),
+    updated: formatTaskTimestamp(now),
   };
 }
 
@@ -302,6 +385,6 @@ export function withStatus(task: Task, status: TaskStatus, now: Date): Task {
   return {
     ...task,
     status,
-    updated: now.toISOString(),
+    updated: formatTaskTimestamp(now),
   };
 }

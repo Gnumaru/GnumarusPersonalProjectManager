@@ -8,7 +8,7 @@ import {
   type TaskInput,
   type TaskStatus,
 } from '../core/task.js';
-import { button, el, input, select, textArea } from './dom.js';
+import { button, el, formatTimestamp, input, select, textArea } from './dom.js';
 import { createIcon } from './icons.js';
 import { Modal } from './modal.js';
 
@@ -102,8 +102,10 @@ export class TaskDialog {
         'Tags',
         task.tags.length === 0 ? '—' : task.tags.map((tag) => `#${tag}`).join('  '),
       ),
-      this.definitionRow('Created', task.created.length > 0 ? task.created : '—'),
-      this.definitionRow('Updated', task.updated.length > 0 ? task.updated : '—'),
+      this.definitionRow('Created', task.created.length > 0 ? formatTimestamp(task.created) : '—'),
+      this.definitionRow('Updated', task.updated.length > 0 ? formatTimestamp(task.updated) : '—'),
+      this.definitionRow('Start', task.start.length > 0 ? formatTimestamp(task.start) : '—'),
+      this.definitionRow('End', task.end.length > 0 ? formatTimestamp(task.end) : '—'),
     ];
 
     const description = el(this.doc, 'div', {

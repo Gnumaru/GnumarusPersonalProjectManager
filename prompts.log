@@ -41,7 +41,7 @@ eu quero que, ao invez disso, passemos a guardar apenas no formato YYYYMMDDHHNNS
 
 calendario
 ====
-crie um novo modo de visualizacao das tarefas, de grafico gantt. ele devera ter uma linha para cada tarefa
+crie um novo modo de visualizacao das tarefas, de grafico gantt. ele deverá ter uma linha para cada tarefa, e similar ao modo arvore as tarefas serao exibidas em arvore de parentesco e podem ser expandidas e colapsadas. o grafico gantt tera uma coluna por dia, um agrupamento de dias por semana e outro por mes. como acontece em graficos gantt, as datas de inicio e fim das tarefas serão utilizadas para desenhar barras horizontais comecando no dia de inicio e terminando na data de fim da tarefa
 gantt
 ====
 ====

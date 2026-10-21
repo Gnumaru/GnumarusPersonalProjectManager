@@ -33,8 +33,10 @@ id=12
 title=Implement pagination
 status=todo
 tags=frontend ui
-created=2026-10-20T22:00:00.000Z
-updated=2026-10-20T22:00:00.000Z
+created=20261020220000000
+updated=20261020220000000
+start=
+end=
 ----
 Free text description of the task.
 ```
@@ -45,6 +47,8 @@ Free text description of the task.
 * Root tasks have **no** `parent` key. Child tasks would carry `parent=<id>`.
 * `status` is one of `planning`, `next`, `todo`, `doing`, `paused`, `done` or
   `canceled` (the badge shows the name in upper case).
+* The dates are written in the compact format `YYYYMMDDHHNNSSIII` (local time,
+  no timezone). A task also carries the dates of its start and of its end.
 * `tags` is a whitespace separated list (a tag can never contain whitespace).
 * File name is `task_<id>.txt`, `<id>` being a unique incremental integer.
 
@@ -208,6 +212,8 @@ title and the tags of every task, so the whole board costs two round trips
     and `CANCELED`.
 17. [x] Board of the tasks: one column per status, the tasks that have no
     child, and the drag and drop that changes the status.
+18. [x] The dates are stored in the compact format `YYYYMMDDHHNNSSIII` (local
+    time, no timezone) and the tasks carry a start and an end date.
 
 ## Verification commands
 

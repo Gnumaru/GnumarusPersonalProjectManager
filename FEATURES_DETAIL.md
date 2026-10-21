@@ -19,8 +19,10 @@ id=12
 title=Implement pagination
 status=todo
 tags=frontend ui
-created=2026-10-20T10:00:00.000Z
-updated=2026-10-20T10:00:00.000Z
+created=20261020100000000
+updated=20261020100000000
+start=
+end=
 ----
 The description of the task.
 It can have as many lines as needed.
@@ -40,7 +42,28 @@ Rules:
 * `tags` - the tags separated by white spaces. A tag can never contain a white
   space, so white space is an unambiguous separator. Duplicated tags are removed
   while the original order is kept.
-* `created` / `updated` - ISO 8601 timestamps.
+* `created` / `updated` - the timestamps of the creation and of the last update.
+* `start` / `end` - the timestamps of the start and of the end of the task. They
+  are empty when the task has not started and when it is not finished. They are
+  written and read, and shown in the view of a task; they will be used by the
+  features to come.
+
+### The timestamps
+
+The dates are written in the **compact format** `YYYYMMDDHHNNSSIII`:
+
+```
+created=20261020100000000     ->  2026-10-20 10:00:00.000
+```
+
+The time is the **local** time of the machine: the format carries **no
+timezone**, so the same moment is written differently on two machines. The
+functions `formatTaskTimestamp` and `parseTaskTimestamp` do the conversion, and
+`normalizeTaskTimestamp` turns an unknown value into an empty string.
+
+The ISO 8601 format of the tasks written before the change (`created=2026-10-20T10:00:00.000Z`)
+is still **read**, so their dates are not lost; they are written back in the
+compact format the next time the task is saved.
 
 Parsing is tolerant: a file without a separator keeps its `key=value` lines as
 metadata and uses the remaining lines as the description; Windows line endings

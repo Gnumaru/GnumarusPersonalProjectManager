@@ -49,6 +49,8 @@ list or as a tree.
 | Automatic id allocation, collision safe | Done | `src/core/taskRepository.ts` |
 | `parent=<id>` key written and read for the child tasks | Done | `src/core/task.ts` |
 | **A task moved under another one (drag and drop)** | Done | `src/core/task.ts`, `src/core/taskRepository.ts` |
+| **Dates written in the compact format `YYYYMMDDHHNNSSIII` (local time, no timezone)** | Done | `src/core/task.ts` |
+| **`start=...` and `end=...`: the start and the end date of a task** | Done | `src/core/task.ts` |
 | Amount of children per task (read with `grep`) | Done | `src/core/taskRepository.ts` |
 
 ## Bridge integration
