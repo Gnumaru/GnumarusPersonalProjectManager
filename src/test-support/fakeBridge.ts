@@ -163,6 +163,8 @@ export class FakeBridge {
     }
     const prefix = path === '/' ? '/' : `${path}/`;
     const names = new Map<string, FakeEntry>();
+
+    // The files of the folder.
     for (const filePath of this.files.keys()) {
       if (!filePath.startsWith(prefix)) {
         continue;
@@ -175,6 +177,21 @@ export class FakeBridge {
         names.set(rest.slice(0, slash), { type: 'dir' });
       }
     }
+
+    // The subfolders, even the ones that hold no file.
+    for (const directory of this.directories) {
+      if (directory === path || !directory.startsWith(prefix)) {
+        continue;
+      }
+      const rest = directory.slice(prefix.length);
+      const slash = rest.indexOf('/');
+      if (slash === -1) {
+        names.set(rest, { type: 'dir' });
+      } else {
+        names.set(rest.slice(0, slash), { type: 'dir' });
+      }
+    }
+
     const entries = [...names.entries()].map(([name, entry]) => ({
       name,
       path: `${prefix}${name}`,
@@ -191,9 +208,24 @@ export class FakeBridge {
     const cwd = String(body['cwd'] ?? '/');
     const stdin = typeof body['stdin'] === 'string' ? (body['stdin'] as string) : '';
 
+    const prefix = cwd === '/' ? '/' : `${cwd}/`;
+    // The `--include='...'` option of `grep` tells which files are read.
+    const include = /--include='([^']*)'/u.exec(command)?.[1] ?? null;
+    const includePattern = include === null ? null : globToRegExp(include);
+    /** The text files of the folder, the ones the command asks for. */
+    const files = (): [string, string][] =>
+      [...this.files.entries()].filter(([filePath]) => {
+        if (!filePath.startsWith(prefix) || !filePath.endsWith('.txt')) {
+          return false;
+        }
+        if (includePattern === null) {
+          return true;
+        }
+        return includePattern.test(filePath.slice(filePath.lastIndexOf('/') + 1));
+      });
+
     let stdout = '';
     if (command.startsWith('find ')) {
-      const prefix = cwd === '/' ? '/' : `${cwd}/`;
       const namePattern = globToRegExp(/-name '([^']*)'/u.exec(command)?.[1] ?? '*.txt');
       stdout = [...this.files.keys()]
         .filter((filePath) => filePath.startsWith(prefix))
@@ -208,20 +240,14 @@ export class FakeBridge {
       // The comment files of a task.
       const match = /-e '\^task=(\d+)\$'/u.exec(command);
       const taskId = match?.[1] ?? '';
-      const prefix = cwd === '/' ? '/' : `${cwd}/`;
-      const matches = [...this.files.entries()]
-        .filter(([filePath]) => filePath.startsWith(prefix) && filePath.endsWith('.txt'))
+      const matches = files()
         .filter(([, content]) => new RegExp(`^task=${taskId}$`, 'mu').test(content))
         .map(([filePath]) => `./${filePath.slice(prefix.length)}`);
       stdout = matches.length > 0 ? `${matches.join('\n')}\n` : '';
     } else if (command.includes('-rH') && command.includes("-e '^id='")) {
       // Reading the cards of the board: the metadata of every task.
-      const prefix = cwd === '/' ? '/' : `${cwd}/`;
       const lines: string[] = [];
-      for (const [filePath, content] of this.files) {
-        if (!filePath.startsWith(prefix) || !filePath.endsWith('.txt')) {
-          continue;
-        }
+      for (const [filePath, content] of files()) {
         const relative = `./${filePath.slice(prefix.length)}`;
         for (const line of content.split('\n')) {
           if (line.trim() === '----') {
@@ -233,14 +259,25 @@ export class FakeBridge {
         }
       }
       stdout = lines.length > 0 ? `${lines.join('\n')}\n` : '';
+    } else if (command.includes('-rH') && command.includes("-e '^title='")) {
+      // Reading the titles of the notes.
+      const lines: string[] = [];
+      for (const [filePath, content] of files()) {
+        const relative = `./${filePath.slice(prefix.length)}`;
+        for (const line of content.split('\n')) {
+          if (line.trim() === '----') {
+            break;
+          }
+          if (line.startsWith('title=')) {
+            lines.push(`${relative}:${line}`);
+          }
+        }
+      }
+      stdout = lines.length > 0 ? `${lines.join('\n')}\n` : '';
     } else if (command.includes('-rH') && command.includes("'^parent='")) {
       // Reading the hierarchy: one line per task that has a parent.
-      const prefix = cwd === '/' ? '/' : `${cwd}/`;
       const lines: string[] = [];
-      for (const [filePath, content] of this.files) {
-        if (!filePath.startsWith(prefix) || !filePath.endsWith('.txt')) {
-          continue;
-        }
+      for (const [filePath, content] of files()) {
         const match = /^parent=(\d+)$/mu.exec(content);
         if (match === null) {
           continue;
@@ -251,7 +288,7 @@ export class FakeBridge {
     } else if (command.includes("'^parent='")) {
       // Counting the children of every task.
       const counts = new Map<string, number>();
-      for (const content of this.files.values()) {
+      for (const [, content] of files()) {
         const match = /^parent=(\d+)$/mu.exec(content);
         if (match === null) {
           continue;
@@ -267,18 +304,14 @@ export class FakeBridge {
       // Listing the children of one task.
       const match = /-e '\^parent=(\d+)\$'/u.exec(command);
       const parentId = match?.[1] ?? '';
-      const prefix = cwd === '/' ? '/' : `${cwd}/`;
-      const matches = [...this.files.entries()]
-        .filter(([filePath]) => filePath.startsWith(prefix) && filePath.endsWith('.txt'))
+      const matches = files()
         .filter(([, content]) => new RegExp(`^parent=${parentId}$`, 'mu').test(content))
         .map(([filePath]) => `./${filePath.slice(prefix.length)}`);
       stdout = matches.length > 0 ? `${matches.join('\n')}\n` : '';
     } else if (command.startsWith('grep ')) {
       const pattern = stdin.split('\n')[0] ?? '';
       const lower = pattern.toLowerCase();
-      const prefix = cwd === '/' ? '/' : `${cwd}/`;
-      const matches = [...this.files.entries()]
-        .filter(([filePath]) => filePath.startsWith(prefix) && filePath.endsWith('.txt'))
+      const matches = files()
         .filter(([, content]) => content.toLowerCase().includes(lower))
         .map(([filePath]) => `./${filePath.slice(prefix.length)}`);
       stdout = matches.length > 0 ? `${matches.join('\n')}\n` : '';

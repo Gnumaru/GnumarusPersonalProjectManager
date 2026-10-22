@@ -16,6 +16,7 @@ import {
   readMode,
   saveConfig,
   writeMode,
+  clampNotePageSize,
   type AppConfig,
 } from '../core/config.js';
 import { DEFAULT_PAGE_SIZE, computePageInfo, type PageInfo } from '../core/pagination.js';
@@ -24,6 +25,15 @@ import { EmbeddedProjectStore } from '../core/embeddedStore.js';
 import { ServiceProjectStore } from '../core/serviceStore.js';
 import type { ProjectStore, TaskHierarchy, TaskSummary } from '../core/projectStore.js';
 import { commentFileName, type TaskComment } from '../core/comment.js';
+import {
+  NOTE_SCOPE_LABELS,
+  NOTE_SEARCH_SCOPES,
+  applyNoteInput,
+  buildNote,
+  type Note,
+  type NoteInput,
+  type NoteSearchScope,
+} from '../core/note.js';
 import { createZip, readZip } from '../core/zip.js';
 import {
   ancestorsOf,
@@ -60,7 +70,7 @@ import {
   type TaskInput,
   type TaskStatus,
 } from '../core/task.js';
-import { button, clear, el, input, type Child } from './dom.js';
+import { button, clear, el, input, select, type Child } from './dom.js';
 import { FileDialog } from './fileDialog.js';
 import { renderGanttView, type GanttTask } from './ganttView.js';
 import { GanttDragController, type GanttDragContext } from './ganttDrag.js';
@@ -68,6 +78,8 @@ import { createIcon } from './icons.js';
 import { KanbanDragController } from './kanbanDrag.js';
 import { renderKanbanBoard } from './kanbanBoard.js';
 import { Modal } from './modal.js';
+import { NoteDialog } from './noteDialog.js';
+import { renderNoteRows } from './noteTable.js';
 import { ProjectDialog } from './projectDialog.js';
 import { renderPaginationBar } from './paginationBar.js';
 import { TaskDialog } from './taskDialog.js';
@@ -91,8 +103,8 @@ export interface TokenStorage {
 
 export type ServiceState = 'checking' | 'online' | 'offline' | 'unauthorized';
 
-/** The four ways the tasks can be displayed. */
-export type ViewMode = 'list' | 'tree' | 'kanban' | 'gantt';
+/** The five ways the project can be displayed. */
+export type ViewMode = 'list' | 'tree' | 'kanban' | 'gantt' | 'notes';
 
 export interface AppOptions {
   readonly doc: Document;
@@ -123,7 +135,12 @@ export class App {
    * `null` when the policy could not be determined.
    */
   private authRequired: boolean | null = null;
-  private config: AppConfig = { mode: 'service', projectDir: null, pageSize: DEFAULT_PAGE_SIZE };
+  private config: AppConfig = {
+    mode: 'service',
+    projectDir: null,
+    pageSize: DEFAULT_PAGE_SIZE,
+    notePageSize: 10,
+  };
   /**
    * The storage of the project.
    *
@@ -138,6 +155,15 @@ export class App {
   private info: PageInfo = computePageInfo(1, DEFAULT_PAGE_SIZE, 0);
   private childCounts = new Map<number, number>();
   private serviceState: ServiceState = 'checking';
+
+  /** The notes of the displayed page. */
+  private notes: Note[] = [];
+  /** The pagination of the notes. */
+  private notePage = 1;
+  private notePageSize = 10;
+  private noteInfo: PageInfo = computePageInfo(1, 10, 0);
+  /** What the search of the notes looks at. */
+  private noteScope: NoteSearchScope = 'both';
 
   /** The display mode currently in use. */
   private viewMode: ViewMode = 'list';
@@ -179,6 +205,8 @@ export class App {
   private treeViewButton!: HTMLButtonElement;
   private kanbanViewButton!: HTMLButtonElement;
   private ganttViewButton!: HTMLButtonElement;
+  private notesViewButton!: HTMLButtonElement;
+  private noteScopeSelect!: HTMLSelectElement;
   private tableWrapElement!: HTMLElement;
   private treeWrapElement!: HTMLElement;
   private treeHeaderElement!: HTMLElement;
@@ -189,7 +217,9 @@ export class App {
   private ganttDrag: GanttDragController | null = null;
   private treeDrag: TreeDragController | null = null;
   private kanbanDrag: KanbanDragController | null = null;
+  private notesWrapElement!: HTMLElement;
   private rowsElement!: HTMLTableSectionElement;
+  private noteRowsElement!: HTMLTableSectionElement;
   private emptyStateElement!: HTMLElement;
   private paginationElement!: HTMLElement;
   private resultCountElement!: HTMLElement;
@@ -362,6 +392,23 @@ export class App {
       },
     });
 
+    // The scope of the search of the notes: the title, the content or both.
+    this.noteScopeSelect = select(this.doc, {
+      class: 'search-scope',
+      id: 'note-scope',
+      value: 'both',
+      options: [
+        { value: 'both', label: NOTE_SCOPE_LABELS.both },
+        { value: 'title', label: NOTE_SCOPE_LABELS.title },
+        { value: 'content', label: NOTE_SCOPE_LABELS.content },
+      ],
+      onChange: (value) => {
+        this.setNoteScope(value);
+      },
+    });
+    this.noteScopeSelect.setAttribute('hidden', 'hidden');
+    this.noteScopeSelect.title = 'What the search of the notes looks at';
+
     const searchButton = button(this.doc, 'Search', {
       class: 'primary',
       onClick: () => {
@@ -383,7 +430,7 @@ export class App {
     this.newTaskButton = button(this.doc, 'New task', {
       class: 'primary',
       onClick: () => {
-        this.openCreateDialog();
+        this.openCreateFromToolbar();
       },
     });
     this.newTaskButton.append(createIcon(this.doc, 'plus'));
@@ -424,15 +471,35 @@ export class App {
     });
     this.ganttViewButton.dataset['viewMode'] = 'gantt';
 
+    this.notesViewButton = button(this.doc, 'Notes', {
+      class: 'view-toggle-button',
+      title: 'Show the notes of the project',
+      onClick: () => {
+        void this.setViewMode('notes');
+      },
+    });
+    this.notesViewButton.dataset['viewMode'] = 'notes';
+
     const viewToggle = el(
       this.doc,
       'div',
-      { class: 'view-toggle', attrs: { role: 'group', 'aria-label': 'The way the tasks are displayed' } },
-      [this.listViewButton, this.treeViewButton, this.kanbanViewButton, this.ganttViewButton],
+      { class: 'view-toggle', attrs: { role: 'group', 'aria-label': 'The way the project is displayed' } },
+      [
+        this.listViewButton,
+        this.treeViewButton,
+        this.kanbanViewButton,
+        this.ganttViewButton,
+        this.notesViewButton,
+      ],
     );
 
     const toolbar = el(this.doc, 'div', { class: 'toolbar' }, [
-      el(this.doc, 'div', { class: 'search-box' }, [this.searchInput, searchButton, this.clearSearchButton]),
+      el(this.doc, 'div', { class: 'search-box' }, [
+        this.searchInput,
+        this.noteScopeSelect,
+        searchButton,
+        this.clearSearchButton,
+      ]),
       el(this.doc, 'div', { class: 'toolbar-right' }, [
         viewToggle,
         this.resultCountElement,
@@ -459,6 +526,26 @@ export class App {
     ]);
 
     this.tableWrapElement = el(this.doc, 'div', { class: 'table-wrap' }, [table]);
+
+    this.noteRowsElement = this.doc.createElement('tbody');
+    const noteTable = el(this.doc, 'table', { class: 'note-table' }, [
+      el(this.doc, 'thead', {}, [
+        el(this.doc, 'tr', {}, [
+          el(this.doc, 'th', { class: 'cell-id', text: 'ID' }),
+          el(this.doc, 'th', { class: 'cell-title', text: 'Title' }),
+          el(this.doc, 'th', { class: 'cell-updated', text: 'Updated' }),
+          el(this.doc, 'th', { class: 'cell-actions' }),
+        ]),
+      ]),
+      this.noteRowsElement,
+    ]);
+    this.notesWrapElement = el(
+      this.doc,
+      'div',
+      { class: 'table-wrap notes-wrap', attrs: { hidden: 'hidden' } },
+      [noteTable],
+    );
+
     this.treeHeaderElement = el(this.doc, 'div', { class: 'tree-header' });
     this.treeRowsElement = el(this.doc, 'div', { class: 'tree-rows' });
     this.treeWrapElement = el(this.doc, 'div', { class: 'tree-wrap', attrs: { hidden: 'hidden' } }, [
@@ -501,6 +588,7 @@ export class App {
 
     const content = el(this.doc, 'main', { class: 'content' }, [
       this.tableWrapElement,
+      this.notesWrapElement,
       this.treeWrapElement,
       this.kanbanElement,
       this.ganttElement,
@@ -510,6 +598,7 @@ export class App {
     this.paginationElement = el(this.doc, 'footer', { class: 'pagination-footer' });
 
     this.root.append(topbar, this.bannerElement, toolbar, content, this.paginationElement);
+    this.updateToolbarForMode();
   }
 
   // -------------------------------------------------------------- service --
@@ -619,6 +708,7 @@ export class App {
     this.config = await loadConfig(this.api, mode);
     this.config = { ...this.config, mode };
     this.pageSize = this.config.pageSize;
+    this.notePageSize = this.config.notePageSize;
     this.updateProjectPath();
   }
 
@@ -628,6 +718,7 @@ export class App {
         mode: this.config.mode,
         projectDir: this.config.projectDir,
         pageSize: this.pageSize,
+        notePageSize: this.notePageSize,
       });
     } catch (error) {
       showToast({
@@ -809,6 +900,8 @@ export class App {
         await this.refreshKanban();
       } else if (this.viewMode === 'gantt') {
         await this.refreshGantt();
+      } else if (this.viewMode === 'notes') {
+        await this.refreshNotes();
       } else {
         await this.refreshList();
       }
@@ -819,6 +912,46 @@ export class App {
     } finally {
       this.setBusy(false);
     }
+  }
+
+  /**
+   * Loads one page of the notes.
+   *
+   * Only the files of the page are read: the memory holds the notes that are
+   * on the screen and nothing else.
+   */
+  private async refreshNotes(): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      this.notes = [];
+      this.noteInfo = computePageInfo(1, this.notePageSize, 0);
+      return;
+    }
+    const paths =
+      this.query.length === 0
+        ? await store.listNotePaths()
+        : await store.searchNotePaths(this.query, this.noteScope);
+
+    const info = computePageInfo(this.notePage, this.notePageSize, paths.length);
+    const start = (info.page - 1) * this.notePageSize;
+    const pagePaths = paths.slice(start, start + this.notePageSize);
+
+    const notes: Note[] = [];
+    for (const path of pagePaths) {
+      try {
+        notes.push(await store.readNote(path));
+      } catch (error) {
+        // The file disappeared between the listing and the read: skip it.
+        if (error instanceof ApiError && error.status === 404) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    this.notes = notes;
+    this.noteInfo = info;
+    this.notePage = info.page;
   }
 
   /** Loads one page of the flat list of the tasks. */
@@ -1090,19 +1223,62 @@ export class App {
   private renderCurrentView(): void {
     const mode = this.viewMode;
     this.tableWrapElement.toggleAttribute('hidden', mode !== 'list');
+    this.notesWrapElement.toggleAttribute('hidden', mode !== 'notes');
     this.treeWrapElement.toggleAttribute('hidden', mode !== 'tree');
     this.kanbanElement.toggleAttribute('hidden', mode !== 'kanban');
     this.ganttElement.toggleAttribute('hidden', mode !== 'gantt');
-    this.paginationElement.toggleAttribute('hidden', mode !== 'list');
+    this.paginationElement.toggleAttribute('hidden', mode !== 'list' && mode !== 'notes');
     if (mode === 'tree') {
       this.renderTree();
     } else if (mode === 'kanban') {
       this.renderKanban();
     } else if (mode === 'gantt') {
       this.renderGantt();
+    } else if (mode === 'notes') {
+      this.renderNotes();
     } else {
       this.renderList();
     }
+  }
+
+  /** Draws the list of the notes. */
+  private renderNotes(): void {
+    clear(this.noteRowsElement);
+    for (const row of renderNoteRows(this.doc, this.notes, {
+      onView: (note) => {
+        this.openNoteViewDialog(note);
+      },
+      onEdit: (note) => {
+        this.openNoteEditDialog(note);
+      },
+      onDelete: (note) => {
+        this.openNoteDeleteDialog(note);
+      },
+    })) {
+      this.noteRowsElement.append(row);
+    }
+
+    const isEmpty = this.notes.length === 0;
+    this.noteRowsElement.parentElement?.classList.toggle('table-empty', isEmpty);
+    this.updateEmptyState(isEmpty);
+
+    clear(this.paginationElement);
+    this.paginationElement.append(
+      renderPaginationBar(this.doc, this.noteInfo, {
+        itemLabel: 'notes',
+        showPageJump: true,
+        showPageSize: true,
+        onPage: (page) => {
+          void this.goToNotePage(page);
+        },
+        onPageSize: (pageSize) => {
+          void this.setNotePageSize(pageSize);
+        },
+      }),
+    );
+
+    this.resultCountElement.textContent = this.buildResultCount();
+    this.updateToolbarState();
   }
 
   /** Draws the flat list of the tasks. */
@@ -1482,11 +1658,15 @@ export class App {
 
   /** Shows the message of the empty state, when there is nothing to show. */
   private updateEmptyState(isEmpty: boolean): void {
-    const hasProject = this.config.projectDir !== null;
-    if (!hasProject) {
+    const notes = this.viewMode === 'notes';
+    if (!this.hasProject()) {
       this.showEmptyState(
-        'Choose the folder that will hold your tasks',
-        'Every task is a text file named task_<id>.txt inside that folder.',
+        notes
+          ? 'Choose the folder that will hold your notes'
+          : 'Choose the folder that will hold your tasks',
+        notes
+          ? 'Every note is a text file named note_<id>.txt inside that folder.'
+          : 'Every task is a text file named task_<id>.txt inside that folder.',
         'Choose folder…',
         () => {
           void this.openFolderPicker();
@@ -1496,8 +1676,10 @@ export class App {
     }
     if (isEmpty && this.query.length > 0) {
       this.showEmptyState(
-        `No task matches "${this.query}"`,
-        'Try another search term or clear the search to see every task.',
+        notes ? `No note matches "${this.query}"` : `No task matches "${this.query}"`,
+        notes
+          ? 'Try another search term or clear the search to see every note.'
+          : 'Try another search term or clear the search to see every task.',
         'Clear search',
         () => {
           this.applySearch('');
@@ -1507,11 +1689,15 @@ export class App {
     }
     if (isEmpty) {
       this.showEmptyState(
-        'This folder does not contain any task yet',
-        'Create the first task to get started.',
-        'New task',
+        notes ? 'This folder does not contain any note yet' : 'This folder does not contain any task yet',
+        notes ? 'Create the first note to get started.' : 'Create the first task to get started.',
+        notes ? 'New note' : 'New task',
         () => {
-          this.openCreateDialog();
+          if (notes) {
+            this.openNoteCreateDialog();
+          } else {
+            this.openCreateDialog();
+          }
         },
       );
       return;
@@ -1519,16 +1705,33 @@ export class App {
     this.hideEmptyState();
   }
 
+  /**
+   * True when the project is ready to be used.
+   *
+   * The service mode needs a folder, the embedded mode needs the storage of
+   * the browser: the embedded project has no folder at all.
+   */
+  private hasProject(): boolean {
+    return this.config.mode === 'embedded' || this.config.projectDir !== null;
+  }
+
   /** Keeps the state of the toolbar in sync with the current view. */
   private updateToolbarState(): void {
-    const hasProject = this.config.projectDir !== null;
+    const hasProject = this.hasProject();
     this.clearSearchButton.toggleAttribute('hidden', this.query.length === 0);
     this.newTaskButton.toggleAttribute('disabled', !hasProject);
   }
 
   private buildResultCount(): string {
-    if (this.config.projectDir === null) {
+    if (!this.hasProject()) {
       return '';
+    }
+    if (this.viewMode === 'notes') {
+      const total = this.noteInfo.totalItems;
+      if (this.query.length > 0) {
+        return `${total} result${total === 1 ? '' : 's'} for "${this.query}"`;
+      }
+      return `${total} note${total === 1 ? '' : 's'}`;
     }
     if (this.viewMode === 'kanban') {
       const count = this.kanbanCards.length;
@@ -1591,6 +1794,7 @@ export class App {
     }
     this.viewMode = mode;
     this.updateViewToggle();
+    this.updateToolbarForMode();
     await this.refresh();
   }
 
@@ -1599,10 +1803,31 @@ export class App {
     this.treeViewButton.classList.toggle('is-active', this.viewMode === 'tree');
     this.kanbanViewButton.classList.toggle('is-active', this.viewMode === 'kanban');
     this.ganttViewButton.classList.toggle('is-active', this.viewMode === 'gantt');
+    this.notesViewButton.classList.toggle('is-active', this.viewMode === 'notes');
     this.listViewButton.setAttribute('aria-pressed', this.viewMode === 'list' ? 'true' : 'false');
     this.treeViewButton.setAttribute('aria-pressed', this.viewMode === 'tree' ? 'true' : 'false');
     this.kanbanViewButton.setAttribute('aria-pressed', this.viewMode === 'kanban' ? 'true' : 'false');
     this.ganttViewButton.setAttribute('aria-pressed', this.viewMode === 'gantt' ? 'true' : 'false');
+    this.notesViewButton.setAttribute('aria-pressed', this.viewMode === 'notes' ? 'true' : 'false');
+  }
+
+  /**
+   * Adapts the toolbar to the display mode.
+   *
+   * The notes have their own search (with its scope) and their own button to
+   * create them: the toolbar of the tasks is left untouched.
+   */
+  private updateToolbarForMode(): void {
+    const notes = this.viewMode === 'notes';
+    this.noteScopeSelect.toggleAttribute('hidden', !notes);
+    this.searchInput.placeholder = notes
+      ? 'Search notes by title or content…'
+      : 'Search tasks by title, tag or description…';
+    const label = notes ? 'New note' : 'New task';
+    this.newTaskButton.replaceChildren(
+      this.doc.createTextNode(label),
+      createIcon(this.doc, notes ? 'file' : 'plus'),
+    );
   }
 
   /**
@@ -1796,7 +2021,38 @@ export class App {
     this.query = value.trim();
     this.searchInput.value = value;
     this.page = 1;
+    this.notePage = 1;
     void this.refresh();
+  }
+
+  /** Chooses what the search of the notes looks at. */
+  private setNoteScope(value: string): void {
+    const scope = NOTE_SEARCH_SCOPES.find((candidate) => candidate === value);
+    if (scope === undefined) {
+      return;
+    }
+    this.noteScope = scope;
+    this.notePage = 1;
+    void this.refresh();
+  }
+
+  /** Goes to the given page of the notes. */
+  private async goToNotePage(page: number): Promise<void> {
+    if (page === this.notePage) {
+      return;
+    }
+    this.notePage = page;
+    await this.refresh();
+  }
+
+  /** Changes the amount of notes per page. */
+  private async setNotePageSize(pageSize: number): Promise<void> {
+    const size = clampNotePageSize(pageSize);
+    this.notePageSize = size;
+    this.notePage = 1;
+    this.config = { ...this.config, notePageSize: size };
+    await this.persistConfig();
+    await this.refresh();
   }
 
   private async goToPage(page: number): Promise<void> {
@@ -1994,6 +2250,132 @@ export class App {
     await store.deleteFile(this.pathOfTask(task.id));
     showToast({ doc: this.doc, message: `Task #${task.id} deleted.`, kind: 'success' });
     await this.refresh();
+  }
+
+  // ---------------------------------------------------------------- notes --
+
+  /**
+   * Opens the editor of the thing the toolbar creates.
+   *
+   * The button of the toolbar creates a task, or a note when the notes are
+   * displayed.
+   */
+  private openCreateFromToolbar(): void {
+    if (this.viewMode === 'notes') {
+      this.openNoteCreateDialog();
+      return;
+    }
+    this.openCreateDialog();
+  }
+
+  /** Opens the editor of a new note. */
+  private openNoteCreateDialog(): void {
+    if (!this.hasProject()) {
+      showToast({ doc: this.doc, message: 'Choose a project folder first.', kind: 'error' });
+      return;
+    }
+    const dialog = new NoteDialog({
+      doc: this.doc,
+      mode: 'create',
+      onSave: async (noteInput: NoteInput) => {
+        await this.createNote(noteInput);
+      },
+    });
+    dialog.open();
+  }
+
+  /** Opens the read only view of a note. */
+  private openNoteViewDialog(note: Note): void {
+    const dialog = new NoteDialog({
+      doc: this.doc,
+      mode: 'view',
+      note,
+      onSave: async () => {
+        // The read only view never saves.
+      },
+      onDelete: async () => {
+        await this.deleteNote(note);
+      },
+      onEdit: () => {
+        this.openNoteEditDialog(note);
+      },
+    });
+    dialog.open();
+  }
+
+  /** Opens the editor of a note. */
+  private openNoteEditDialog(note: Note): void {
+    const dialog = new NoteDialog({
+      doc: this.doc,
+      mode: 'edit',
+      note,
+      onSave: async (noteInput: NoteInput) => {
+        await this.updateNote(note, noteInput);
+      },
+      onDelete: async () => {
+        await this.deleteNote(note);
+      },
+    });
+    dialog.open();
+  }
+
+  /** Opens the editor of a note, in read only mode, to delete it. */
+  private openNoteDeleteDialog(note: Note): void {
+    const dialog = new NoteDialog({
+      doc: this.doc,
+      mode: 'view',
+      note,
+      onSave: async () => {
+        // The read only view never saves.
+      },
+      onDelete: async () => {
+        await this.deleteNote(note);
+      },
+    });
+    dialog.open();
+  }
+
+  /** Creates a note file. */
+  private async createNote(noteInput: NoteInput): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      throw new Error('No project selected');
+    }
+    const id = await store.nextNoteId();
+    const note = buildNote(noteInput, id, new Date());
+    await store.createNoteFile(store.notePath(id), note);
+    showToast({ doc: this.doc, message: `Note #${note.id} created.`, kind: 'success' });
+    await this.refresh();
+  }
+
+  /** Changes the title and the body of a note. */
+  private async updateNote(note: Note, noteInput: NoteInput): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      throw new Error('No project selected');
+    }
+    const path = this.pathOfNote(note.id);
+    const current = await store.readNote(path);
+    const updated = applyNoteInput(current, noteInput, new Date());
+    await store.writeNote(path, updated);
+    showToast({ doc: this.doc, message: `Note #${note.id} updated.`, kind: 'success' });
+    await this.refresh();
+  }
+
+  /** Deletes a note file. */
+  private async deleteNote(note: Note): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      throw new Error('No project selected');
+    }
+    await store.deleteFile(this.pathOfNote(note.id));
+    showToast({ doc: this.doc, message: `Note #${note.id} deleted.`, kind: 'success' });
+    await this.refresh();
+  }
+
+  /** The path of the file of a note, relative to the project folder. */
+  private pathOfNote(noteId: number): string {
+    return this.store?.notePath(noteId) ?? `note_${noteId}.txt`;
   }
 
   // ---------------------------------------------------------------- token --

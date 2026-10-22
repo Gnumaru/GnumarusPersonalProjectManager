@@ -238,6 +238,23 @@ async function run() {
     });
   }
 
+  // The notes: one of them holds the term in its title, the other one in its
+  // body.
+  for (let id = 1; id <= 12; id += 1) {
+    const content = [
+      `id=${id}`,
+      `title=Browser test note ${id}`,
+      'created=20261001100000000',
+      'updated=20261002100000000',
+      '----',
+      id === 1 ? 'A body with a needle in it' : `note-body-${id}`,
+    ].join('\n');
+    await apiRequest(`/api/file?path=${encodeURIComponent(`${taskDirectory}/note_${id}.txt`)}`, {
+      method: 'POST',
+      body: JSON.stringify({ content, encoding: 'text' }),
+    });
+  }
+
   await shell(`mkdir -p -- "$HOME/.config/GnumarusProjectManager"`);
   await writeFileEnsured(
     configPath,
@@ -1133,7 +1150,185 @@ async function runChecks() {
 
   await evaluate(`document.querySelector('.modal-close').click()`);
 
+  await checkNotes();
   await checkEmbeddedProject();
+}
+
+/**
+ * Checks the notes: the display mode, the listing, the pagination, the search
+ * and the editor.
+ */
+async function checkNotes() {
+  // --- the display mode ------------------------------------------------------
+
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Notes');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.note-table tbody tr').length === 10`);
+  check(true, 'the notes mode shows the notes of the project');
+  await capture('notes');
+
+  const scopeVisible = await evaluate(
+    `document.querySelector('#note-scope')?.hasAttribute('hidden') === false`,
+  );
+  check(scopeVisible === true, 'the scope of the search of the notes is shown');
+
+  const newButton = await evaluate(
+    `[...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'New note') !== undefined`,
+  );
+  check(newButton === true, 'the toolbar creates a note in the notes mode');
+
+  // --- the pagination --------------------------------------------------------
+
+  const summary = await evaluate(`document.querySelector('.pagination-summary')?.textContent`);
+  check(summary === 'Showing 1-10 of 12 notes', 'the notes are paginated, ten per page', String(summary));
+
+  await evaluate(`document.querySelector('[data-page-action="next"]').click()`);
+  await waitFor(`document.querySelector('.page-current')?.textContent === '2'`);
+  check(
+    (await evaluate(`document.querySelectorAll('.note-table tbody tr').length`)) === 2,
+    'the second page shows the remaining notes',
+  );
+
+  await evaluate(`document.querySelector('[data-page-action="first"]').click()`);
+  await waitFor(`document.querySelector('.page-current')?.textContent === '1'`);
+
+  // The input that jumps to a page number.
+  await evaluate(`(() => {
+    const field = document.querySelector('.page-jump-input');
+    field.value = '2';
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.page-current')?.textContent === '2'`);
+  check(true, 'the input jumps to the page the user types');
+
+  await evaluate(`document.querySelector('[data-page-action="first"]').click()`);
+  await waitFor(`document.querySelector('.page-current')?.textContent === '1'`);
+
+  // --- the search ------------------------------------------------------------
+
+  await evaluate(`(() => {
+    const input = document.querySelector('#search-input');
+    input.value = 'needle';
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Search');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.note-table tbody tr').length === 1`);
+  check(true, 'the search finds the note whose body holds the term');
+
+  // The scope of the search: the title only.
+  await evaluate(`(() => {
+    const scope = document.querySelector('#note-scope');
+    scope.value = 'title';
+    scope.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.note-table tbody tr').length === 0`);
+  check(true, 'the search of the titles does not find the note whose body holds the term');
+
+  await evaluate(`(() => {
+    const scope = document.querySelector('#note-scope');
+    scope.value = 'content';
+    scope.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.note-table tbody tr').length === 1`);
+  check(true, 'the search of the bodies finds the note whose body holds the term');
+
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Clear');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.note-table tbody tr').length === 10`);
+
+  // --- the editor ------------------------------------------------------------
+
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'New note');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('#note-title') !== null`);
+
+  await evaluate(`(() => {
+    document.querySelector('#note-title').value = 'A note of the browser test';
+    document.querySelector('#note-content').value = '# The heading\\n\\nSome **bold** text.';
+    return true;
+  })()`);
+
+  // The preview shows the markdown.
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Preview');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.note-preview h1') !== null`);
+  const heading = await evaluate(`document.querySelector('.note-preview h1')?.textContent`);
+  check(heading === 'The heading', 'the preview shows the note as markdown', String(heading));
+  await capture('note-preview');
+
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Create note');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.result-count')?.textContent === '13 notes'`);
+
+  // The new note is the last one: it is on the second page.
+  await evaluate(`document.querySelector('[data-page-action="last"]').click()`);
+  await waitFor(`document.querySelector('.page-current')?.textContent === '2'`);
+  const created = await evaluate(
+    `[...document.querySelectorAll('.note-table tbody .cell-title')].some((node) => node.textContent.includes('A note of the browser test'))`,
+  );
+  check(created === true, 'the note is created and listed');
+
+  // The file of the note is on the disk, with its id inside.
+  const noteFile = await apiRequest(
+    `/api/file?path=${encodeURIComponent(`${taskDirectory}/note_13.txt`)}`,
+  );
+  check(
+    String(noteFile.content ?? '').includes('id=13') &&
+      String(noteFile.content ?? '').includes('title=A note of the browser test'),
+    'the file of the note holds its id and its title',
+  );
+
+  // The note is deleted.
+  await evaluate(`(() => {
+    const rows = [...document.querySelectorAll('.note-table tbody tr')];
+    const row = rows.find((node) => node.textContent.includes('A note of the browser test'));
+    row.querySelectorAll('.row-action')[2].click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.note-dialog') !== null`);
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Delete');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.dialog-confirm') !== null`);
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Yes, delete');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.result-count')?.textContent === '12 notes'`);
+  const deleted = await evaluate(
+    `[...document.querySelectorAll('.note-table tbody .cell-title')].some((node) => node.textContent.includes('A note of the browser test'))`,
+  );
+  check(deleted === false, 'the note is deleted');
+
+  // Back to the tasks.
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'List');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.task-table tbody tr').length === 10`);
 }
 
 /**

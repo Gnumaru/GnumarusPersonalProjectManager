@@ -19,6 +19,8 @@ Browser (SPA, no framework, strict TypeScript)
   |
   |-- src/api/client.ts        REST client for the GnumarusOSBridge API (token aware)
   |-- src/core/task.ts         task file format: parse / serialize
+  |-- src/core/note.ts         note file format: parse / serialize
+  |-- src/core/markdown.ts     markdown parser (pure)
   |-- src/core/projectStore.ts the storage facade: the interface the application uses
   |-- src/core/serviceStore.ts the implementation over the service (find, grep, read, write)
   |-- src/core/embeddedStore.ts the implementation over the storage of the browser
@@ -290,6 +292,63 @@ method, without compression), so no dependency is needed.
     the editor of the task.
 25. [x] The embedded project: the files live in the browser, the project can be
     downloaded as a ZIP archive and imported from a ZIP archive.
+26. [x] The notes: a new display mode, the notes are files `note_<id>.txt` whose
+    body is markdown, they are searched by title or by content and they are
+    paginated.
+
+## Batch 10 - The notes
+
+The notes are a **new kind of thing**, next to the tasks and the comments: a
+simple replacement for a note taking application. They do not involve the tasks
+at all: a note never has a parent, a status or a tag.
+
+A note is a text file of its own, named `note_<id>.txt`, stored in the project
+folder. Its format is the format of the task files: a block of `key=value`
+lines, a line that contains only the separator and then the body of the note:
+
+```
+id=12
+title=Shopping list
+created=20261022100000000
+updated=20261022100000000
+----
+# Shopping
+
+- milk
+- eggs
+```
+
+The body of the note is **markdown**. The editor shows it either as plain text
+(the markdown source) or rendered, and the renderer is written in the project
+(no dependency): the DOM is built node by node, never with `innerHTML`.
+
+The **Notes** button of the toolbar opens the new display mode. In that mode:
+
+* the search field looks for the notes, and a drop down chooses what is
+  searched: the **title**, the **content** or **both**;
+* the listing shows the notes of the current page, ten per page by default;
+* the pagination bar has the four usual buttons, an input that jumps to a page
+  number when the user presses `Enter`, and an input that changes the amount of
+  notes per page (from 10 to 100);
+* the amount of notes per page is kept in the configuration of the project.
+
+The notes live in the same files as the tasks, so they work the same way in the
+service mode and in the embedded mode: the facade of the storage gained the
+note operations and both implementations offer them.
+
+### The ids inside the files
+
+Every file of the project carries its own id **inside** the file, not only in
+its name:
+
+| Kind of file | Name | Key inside the file |
+| ------------ | ---- | ------------------- |
+| Task | `task_<id>.txt` | `id=<id>` |
+| Comment | `comment_<id>.txt` | `id=<id>` |
+| Note | `note_<id>.txt` | `id=<id>` |
+
+The id inside the file is the one the application uses: the name of the file is
+only a fallback for the files written before the key existed.
 
 ## Verification commands
 

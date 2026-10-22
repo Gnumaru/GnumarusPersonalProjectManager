@@ -27,6 +27,16 @@ import {
   taskFileName,
   type Task,
 } from './task.js';
+import {
+  isNoteFileName,
+  noteFileName,
+  noteMatches,
+  parseNote,
+  parseNoteIdFromFileName,
+  serializeNote,
+  type Note,
+  type NoteSearchScope,
+} from './note.js';
 import type { BrowserFileStorage } from './browserStorage.js';
 import type { ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
 
@@ -51,11 +61,19 @@ export class EmbeddedProjectStore implements ProjectStore {
     }
   }
 
-  /** The names of the files, without their content. */
-  private pathsOf(predicate: (path: string) => boolean): string[] {
+  /**
+   * The names of the files, without their content.
+   *
+   * The files are sorted by the id encoded in their name: the parser of the
+   * ids changes for the notes and for the comments.
+   */
+  private pathsOf(
+    predicate: (path: string) => boolean,
+    parseId: (name: string) => number | null = parseTaskIdFromFileName,
+  ): string[] {
     return [...this.files.keys()].filter(predicate).sort((left, right) => {
-      const leftId = parseTaskIdFromFileName(left.slice(left.lastIndexOf('/') + 1));
-      const rightId = parseTaskIdFromFileName(right.slice(right.lastIndexOf('/') + 1));
+      const leftId = parseId(left.slice(left.lastIndexOf('/') + 1));
+      const rightId = parseId(right.slice(right.lastIndexOf('/') + 1));
       if (leftId !== null && rightId !== null && leftId !== rightId) {
         return leftId - rightId;
       }
@@ -176,6 +194,72 @@ export class EmbeddedProjectStore implements ProjectStore {
   async deleteComment(path: string): Promise<void> {
     this.files.delete(path);
     await this.storage.remove(path);
+  }
+
+  // --------------------------------------------------------------- notes --
+
+  async listNotePaths(): Promise<readonly string[]> {
+    return this.pathsOf(
+      (path) => isNoteFileName(path.slice(path.lastIndexOf('/') + 1)),
+      parseNoteIdFromFileName,
+    );
+  }
+
+  async searchNotePaths(term: string, scope: NoteSearchScope): Promise<readonly string[]> {
+    const paths = await this.listNotePaths();
+    const needle = term.trim();
+    if (needle.length === 0) {
+      return paths;
+    }
+    const matches: string[] = [];
+    for (const path of paths) {
+      const content = this.files.get(path);
+      if (content === undefined) {
+        continue;
+      }
+      const note = parseNote(content, parseNoteIdFromFileName(path.slice(path.lastIndexOf('/') + 1)) ?? undefined);
+      if (noteMatches(note, needle, scope)) {
+        matches.push(path);
+      }
+    }
+    return matches;
+  }
+
+  async readNote(path: string): Promise<Note> {
+    const content = this.files.get(path);
+    if (content === undefined) {
+      throw new Error(`The file "${path}" does not exist in the embedded project.`);
+    }
+    return parseNote(
+      content,
+      parseNoteIdFromFileName(path.slice(path.lastIndexOf('/') + 1)) ?? undefined,
+    );
+  }
+
+  async writeNote(path: string, note: Note): Promise<void> {
+    await this.write(path, serializeNote(note));
+  }
+
+  async createNoteFile(path: string, note: Note): Promise<void> {
+    if (this.files.has(path)) {
+      throw new Error(`The file "${path}" already exists in the embedded project.`);
+    }
+    await this.write(path, serializeNote(note));
+  }
+
+  async nextNoteId(): Promise<number> {
+    const ids: number[] = [];
+    for (const path of await this.listNotePaths()) {
+      const id = parseNoteIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
+      if (id !== null) {
+        ids.push(id);
+      }
+    }
+    return ids.length === 0 ? 1 : Math.max(...ids) + 1;
+  }
+
+  notePath(id: number): string {
+    return noteFileName(id);
   }
 
   async nextTaskId(): Promise<number> {

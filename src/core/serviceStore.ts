@@ -27,6 +27,15 @@ import {
   type Task,
   type TaskStatus,
 } from './task.js';
+import {
+  noteFileName,
+  noteMatches,
+  parseNote,
+  parseNoteIdFromFileName,
+  serializeNote,
+  type Note,
+  type NoteSearchScope,
+} from './note.js';
 import type { ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
 
 /** The metadata of a task, while it is being read. */
@@ -47,6 +56,28 @@ export const FIND_TASK_FILES_COMMAND =
 /** Command used to list the comment files of the project. */
 export const FIND_COMMENT_FILES_COMMAND =
   "find . -type f -name 'comment_*.txt' -not -path '*/.git/*' -not -path '*/.svn/*' -not -path '*/.hg/*' -print";
+
+/** Command used to list the note files of the project. */
+export const FIND_NOTE_FILES_COMMAND =
+  "find . -type f -name 'note_*.txt' -not -path '*/.git/*' -not -path '*/.svn/*' -not -path '*/.hg/*' -print";
+
+/**
+ * Command used to search the note files.
+ *
+ * The pattern is fed through stdin (`-f -`) so it never becomes part of the
+ * command line: no quoting or escaping problem is possible.
+ */
+export const GREP_NOTE_FILES_COMMAND =
+  "grep -rIl --fixed-strings --ignore-case --include='note_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -f - .";
+
+/**
+ * Command used to read the titles of the notes.
+ *
+ * Only the `title=` keys are read, so the answer stays small and no file has
+ * to be downloaded to search a title.
+ */
+export const READ_NOTE_TITLES_COMMAND =
+  "grep -rH --include='note_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^title=' .";
 
 /** Command used to list every file of the project. */
 export const FIND_ALL_FILES_COMMAND =
@@ -86,8 +117,15 @@ export function commentsCommand(taskId: number): string {
 
 /**
  * Turns the output of a `find` into absolute paths, sorted by task id.
+ *
+ * The id of a file is read from its name: the parser of the ids can be changed
+ * to list the notes or the comments instead of the tasks.
  */
-export function parseServicePaths(stdout: string, projectDir: string): string[] {
+export function parseServicePaths(
+  stdout: string,
+  projectDir: string,
+  parseId: (name: string) => number | null = parseTaskIdFromFileName,
+): string[] {
   const base = projectDir.replace(/\/+$/u, '');
   const paths: { path: string; id: number }[] = [];
   for (const line of stdout.split('\n')) {
@@ -97,7 +135,7 @@ export function parseServicePaths(stdout: string, projectDir: string): string[] 
     }
     const path = trimmed.startsWith('/') ? trimmed : `${base}/${trimmed.replace(/^\.\//u, '')}`;
     const name = path.slice(path.lastIndexOf('/') + 1);
-    paths.push({ path, id: parseTaskIdFromFileName(name) ?? Number.MAX_SAFE_INTEGER });
+    paths.push({ path, id: parseId(name) ?? Number.MAX_SAFE_INTEGER });
   }
   paths.sort((left, right) => {
     if (left.id !== right.id) {
@@ -169,7 +207,7 @@ export class ServiceProjectStore implements ProjectStore {
       if (trimmed.length === 0) {
         continue;
       }
-      const match = /^(.*):(id|parent|status|title|tags|start|end)=(.*)$/u.exec(trimmed);
+      const match = /^(.*?):(id|parent|status|title|tags|start|end)=(.*)$/u.exec(trimmed);
       if (match === null) {
         continue;
       }
@@ -314,6 +352,79 @@ export class ServiceProjectStore implements ProjectStore {
     await this.api.deleteFile(this.absolute(path));
   }
 
+  // --------------------------------------------------------------- notes --
+
+  async listNotePaths(): Promise<readonly string[]> {
+    const paths = await this.listNotePathsInternal();
+    return paths.map((path) => this.relative(path));
+  }
+
+  /**
+   * Searches the notes.
+   *
+   * * **both** and **content** start with the same `grep`: the files that hold
+   *   the term somewhere. The content search then reads those files and keeps
+   *   the ones where the term is really in the body of the note;
+   * * **title** reads the `title=` keys of every note with one command: no
+   *   file has to be downloaded.
+   */
+  async searchNotePaths(term: string, scope: NoteSearchScope): Promise<readonly string[]> {
+    const normalized = term.trim();
+    if (normalized.length === 0) {
+      return this.listNotePaths();
+    }
+    if (scope === 'title') {
+      return this.searchNoteTitles(normalized);
+    }
+    const candidates = await this.searchNotePathsInternal(normalized);
+    if (scope === 'both') {
+      return candidates.map((path) => this.relative(path));
+    }
+    const matches: string[] = [];
+    for (const path of candidates) {
+      try {
+        const note = await this.loadNote(path);
+        if (noteMatches(note, normalized, 'content')) {
+          matches.push(this.relative(path));
+        }
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    return matches;
+  }
+
+  async readNote(path: string): Promise<Note> {
+    return this.loadNote(this.absolute(path));
+  }
+
+  async writeNote(path: string, note: Note): Promise<void> {
+    await this.api.overwriteFile(this.absolute(path), serializeNote(note));
+  }
+
+  async createNoteFile(path: string, note: Note): Promise<void> {
+    await this.api.createFile(this.absolute(path), serializeNote(note));
+  }
+
+  async nextNoteId(): Promise<number> {
+    const paths = await this.listNotePathsInternal();
+    const ids: number[] = [];
+    for (const path of paths) {
+      const id = parseNoteIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
+      if (id !== null) {
+        ids.push(id);
+      }
+    }
+    return ids.length === 0 ? 1 : Math.max(...ids) + 1;
+  }
+
+  notePath(id: number): string {
+    return noteFileName(id);
+  }
+
   async nextTaskId(): Promise<number> {
     const paths = await this.listTaskPathsInternal();
     const ids: number[] = [];
@@ -402,6 +513,84 @@ export class ServiceProjectStore implements ProjectStore {
       );
     }
     return parseServicePaths(result.stdout, this.projectDir);
+  }
+
+  /** The absolute paths of the note files. */
+  private async listNotePathsInternal(): Promise<string[]> {
+    const result = await this.api.execShell({
+      command: FIND_NOTE_FILES_COMMAND,
+      cwd: this.projectDir,
+      timeout: 30,
+    });
+    if (result.returncode !== 0 && result.returncode !== 1) {
+      throw new Error(
+        `Unable to list the notes of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
+      );
+    }
+    return parseServicePaths(result.stdout, this.projectDir, parseNoteIdFromFileName);
+  }
+
+  /** The absolute paths of the note files whose content holds the term. */
+  private async searchNotePathsInternal(term: string): Promise<string[]> {
+    const result = await this.api.execShell({
+      command: GREP_NOTE_FILES_COMMAND,
+      cwd: this.projectDir,
+      stdin: `${term.replace(/[\r\n]+/gu, ' ')}\n`,
+      timeout: 60,
+    });
+    // grep exits with 1 when nothing matched, which is not an error.
+    if (result.returncode !== 0 && result.returncode !== 1) {
+      throw new Error(
+        `Unable to search the notes of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
+      );
+    }
+    return parseServicePaths(result.stdout, this.projectDir, parseNoteIdFromFileName);
+  }
+
+  /**
+   * The paths of the notes whose title holds the term.
+   *
+   * The titles of every note are read with one command: the answer is a few
+   * short lines per note and no file has to be downloaded.
+   */
+  private async searchNoteTitles(term: string): Promise<string[]> {
+    const result = await this.api.execShell({
+      command: READ_NOTE_TITLES_COMMAND,
+      cwd: this.projectDir,
+      timeout: 60,
+    });
+    if (result.returncode !== 0 && result.returncode !== 1) {
+      throw new Error(
+        `Unable to search the notes of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
+      );
+    }
+
+    const needle = term.toLowerCase();
+    const paths: string[] = [];
+    for (const line of result.stdout.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) {
+        continue;
+      }
+      const match = /^(.*?):title=(.*)$/u.exec(trimmed);
+      if (match === null) {
+        continue;
+      }
+      const relative = (match[1] ?? '').replace(/^\.\//u, '');
+      const title = match[2] ?? '';
+      if (relative.length === 0 || !title.toLowerCase().includes(needle)) {
+        continue;
+      }
+      paths.push(relative);
+    }
+    return paths;
+  }
+
+  /** Reads a note file. */
+  private async loadNote(path: string): Promise<Note> {
+    const file = await this.api.readFile(path);
+    const name = path.slice(path.lastIndexOf('/') + 1);
+    return parseNote(file.content, parseNoteIdFromFileName(name) ?? undefined);
   }
 
   /** The absolute paths of every file of the project. */

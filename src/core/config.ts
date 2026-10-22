@@ -28,13 +28,37 @@ export interface AppConfig {
   readonly projectDir: string | null;
   /** Amount of tasks shown per page. */
   readonly pageSize: number;
+  /** Amount of notes shown per page, from 10 to 100. */
+  readonly notePageSize: number;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
   mode: 'service',
   projectDir: null,
   pageSize: 10,
+  notePageSize: 10,
 };
+
+/** The smallest amount of notes a page can hold. */
+export const MIN_NOTE_PAGE_SIZE = 10;
+
+/** The biggest amount of notes a page can hold. */
+export const MAX_NOTE_PAGE_SIZE = 100;
+
+/** Keeps the amount of notes per page inside the allowed range. */
+export function clampNotePageSize(value: number): number {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_CONFIG.notePageSize;
+  }
+  const truncated = Math.trunc(value);
+  if (truncated < MIN_NOTE_PAGE_SIZE) {
+    return MIN_NOTE_PAGE_SIZE;
+  }
+  if (truncated > MAX_NOTE_PAGE_SIZE) {
+    return MAX_NOTE_PAGE_SIZE;
+  }
+  return truncated;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -55,6 +79,7 @@ export function parseConfig(content: string): AppConfig {
   const mode = parsed['mode'];
   const projectDir = parsed['projectDir'];
   const pageSize = parsed['pageSize'];
+  const notePageSize = parsed['notePageSize'];
 
   return {
     mode: mode === 'embedded' ? 'embedded' : 'service',
@@ -63,13 +88,22 @@ export function parseConfig(content: string): AppConfig {
       typeof pageSize === 'number' && Number.isFinite(pageSize) && pageSize > 0
         ? Math.trunc(pageSize)
         : DEFAULT_CONFIG.pageSize,
+    notePageSize:
+      typeof notePageSize === 'number' && Number.isFinite(notePageSize)
+        ? clampNotePageSize(notePageSize)
+        : DEFAULT_CONFIG.notePageSize,
   };
 }
 
 /** Serializes the configuration as pretty printed JSON. */
 export function serializeConfig(config: AppConfig): string {
   return `${JSON.stringify(
-    { mode: config.mode, projectDir: config.projectDir, pageSize: config.pageSize },
+    {
+      mode: config.mode,
+      projectDir: config.projectDir,
+      pageSize: config.pageSize,
+      notePageSize: config.notePageSize,
+    },
     null,
     2,
   )}\n`;
@@ -137,7 +171,11 @@ function saveEmbeddedConfig(config: AppConfig): void {
   try {
     localStorage.setItem(
       EMBEDDED_CONFIG_STORAGE_KEY,
-      JSON.stringify({ projectDir: null, pageSize: config.pageSize }),
+      JSON.stringify({
+        projectDir: null,
+        pageSize: config.pageSize,
+        notePageSize: config.notePageSize,
+      }),
     );
   } catch {
     // The browser refuses to keep the configuration: it is asked again next time.

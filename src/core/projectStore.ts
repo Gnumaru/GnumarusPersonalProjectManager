@@ -18,6 +18,7 @@
  */
 
 import type { TaskComment } from './comment.js';
+import type { Note, NoteSearchScope } from './note.js';
 import type { Task, TaskStatus } from './task.js';
 
 /** The kind of storage a project uses. */
@@ -96,6 +97,27 @@ export interface ProjectStore {
 
   /** Deletes a comment file. */
   deleteComment(path: string): Promise<void>;
+
+  /** The paths of the note files, sorted by note id. */
+  listNotePaths(): Promise<readonly string[]>;
+
+  /** The paths of the note files whose title or content matches the term. */
+  searchNotePaths(term: string, scope: NoteSearchScope): Promise<readonly string[]>;
+
+  /** The full note held by a file. */
+  readNote(path: string): Promise<Note>;
+
+  /** Writes a note file, replacing the previous content. */
+  writeNote(path: string, note: Note): Promise<void>;
+
+  /** Creates a note file, failing when the file already exists. */
+  createNoteFile(path: string, note: Note): Promise<void>;
+
+  /** The id that the next note will take. */
+  nextNoteId(): Promise<number>;
+
+  /** The path of the file of a note, relative to the project folder. */
+  notePath(id: number): string;
 
   /** The id that the next task will take. */
   nextTaskId(): Promise<number>;

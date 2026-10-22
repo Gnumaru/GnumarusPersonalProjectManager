@@ -99,6 +99,20 @@ list or as a tree.
 | **The bars can be dragged to change the dates of a task** | Done | `src/ui/ganttDrag.ts` |
 | **The bars carry the colour of the status** | Done | `src/styles.css` |
 
+## The notes
+
+| Feature | Status | Where |
+| ------- | ------ | ----- |
+| **Notes: a new display mode, next to the tasks** | Done | `src/ui/app.ts` |
+| **Every note is a file `note_<id>.txt`, with its id inside the file** | Done | `src/core/note.ts` |
+| **The body of a note is markdown** | Done | `src/core/markdown.ts` |
+| **The note is edited as plain text and shown as rendered markdown** | Done | `src/ui/noteDialog.ts` |
+| **The search of the notes: the title, the content or both** | Done | `src/ui/app.ts` |
+| **The notes are paginated, ten per page** | Done | `src/ui/paginationBar.ts` |
+| **An input jumps to the page the user types** | Done | `src/ui/paginationBar.ts` |
+| **The amount of notes per page is configurable, from 10 to 100** | Done | `src/core/config.ts` |
+| **The notes work in the service mode and in the embedded mode** | Done | `src/core/projectStore.ts` |
+
 ## The project
 
 | Feature | Status | Where |
@@ -109,6 +123,7 @@ list or as a tree.
 | **A ZIP archive can be imported as the embedded project** | Done | `src/ui/app.ts` |
 | **One storage facade for the service and for the browser** | Done | `src/core/projectStore.ts` |
 | **Only one embedded project in the browser: an import replaces it completely** | Done | `src/core/embeddedStore.ts` |
+| **Every file of the project carries its id inside the file** | Done | `src/core/task.ts`, `src/core/comment.ts`, `src/core/note.ts` |
 
 ## User interface
 

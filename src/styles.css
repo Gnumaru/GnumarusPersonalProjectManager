@@ -454,13 +454,15 @@ button[hidden] {
   display: none;
 }
 
-.task-table {
+.task-table,
+.note-table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
 
-.task-table th {
+.task-table th,
+.note-table th {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -475,49 +477,58 @@ button[hidden] {
   white-space: nowrap;
 }
 
-.task-table td {
+.task-table td,
+.note-table td {
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
   overflow: hidden;
 }
 
-.task-table tbody tr:hover {
+.task-table tbody tr:hover,
+.note-table tbody tr:hover {
   background: var(--bg-subtle);
 }
 
-.task-table tbody tr:last-child td {
+.task-table tbody tr:last-child td,
+.note-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.task-table .cell-id {
+.task-table .cell-id,
+.note-table .cell-id {
   width: 62px;
   color: var(--text-faint);
   font-family: var(--mono);
   font-size: 12px;
 }
 
-.task-table .cell-tags {
+.task-table .cell-tags,
+.note-table .cell-tags {
   width: 20%;
   overflow: hidden;
 }
 
-.task-table .cell-parent {
+.task-table .cell-parent,
+.note-table .cell-parent {
   width: 92px;
 }
 
-.task-table .cell-status {
+.task-table .cell-status,
+.note-table .cell-status {
   width: 128px;
 }
 
-.task-table .cell-updated {
+.task-table .cell-updated,
+.note-table .cell-updated {
   width: 165px;
   color: var(--text-muted);
   font-size: 12.5px;
   white-space: nowrap;
 }
 
-.task-table .cell-actions {
+.task-table .cell-actions,
+.note-table .cell-actions {
   width: 150px;
   text-align: right;
   white-space: nowrap;
@@ -2358,4 +2369,236 @@ input[type='date'] {
   .brand-text p {
     display: none;
   }
+}
+
+/* --------------------------------------------------------------- notes -- */
+
+.search-scope {
+  flex: none;
+  width: auto;
+  min-width: 148px;
+  padding: 6px 8px;
+}
+
+.search-scope[hidden] {
+  display: none;
+}
+
+.notes-wrap[hidden] {
+  display: none;
+}
+
+.note-table .cell-title {
+  max-width: 720px;
+}
+
+.note-table .cell-updated {
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------- note editor -- */
+
+.note-dialog .modal-panel {
+  width: min(960px, 100%);
+}
+
+.note-meta {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 4px 12px;
+  margin: 0 0 16px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.note-meta dt {
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.note-meta dd {
+  margin: 0;
+  color: var(--text);
+}
+
+.editor-mode-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  margin-bottom: 10px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.editor-mode-button {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 4px 14px;
+  font-size: 12.5px;
+}
+
+.editor-mode-button.is-active {
+  background: var(--bg-elevated);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.note-editor {
+  display: flex;
+  flex-direction: column;
+}
+
+.note-content-input {
+  width: 100%;
+  min-height: 260px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.note-content-input[hidden] {
+  display: none;
+}
+
+.note-preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  background: var(--bg-subtle);
+  min-height: 260px;
+  max-height: 46vh;
+  overflow: auto;
+}
+
+.note-preview[hidden] {
+  display: none;
+}
+
+/* ---------------------------------------------------------- markdown -- */
+
+.markdown {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-heading {
+  margin: 18px 0 8px;
+  line-height: 1.25;
+}
+
+.markdown-h1 {
+  font-size: 22px;
+}
+
+.markdown-h2 {
+  font-size: 19px;
+}
+
+.markdown-h3 {
+  font-size: 17px;
+}
+
+.markdown-h4,
+.markdown-h5,
+.markdown-h6 {
+  font-size: 15px;
+}
+
+.markdown-paragraph {
+  margin: 0 0 12px;
+}
+
+.markdown-list {
+  margin: 0 0 12px;
+  padding-left: 24px;
+}
+
+.markdown-list-item {
+  margin: 2px 0;
+}
+
+.markdown-list-item > .markdown-paragraph {
+  margin: 0 0 4px;
+}
+
+.markdown-quote {
+  margin: 0 0 12px;
+  padding: 6px 14px;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-muted);
+}
+
+.markdown-code {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: auto;
+}
+
+.markdown-code code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.markdown-inline-code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  padding: 1px 5px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.markdown-link {
+  color: var(--accent);
+}
+
+.markdown-rule {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+.markdown-image {
+  max-width: 100%;
+}
+
+/* ------------------------------------------------- pagination extras -- */
+
+.pagination-jump,
+.pagination-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.page-jump-input {
+  width: 68px;
+  padding: 4px 6px;
+}
+
+.page-size-input {
+  width: 68px;
+  padding: 4px 6px;
 }

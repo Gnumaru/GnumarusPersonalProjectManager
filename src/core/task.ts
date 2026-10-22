@@ -299,8 +299,13 @@ function parseInteger(value: string | undefined): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
-/** Removes characters that would break the `key=value` metadata format. */
-function sanitizeMetaValue(value: string): string {
+/**
+ * Removes characters that would break the `key=value` metadata format.
+ *
+ * A value cannot hold a line break: the metadata block is made of one `key=value`
+ * per line.
+ */
+export function sanitizeMetadataValue(value: string): string {
   return value.replace(/[\r\n]+/gu, ' ').trim();
 }
 
@@ -412,7 +417,7 @@ export function parseTask(content: string, idHint?: number): Task {
 export function serializeTask(task: Task): string {
   const lines: string[] = [
     `id=${task.id}`,
-    `title=${sanitizeMetaValue(task.title)}`,
+    `title=${sanitizeMetadataValue(task.title)}`,
     `status=${task.status}`,
   ];
 
@@ -420,11 +425,11 @@ export function serializeTask(task: Task): string {
     lines.push(`parent=${task.parentId}`);
   }
 
-  lines.push(`tags=${task.tags.map((tag) => sanitizeMetaValue(tag)).join(' ')}`);
-  lines.push(`created=${sanitizeMetaValue(task.created)}`);
-  lines.push(`updated=${sanitizeMetaValue(task.updated)}`);
-  lines.push(`start=${sanitizeMetaValue(task.start)}`);
-  lines.push(`end=${sanitizeMetaValue(task.end)}`);
+  lines.push(`tags=${task.tags.map((tag) => sanitizeMetadataValue(tag)).join(' ')}`);
+  lines.push(`created=${sanitizeMetadataValue(task.created)}`);
+  lines.push(`updated=${sanitizeMetadataValue(task.updated)}`);
+  lines.push(`start=${sanitizeMetadataValue(task.start)}`);
+  lines.push(`end=${sanitizeMetadataValue(task.end)}`);
   if (task.blockedBy.length > 0) {
     lines.push(`blocked_by=${task.blockedBy.join(',')}`);
   }

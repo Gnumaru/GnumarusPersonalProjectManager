@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import type { BrowserFileStorage } from './browserStorage.js';
 import { EmbeddedProjectStore } from './embeddedStore.js';
+import { buildNote } from './note.js';
 import { buildTask, type TaskInput } from './task.js';
 
 /** A storage that keeps the files in memory. */
@@ -161,5 +162,82 @@ describe('EmbeddedProjectStore', () => {
     expect(files).toHaveLength(1);
     expect(files[0]?.path).toBe('task_1.txt');
     expect(files[0]?.content).toContain('title=A task');
+  });
+
+  it('creates a note in a file of its own, with its id inside the file', async () => {
+    const { store, storage } = await createStore();
+
+    const id = await store.nextNoteId();
+    const note = buildNote({ title: 'The first note', content: '# Hello' }, id, new Date());
+    await store.createNoteFile(store.notePath(id), note);
+
+    expect(storage.files.get('note_1.txt')).toContain('id=1');
+    expect(storage.files.get('note_1.txt')).toContain('title=The first note');
+    expect(storage.files.get('note_1.txt')).toContain('# Hello');
+    expect(await store.nextNoteId()).toBe(2);
+  });
+
+  it('lists and reads the notes', async () => {
+    const { store } = await createStore();
+    const id = await store.nextNoteId();
+    await store.createNoteFile(
+      store.notePath(id),
+      buildNote({ title: 'A note', content: 'The body' }, id, new Date()),
+    );
+
+    expect(await store.listNotePaths()).toEqual(['note_1.txt']);
+
+    const note = await store.readNote('note_1.txt');
+    expect(note.id).toBe(1);
+    expect(note.title).toBe('A note');
+    expect(note.content).toBe('The body');
+  });
+
+  it('searches the notes by title, by content or by both', async () => {
+    const { store } = await createStore();
+    const id = await store.nextNoteId();
+    await store.createNoteFile(
+      store.notePath(id),
+      buildNote({ title: 'Shopping list', content: 'Remember the milk' }, id, new Date()),
+    );
+
+    expect(await store.searchNotePaths('shopping', 'title')).toHaveLength(1);
+    expect(await store.searchNotePaths('milk', 'title')).toHaveLength(0);
+    expect(await store.searchNotePaths('milk', 'content')).toHaveLength(1);
+    expect(await store.searchNotePaths('shopping', 'content')).toHaveLength(0);
+    expect(await store.searchNotePaths('milk', 'both')).toHaveLength(1);
+    expect(await store.searchNotePaths('SHOPPING', 'title')).toHaveLength(1);
+    expect(await store.searchNotePaths('nothing here', 'both')).toHaveLength(0);
+  });
+
+  it('edits and deletes a note', async () => {
+    const { store } = await createStore();
+    const id = await store.nextNoteId();
+    const note = buildNote({ title: 'A note', content: 'body' }, id, new Date());
+    await store.createNoteFile(store.notePath(id), note);
+
+    await store.writeNote(store.notePath(id), { ...note, title: 'The edited note' });
+    const reloaded = await store.readNote(store.notePath(id));
+    expect(reloaded.title).toBe('The edited note');
+
+    await store.deleteFile(store.notePath(id));
+    expect(await store.listNotePaths()).toHaveLength(0);
+  });
+
+  it('keeps the notes and the tasks apart', async () => {
+    const { store } = await createStore();
+    const taskId = await store.nextTaskId();
+    await store.createTaskFile(
+      store.taskPath(taskId),
+      buildTask(input('A task'), taskId, new Date()),
+    );
+    const noteId = await store.nextNoteId();
+    await store.createNoteFile(
+      store.notePath(noteId),
+      buildNote({ title: 'A note', content: 'body' }, noteId, new Date()),
+    );
+
+    expect(await store.listTaskPaths()).toEqual(['task_1.txt']);
+    expect(await store.listNotePaths()).toEqual(['note_1.txt']);
   });
 });

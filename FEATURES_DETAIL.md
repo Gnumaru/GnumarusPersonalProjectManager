@@ -32,7 +32,10 @@ It can have as many lines as needed.
 
 Rules:
 
-* `id` - unique incremental integer, also encoded in the file name.
+* `id` - unique incremental integer, **also encoded in the file name**. The id
+  inside the file is the one the application uses: the name is only a fallback
+  for the files written before the key existed. The same rule holds for the
+  comments (`comment_<id>.txt`) and for the notes (`note_<id>.txt`).
 * `title` - mandatory, single line (new lines are replaced by spaces on write).
 * `status` - one of `planning`, `next`, `todo`, `doing`, `paused`, `done`,
   `canceled`. Anything else falls back to `todo`. The badge of the task shows
@@ -531,6 +534,85 @@ comment files of that task are read.
 
 ---
 
+## 5 quater. The notes
+
+**Files:** `src/core/note.ts`, `src/core/markdown.ts`, `src/core/projectStore.ts`, `src/ui/noteDialog.ts`, `src/ui/noteTable.ts`, `src/ui/markdownView.ts`
+
+The notes are a **new kind of thing**, next to the tasks and the comments: a
+simple replacement for a note taking application. They do not involve the tasks
+at all: a note never has a parent, a status or a tag.
+
+### The file of a note
+
+A note is a text file of its own, stored in the project folder, named
+`note_<id>.txt`. Its format is the format of the task files: a block of
+`key=value` lines, a line that contains only the separator and then the body of
+the note.
+
+```
+id=12
+title=Shopping list
+created=20261022100000000
+updated=20261022100000000
+----
+# Shopping
+
+- milk
+- eggs
+```
+
+The ids of the notes are **incremental integers**, unique in the project,
+exactly like the ids of the tasks and the ids of the comments.
+
+### The markdown of the body
+
+The body of a note is **markdown**. The parser (`src/core/markdown.ts`) is pure
+and covered by unit tests: it understands the headings, the paragraphs, the
+bulleted and the numbered lists, the quotes, the code blocks, the horizontal
+rules, the **bold**, the *italic*, the ~~strikethrough~~, the `code`, the
+[links](https://example.org), the images and the `\` escape character.
+
+The renderer (`src/ui/markdownView.ts`) builds the DOM **node by node**: the text
+of a note is never injected as HTML, so a note can hold any text. The links and
+the images are checked: only the `http`, `https` and `mailto` schemes and the
+relative URLs are kept, a `javascript:` URL never reaches the page.
+
+The editor of a note shows the body either as **plain text** (the markdown
+source, in a text area) or **rendered**, and the user switches from one to the
+other with the two buttons of the editor.
+
+### The search
+
+The search field of the toolbar looks for the notes when the **Notes** mode is
+displayed, and the drop down next to it chooses what is searched:
+
+| Scope | What is looked at |
+|---|---|
+| `both` | the title and the body of the note |
+| `title` | the title of the note only |
+| `content` | the body of the note only |
+
+The comparison ignores the case and looks for the term as a piece of text.
+
+In the **service** mode, the titles are read with **one** command (the
+`title=` keys of every note, no file is downloaded) and the bodies are found
+with a `grep`; the files that hold the term are then read to make sure the term
+is really in the body. In the **embedded** mode, the same search is done in
+JavaScript, over the files of the storage of the browser.
+
+### The listing and the pagination
+
+The notes are listed **ten per page**, like the tasks. The pagination bar of the
+notes mode has the four usual buttons (first, previous, next and last), an
+**input that jumps to a page number** when the user presses `Enter`, and an
+**input that changes the amount of notes per page** (from 10 to 100).
+
+The amount of notes per page is kept in the configuration of the project, next
+to the amount of tasks per page: `notePageSize` in
+`~/.config/GnumarusProjectManager/config.json`.
+
+---
+
 ## 6. The project of the user
 
 **Files:** `src/core/projectStore.ts`, `src/core/serviceStore.ts`, `src/core/embeddedStore.ts`, `src/core/browserStorage.ts`, `src/core/zip.ts`, `src/ui/projectDialog.ts`
@@ -709,6 +791,8 @@ be entered with a double click.
 | `src/core/zip.test.ts` | The ZIP archives: the checksum, the round trip, the empty archive, the damaged file and the unicode characters. |
 | `src/core/embeddedStore.test.ts` | The embedded project: the creation of a task, the metadata, the search, the children, the comments, the export and the import. |
 | `src/core/browserStorage.test.ts` | The storage of the browser: the storages the browser offers, and the files it keeps. |
+| `src/core/note.test.ts` | The note file format: the names, the parsing, the serialization, the round trip, the search scopes and the summary of the body. |
+| `src/core/markdown.test.ts` | The markdown parser: the headings, the paragraphs, the lists, the quotes, the code blocks, the rules and the inline marks. |
 | `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons) and the pagination bar (jsdom). |
 | `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token, the tree view and the board. |
 | `src/ui/kanbanBoard.test.ts` | The board: the columns and their order, the cards, their tags and their actions. |
@@ -717,8 +801,9 @@ be entered with a double click.
 | `src/ui/ganttDrag.test.ts` | The drag of the bars of the Gantt chart: moving a task, changing one of its dates and the limits. |
 | `src/ui/treeDrag.test.ts` | The drag and drop of the rows of the tree: the drop target, the thresholds, the buttons that never start a drag, the click that ends the drag and the detachment of a task. |
 | `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
+| `src/ui/markdownView.test.ts` | The rendering of the markdown: the blocks, the inline marks, the safe URLs and the fact that the text of a note is never injected as markup. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
-| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. It also drives the **embedded project**: the switch, the creation of a task, the export of the ZIP archive and its import. |
+| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. It also drives the **notes** (the listing, the pagination, the jump to a page, the search scopes, the preview and the creation) and the **embedded project**: the switch, the creation of a task, the export of the ZIP archive and its import. |
 
 Commands:
 

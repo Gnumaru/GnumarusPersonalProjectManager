@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vite-plus/test';
 import { ApiClient } from '../api/client.js';
 import { ServiceProjectStore } from './serviceStore.js';
+import { buildNote } from './note.js';
 import {
   buildTask,
   withParent,
@@ -56,7 +57,7 @@ describeLive('ServiceProjectStore against the live service', () => {
   beforeAll(async () => {
     await api.execShell({ command: `mkdir -p -- '${testDirectory}'` });
     await api.execShell({
-      command: `rm -f -- "${testDirectory}"/task_*.txt "${testDirectory}"/comment_*.txt "${testDirectory}"/nested/task_*.txt`,
+      command: `rm -f -- "${testDirectory}"/task_*.txt "${testDirectory}"/comment_*.txt "${testDirectory}"/note_*.txt "${testDirectory}"/nested/task_*.txt`,
     });
     await api.execShell({ command: `rm -rf -- "${testDirectory}"/nested` });
   });
@@ -249,5 +250,82 @@ describeLive('ServiceProjectStore against the live service', () => {
     const files = await store.listFiles();
     expect(files.length).toBeGreaterThan(0);
     expect(files.some((file) => file.path.endsWith('.txt'))).toBe(true);
+  });
+
+  it('creates a note file on disk, with its id inside the file', async () => {
+    const id = await store.nextNoteId();
+    const note = buildNote({ title: 'A note of the integration test', content: '# Hello' }, id, new Date());
+    await store.createNoteFile(store.notePath(id), note);
+
+    const file = await api.readFile(`${testDirectory}/note_${id}.txt`);
+    expect(file.content).toContain(`id=${id}`);
+    expect(file.content).toContain('title=A note of the integration test');
+    expect(file.content).toContain('----');
+    expect(file.content).toContain('# Hello');
+
+    const reloaded = await store.readNote(store.notePath(id));
+    expect(reloaded.id).toBe(id);
+    expect(reloaded.title).toBe('A note of the integration test');
+    expect(reloaded.content).toBe('# Hello');
+  });
+
+  it('lists the note files', async () => {
+    const paths = await store.listNotePaths();
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.some((path) => path.endsWith('note_1.txt'))).toBe(true);
+  });
+
+  it('searches the notes by title', async () => {
+    const found = await store.searchNotePaths('integration', 'title');
+    expect(found.length).toBe(1);
+    expect(found[0]?.endsWith('note_1.txt')).toBe(true);
+
+    const byContent = await store.searchNotePaths('integration', 'content');
+    expect(byContent).toHaveLength(0);
+
+    const both = await store.searchNotePaths('integration', 'both');
+    expect(both.length).toBe(1);
+  });
+
+  it('searches a note whose title holds a colon', async () => {
+    const id = await store.nextNoteId();
+    await store.createNoteFile(
+      store.notePath(id),
+      buildNote({ title: 'Shopping: the list', content: 'body' }, id, new Date()),
+    );
+
+    const found = await store.searchNotePaths('Shopping', 'title');
+    expect(found.length).toBe(1);
+    expect(found[0]?.endsWith(`note_${id}.txt`)).toBe(true);
+  });
+
+  it('searches the notes by content', async () => {    const id = await store.nextNoteId();
+    await store.createNoteFile(
+      store.notePath(id),
+      buildNote({ title: 'A title', content: 'the body holds a needle' }, id, new Date()),
+    );
+
+    const found = await store.searchNotePaths('needle', 'content');
+    expect(found.length).toBe(1);
+    expect(found[0]?.endsWith(`note_${id}.txt`)).toBe(true);
+
+    // The title of that note does not hold the term.
+    const byTitle = await store.searchNotePaths('needle', 'title');
+    expect(byTitle).toHaveLength(0);
+  });
+
+  it('edits and deletes a note', async () => {
+    const id = await store.nextNoteId();
+    const note = buildNote({ title: 'Doomed note', content: 'body' }, id, new Date());
+    await store.createNoteFile(store.notePath(id), note);
+
+    await store.writeNote(store.notePath(id), { ...note, title: 'Edited note' });
+    const reloaded = await store.readNote(store.notePath(id));
+    expect(reloaded.title).toBe('Edited note');
+    expect(reloaded.id).toBe(id);
+
+    await store.deleteFile(store.notePath(id));
+    const paths = await store.listNotePaths();
+    expect(paths.some((path) => path.endsWith(`note_${id}.txt`))).toBe(false);
   });
 });

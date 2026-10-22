@@ -35,6 +35,12 @@ interface HarnessOptions {
   readonly rejectPaths?: readonly string[];
   /** The tasks created on the fake disk. */
   readonly tasks?: readonly { readonly id: number; readonly parentId?: number }[];
+  /** The notes created on the fake disk. */
+  readonly notes?: readonly {
+    readonly id: number;
+    readonly title?: string;
+    readonly content?: string;
+  }[];
 }
 
 function taskContent(id: number, parentId: number | null = null): string {
@@ -52,6 +58,17 @@ function taskContent(id: number, parentId: number | null = null): string {
     `marker-${id}`,
   );
   return lines.join('\n');
+}
+
+function noteContent(id: number, title = `Note ${id}`, content = `body-${id}`): string {
+  return [
+    `id=${id}`,
+    `title=${title}`,
+    'created=20261001100000000',
+    'updated=20261002100000000',
+    '----',
+    content,
+  ].join('\n');
 }
 
 async function createHarness(taskCount = 25, options: HarnessOptions = {}): Promise<Harness> {
@@ -79,6 +96,12 @@ async function createHarness(taskCount = 25, options: HarnessOptions = {}): Prom
     for (let id = 1; id <= taskCount; id += 1) {
       bridge.addFile(`/home/user/projects/task_${id}.txt`, taskContent(id));
     }
+  }
+  for (const note of options.notes ?? []) {
+    bridge.addFile(
+      `/home/user/projects/note_${note.id}.txt`,
+      noteContent(note.id, note.title ?? undefined, note.content ?? undefined),
+    );
   }
   if (options.config !== undefined) {
     bridge.addFile('~/.config/GnumarusProjectManager/config.json', options.config);
@@ -1363,6 +1386,273 @@ describe('App and the Gantt chart', () => {
     harness.app.dispose();
   });
 });
+
+describe('the notes', () => {
+  it('shows the notes of the folder, ten per page', async () => {
+    const harness = await createHarness(0, {
+      notes: Array.from({ length: 25 }, (_value, index) => ({ id: index + 1 })),
+    });
+    await selectFolder(harness);
+    await openNotes(harness);
+
+    const rows = harness.root.querySelectorAll('.note-table tbody tr');
+    expect(rows).toHaveLength(10);
+    expect(harness.root.querySelector('.page-current')?.textContent).toBe('1');
+    expect(harness.root.querySelector('.page-total')?.textContent).toBe('3');
+    expect(harness.root.querySelector('.pagination-summary')?.textContent).toBe(
+      'Showing 1-10 of 25 notes',
+    );
+    expect(harness.root.querySelector('.result-count')?.textContent).toBe('25 notes');
+    harness.app.dispose();
+  });
+
+  it('hides the tasks and shows the notes', async () => {
+    const harness = await createHarness(3, { notes: [{ id: 1, title: 'A note' }] });
+    await selectFolder(harness);
+    await openNotes(harness);
+
+    expect(harness.root.querySelector('.task-table:not(.note-table)')?.hasAttribute('hidden')).toBe(
+      false,
+    );
+    expect(harness.root.querySelector('.notes-wrap')?.hasAttribute('hidden')).toBe(false);
+    expect(harness.root.querySelector('.note-table tbody tr')).not.toBeNull();
+    harness.app.dispose();
+  });
+
+  it('moves between the pages of the notes', async () => {
+    const harness = await createHarness(0, {
+      notes: Array.from({ length: 25 }, (_value, index) => ({ id: index + 1 })),
+    });
+    await selectFolder(harness);
+    await openNotes(harness);
+
+    click(harness.root.querySelector<HTMLButtonElement>('.page-last'));
+    await flush();
+    expect(harness.root.querySelector('.page-current')?.textContent).toBe('3');
+    expect(harness.root.querySelectorAll('.note-table tbody tr')).toHaveLength(5);
+
+    click(harness.root.querySelector<HTMLButtonElement>('.page-first'));
+    await flush();
+    expect(harness.root.querySelector('.page-current')?.textContent).toBe('1');
+    harness.app.dispose();
+  });
+
+  it('jumps to the page the user types', async () => {
+    const harness = await createHarness(0, {
+      notes: Array.from({ length: 25 }, (_value, index) => ({ id: index + 1 })),
+    });
+    await selectFolder(harness);
+    await openNotes(harness);
+
+    const jump = harness.root.querySelector<HTMLInputElement>('.page-jump-input');
+    expect(jump).not.toBeNull();
+    if (jump === null) {
+      return;
+    }
+    jump.value = '3';
+    jump.dispatchEvent(
+      new harness.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    );
+    await flush();
+
+    expect(harness.root.querySelector('.page-current')?.textContent).toBe('3');
+    expect(harness.root.querySelectorAll('.note-table tbody tr')).toHaveLength(5);
+    harness.app.dispose();
+  });
+
+  it('changes the amount of notes per page', async () => {
+    const harness = await createHarness(0, {
+      notes: Array.from({ length: 25 }, (_value, index) => ({ id: index + 1 })),
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+    await selectFolder(harness);
+    await openNotes(harness);
+
+    const size = harness.root.querySelector<HTMLInputElement>('.page-size-input');
+    expect(size).not.toBeNull();
+    if (size === null) {
+      return;
+    }
+    expect(size.min).toBe('10');
+    expect(size.max).toBe('100');
+    size.value = '25';
+    size.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+
+    expect(harness.root.querySelectorAll('.note-table tbody tr')).toHaveLength(25);
+    expect(harness.root.querySelector('.page-total')?.textContent).toBe('1');
+
+    // The amount is kept in the configuration of the project.
+    const config = harness.bridge.files.get('~/.config/GnumarusProjectManager/config.json');
+    expect(config).toContain('"notePageSize": 25');
+    harness.app.dispose();
+  });
+
+  it('searches the notes by title, by content or by both', async () => {
+    const harness = await createHarness(0, {
+      notes: [
+        { id: 1, title: 'Shopping list', content: 'Remember the milk' },
+        { id: 2, title: 'A recipe', content: 'The shopping list is empty' },
+      ],
+    });
+    await selectFolder(harness);
+    await openNotes(harness);
+
+    const scope = harness.root.querySelector<HTMLSelectElement>('#note-scope');
+    expect(scope).not.toBeNull();
+    expect(scope?.hasAttribute('hidden')).toBe(false);
+    if (scope === null) {
+      return;
+    }
+
+    const search = harness.root.querySelector<HTMLInputElement>('#search-input');
+    if (search === null) {
+      return;
+    }
+    search.value = 'shopping';
+    click(buttonByText(harness.doc, 'Search'));
+    await flush();
+
+    // Both notes hold the term, one in its title and one in its body.
+    expect(harness.root.querySelectorAll('.note-table tbody tr')).toHaveLength(2);
+
+    scope.value = 'title';
+    scope.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(harness.root.querySelectorAll('.note-table tbody tr')).toHaveLength(1);
+
+    scope.value = 'content';
+    scope.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(harness.root.querySelectorAll('.note-table tbody tr')).toHaveLength(1);
+    expect(harness.root.querySelector('.note-table tbody tr .cell-title')?.textContent).toContain(
+      'A recipe',
+    );
+    harness.app.dispose();
+  });
+
+  it('creates a note, with its id inside the file', async () => {
+    const harness = await createHarness(0);
+    await selectFolder(harness);
+    await openNotes(harness);
+
+    click(buttonByText(harness.doc, 'New note'));
+    await flush();
+
+    const title = harness.doc.querySelector<HTMLInputElement>('#note-title');
+    const content = harness.doc.querySelector<HTMLTextAreaElement>('#note-content');
+    expect(title).not.toBeNull();
+    expect(content).not.toBeNull();
+    if (title === null || content === null) {
+      return;
+    }
+    title.value = 'The new note';
+    content.value = '# The body';
+    click(buttonByText(harness.doc, 'Create note'));
+    await flush();
+
+    const file = harness.bridge.files.get('/home/user/projects/note_1.txt');
+    expect(file).toContain('id=1');
+    expect(file).toContain('title=The new note');
+    expect(file).toContain('----');
+    expect(file).toContain('# The body');
+    expect(harness.root.querySelector('.note-table tbody tr .cell-title')?.textContent).toContain(
+      'The new note',
+    );
+    harness.app.dispose();
+  });
+
+  it('shows the note as markdown and edits it as plain text', async () => {
+    const harness = await createHarness(0, {
+      notes: [{ id: 1, title: 'A note', content: '# The title\n\nSome **bold** text.' }],
+    });
+    await selectFolder(harness);
+    await openNotes(harness);
+
+    // The read only view shows the note as markdown.
+    click(harness.root.querySelector<HTMLButtonElement>('.note-table tbody tr .row-action'));
+    await flush();
+    const view = harness.doc.querySelector('.note-dialog .markdown');
+    expect(view).not.toBeNull();
+    expect(view?.querySelector('h1')?.textContent).toBe('The title');
+    expect(view?.querySelector('strong')?.textContent).toBe('bold');
+
+    // The editor of the note holds the markdown source.
+    click(buttonByText(harness.doc, 'Edit'));
+    await flush();
+    const source = harness.doc.querySelector<HTMLTextAreaElement>('#note-content');
+    expect(source?.value).toContain('# The title');
+
+    // The preview shows the rendered markdown.
+    click(buttonByText(harness.doc, 'Preview'));
+    await flush();
+    const preview = harness.doc.querySelector('.note-preview');
+    expect(preview?.hasAttribute('hidden')).toBe(false);
+    expect(preview?.querySelector('h1')?.textContent).toBe('The title');
+    expect(preview?.querySelector('strong')?.textContent).toBe('bold');
+    harness.app.dispose();
+  });
+
+  it('edits a note', async () => {
+    const harness = await createHarness(0, { notes: [{ id: 1, title: 'Old title' }] });
+    await selectFolder(harness);
+    await openNotes(harness);
+
+    const actions = harness.root.querySelectorAll<HTMLButtonElement>('.note-table tbody tr .row-action');
+    click(actions[1]);
+    await flush();
+
+    const title = harness.doc.querySelector<HTMLInputElement>('#note-title');
+    if (title === null) {
+      return;
+    }
+    title.value = 'The edited title';
+    click(buttonByText(harness.doc, 'Save changes'));
+    await flush();
+
+    const file = harness.bridge.files.get('/home/user/projects/note_1.txt');
+    expect(file).toContain('title=The edited title');
+    expect(file).toContain('id=1');
+    harness.app.dispose();
+  });
+
+  it('deletes a note', async () => {
+    const harness = await createHarness(0, { notes: [{ id: 1, title: 'Doomed note' }] });
+    await selectFolder(harness);
+    await openNotes(harness);
+
+    const actions = harness.root.querySelectorAll<HTMLButtonElement>('.note-table tbody tr .row-action');
+    click(actions[2]);
+    await flush();
+
+    click(buttonByText(harness.doc, 'Delete'));
+    await flush();
+    click(buttonByText(harness.doc, 'Yes, delete'));
+    await flush();
+
+    expect(harness.bridge.files.has('/home/user/projects/note_1.txt')).toBe(false);
+    expect(harness.root.querySelectorAll('.note-table tbody tr')).toHaveLength(0);
+    harness.app.dispose();
+  });
+
+  it('hides the scope of the search in the other display modes', async () => {
+    const harness = await createHarness(0, { notes: [{ id: 1 }] });
+    await selectFolder(harness);
+
+    const scope = harness.root.querySelector<HTMLSelectElement>('#note-scope');
+    expect(scope?.hasAttribute('hidden')).toBe(true);
+
+    await openNotes(harness);
+    expect(scope?.hasAttribute('hidden')).toBe(false);
+    harness.app.dispose();
+  });
+});
+
+/** Opens the notes of the project. */
+async function openNotes(harness: Harness): Promise<void> {
+  click(buttonByText(harness.doc, 'Notes'));
+  await flush();
+}
 
 async function selectFolder(harness: Harness): Promise<void> {
   click(buttonByText(harness.doc, 'Choose folder…'));

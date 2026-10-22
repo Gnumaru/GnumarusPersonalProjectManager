@@ -334,3 +334,42 @@
 ### Build / deploy
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
+## Batch 10 - The notes
+
+### Core (pure, unit tested)
+- [x] `src/core/note.ts` - the note file format (`note_<id>.txt`), with the id
+      inside the file
+- [x] The body of a note is markdown
+- [x] `src/core/markdown.ts` - the markdown parser, without any dependency
+- [x] The search scopes: the title, the content or both
+- [x] `src/core/config.ts` - the amount of notes per page (`notePageSize`),
+      from 10 to 100
+
+### Data layer
+- [x] `src/core/projectStore.ts` - the note operations of the facade
+- [x] `src/core/serviceStore.ts` - the notes on the disk, with `find` and
+      `grep`
+- [x] `src/core/embeddedStore.ts` - the notes in the browser
+
+### User interface
+- [x] The **Notes** display mode, next to the list, the tree, the board and
+      the Gantt chart
+- [x] The notes are created, edited, viewed and deleted
+- [x] The editor shows the note as plain text or as rendered markdown
+- [x] The search of the notes, with the drop down of the scope
+- [x] The pagination: ten notes per page, the four buttons, the input that
+      jumps to a page number and the input of the amount of notes per page
+
+### Tests
+- [x] `src/core/note.test.ts` - the note file format
+- [x] `src/core/markdown.test.ts` - the markdown parser
+- [x] `src/core/serviceStore.test.ts` - the notes against the live bridge
+- [x] `src/core/embeddedStore.test.ts` - the notes in the browser
+- [x] `src/ui/markdownView.test.ts` - the rendering of the markdown
+- [x] `src/ui/app.test.ts` - the notes mode in the application
+- [x] `scripts/e2e-browser.mjs` - the notes driven by a real browser
+
+### Build / deploy
+- [x] `npm run verify`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
