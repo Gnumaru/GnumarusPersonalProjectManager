@@ -78,18 +78,23 @@ expect_marker() {
   echo "ok: ${label} contains '${marker}'"
 }
 
+# The state of the service depends on the kind of storage the browser chose:
+# the pill holds "Service online", "Service not needed" or "Service
+# unavailable". The marker "Service" is always there.
 echo "==> rendering the application at the domain root"
 render "http://127.0.0.1:${PORT}/" "${TMP_DIR}/root.html"
 expect_marker "${TMP_DIR}/root.html" "Gnumarus Project Manager" "the root page"
-expect_marker "${TMP_DIR}/root.html" "Service online" "the root page"
+expect_marker "${TMP_DIR}/root.html" "Service" "the root page"
 expect_marker "${TMP_DIR}/root.html" "New task" "the root page"
 expect_marker "${TMP_DIR}/root.html" "Tree" "the root page"
+expect_marker "${TMP_DIR}/root.html" "Notes" "the root page"
 
 echo "==> rendering the application at a nested path"
 render "http://127.0.0.1:${PORT}/nested/deep/app/" "${TMP_DIR}/nested.html"
 expect_marker "${TMP_DIR}/nested.html" "Gnumarus Project Manager" "the nested page"
-expect_marker "${TMP_DIR}/nested.html" "Service online" "the nested page"
+expect_marker "${TMP_DIR}/nested.html" "Service" "the nested page"
 expect_marker "${TMP_DIR}/nested.html" "New task" "the nested page"
+expect_marker "${TMP_DIR}/nested.html" "Notes" "the nested page"
 
 echo "==> taking a screenshot"
 "${CHROME_BIN}" \

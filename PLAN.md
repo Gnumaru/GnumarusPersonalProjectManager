@@ -25,6 +25,8 @@ Browser (SPA, no framework, strict TypeScript)
   |-- src/core/serviceStore.ts the implementation over the service (find, grep, read, write)
   |-- src/core/embeddedStore.ts the implementation over the storage of the browser
   |-- src/core/browserStorage.ts the OPFS, with an IndexedDB fallback
+  |-- src/core/fileSystemAccess.ts the File System Access API of the browser
+  |-- src/core/fileSystemStore.ts the implementation over a folder of the disk
   |-- src/core/zip.ts          the reader and the writer of the ZIP archives
   |-- src/core/taskTree.ts     tree of the tasks: build / flatten (pure)
   |-- src/core/pagination.ts   pure pagination math
@@ -295,6 +297,8 @@ method, without compression), so no dependency is needed.
 26. [x] The notes: a new display mode, the notes are files `note_<id>.txt` whose
     body is markdown, they are searched by title or by content and they are
     paginated.
+27. [x] The File System Access API: a third kind of storage, the files live in
+    a folder of the disk chosen by the user, without the low level service.
 
 ## Batch 10 - The notes
 
@@ -349,6 +353,46 @@ its name:
 
 The id inside the file is the one the application uses: the name of the file is
 only a fallback for the files written before the key existed.
+
+## Batch 11 - The File System Access API
+
+The files of the project can also live in a folder of the disk, reached
+**directly** by the browser with the **File System Access API** (the Chromium
+based browsers only). The application then works **without the low level
+service of Gnumarus**.
+
+The dialog of the project offers three choices:
+
+| Choice | Where the files live |
+| ------- | --------------------- |
+| The Gnumarus OS Bridge service | the disk, through the service |
+| An embedded project, in this browser | the OPFS of the browser |
+| File System Access API (Chromium based browsers only) | a folder of the disk, chosen by the user |
+
+The choices the browser does not offer are **disabled**: the OPFS choice needs
+the Origin Private File System, the File System Access API choice needs
+`window.showDirectoryPicker`.
+
+### The default
+
+When the browser knows nothing about a project that was opened before, the
+application chooses:
+
+1. the **File System Access API**, when the browser offers it;
+2. the **OPFS**, when the browser offers it;
+3. the **Gnumarus OS Bridge service**, everywhere else.
+
+### The folder of the project
+
+The user chooses the folder with the picker of the browser. The handle of the
+folder is kept in an **IndexedDB** database, so the project is still there the
+next time the page is opened. The *permission* is not kept: the browser asks
+the user again, and the application offers a button to give the access back.
+
+The store of this backend (`FileSystemProjectStore`) reads and writes the files
+directly. The API offers no `find` and no `grep`: the listing and the search
+are done in JavaScript, over the entries of the directory, and only the files
+that are needed are read.
 
 ## Verification commands
 

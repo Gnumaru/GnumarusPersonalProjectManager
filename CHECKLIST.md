@@ -373,3 +373,34 @@
 ### Build / deploy
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
+## Batch 11 - The File System Access API
+
+### Core
+- [x] `src/core/fileSystemAccess.ts` - the picker of the browser, the state of
+      the permission and the storage of the handle of the folder
+- [x] `src/core/fileSystemStore.ts` - the store over a folder of the disk
+- [x] `src/types/fileSystemAccess.d.ts` - the types of the API, without any
+      dependency
+- [x] `src/core/config.ts` - the kind of storage, with the default of the
+      browser: the File System Access API, then the OPFS, then the service
+
+### User interface
+- [x] The dialog of the project offers the three choices
+- [x] The choices the browser does not offer are disabled
+- [x] The application asks for the folder of the project
+- [x] The application asks for the permission of the folder again
+- [x] The service is not needed by the projects that live in the browser
+
+### Tests
+- [x] `src/core/fileSystemStore.test.ts` - the store over a folder of the disk
+- [x] `src/core/fileSystemAccess.test.ts` - the picker, the permission and the
+      storage of the handle
+- [x] `src/core/config.test.ts` - the kind of storage and its default
+- [x] `src/ui/app.test.ts` - the File System Access mode in the application
+- [x] `scripts/e2e-browser.mjs` - the three choices of the dialog of the
+      project
+
+### Build / deploy
+- [x] `npm run verify`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`

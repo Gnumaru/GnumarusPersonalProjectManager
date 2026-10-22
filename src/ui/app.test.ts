@@ -2,6 +2,8 @@ import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vite-plus/test';
 import { ApiClient } from '../api/client.js';
 import { FakeBridge } from '../test-support/fakeBridge.js';
+import { fakeDirectoryHandle } from '../test-support/fakeDirectory.js';
+import { createDirectoryHandleStorage, type DirectoryHandleStorage } from '../core/fileSystemAccess.js';
 import { App, shortenPath, type TokenStorage } from './app.js';
 
 class MemoryStorage implements TokenStorage {
@@ -22,6 +24,8 @@ interface Harness {
   readonly doc: Document;
   readonly root: HTMLElement;
   readonly dom: JSDOM;
+  /** Where the handle of the folder of the project is kept. */
+  readonly handleStorage: DirectoryHandleStorage;
 }
 
 interface HarnessOptions {
@@ -41,6 +45,21 @@ interface HarnessOptions {
     readonly title?: string;
     readonly content?: string;
   }[];
+  /**
+   * The kind of storage the project uses.
+   *
+   * `default` means that nothing is stored: the browser chooses, as it does
+   * when the user opens the application for the first time.
+   */
+  readonly mode?: 'service' | 'embedded' | 'filesystem' | 'default';
+  /** True when the browser offers the File System Access API (default: `true`). */
+  readonly fileSystemAvailable?: boolean;
+  /**
+   * False when the application knows nothing about the folder of the project.
+   *
+   * The user is then asked to choose it with the picker of the browser.
+   */
+  readonly folderKnown?: boolean;
 }
 
 function taskContent(id: number, parentId: number | null = null): string {
@@ -112,11 +131,44 @@ async function createHarness(taskCount = 25, options: HarnessOptions = {}): Prom
   if (token !== null) {
     storage.setItem('gnumarus-project-manager.token', token);
   }
+  // The tests work on the project of the service, unless they ask for
+  // another storage.
+  const mode = options.mode ?? 'service';
+  if (mode !== 'default') {
+    storage.setItem('gnumarus-project-manager.mode', mode);
+  }
 
-  const app = new App({ doc, root, api, storage });
+  // The folder of the project, with the files of the project.
+  const handleStorage = createDirectoryHandleStorage();
+  const directory = fakeDirectoryHandle('project');
+  const fake = directory as unknown as { addFile: (path: string, content: string) => void };
+  for (let id = 1; id <= taskCount; id += 1) {
+    fake.addFile(`task_${id}.txt`, taskContent(id));
+  }
+  for (const note of options.notes ?? []) {
+    fake.addFile(
+      `note_${note.id}.txt`,
+      noteContent(note.id, note.title ?? undefined, note.content ?? undefined),
+    );
+  }
+
+  // The browser offers the File System Access API.
+  const fileSystemAvailable = options.fileSystemAvailable !== false;
+  if (fileSystemAvailable) {
+    const win = dom.window as unknown as {
+      showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
+    };
+    win.showDirectoryPicker = async (): Promise<FileSystemDirectoryHandle> => directory;
+  }
+
+  if (options.mode === 'filesystem' && options.folderKnown !== false) {
+    await handleStorage.write(directory);
+  }
+
+  const app = new App({ doc, root, api, storage, handleStorage });
   await app.start();
 
-  return { app, bridge, doc, root, dom };
+  return { app, bridge, doc, root, dom, handleStorage };
 }
 
 async function flush(times = 6): Promise<void> {
@@ -1644,6 +1696,130 @@ describe('the notes', () => {
 
     await openNotes(harness);
     expect(scope?.hasAttribute('hidden')).toBe(false);
+    harness.app.dispose();
+  });
+});
+
+
+describe('the File System Access API', () => {
+  it('is the default when the browser offers it and knows nothing', async () => {
+    const harness = await createHarness(3, { mode: 'default', fileSystemAvailable: true });
+    // The mode is not stored: the browser knows nothing about a project.
+    expect(harness.root.querySelector('.empty-title')?.textContent).toBe(
+      'Choose the folder of your project',
+    );
+    harness.app.dispose();
+  });
+
+  it('asks for the folder of the project', async () => {
+    const harness = await createHarness(3, { mode: 'filesystem', folderKnown: false });
+
+    expect(harness.root.querySelector('.empty-title')?.textContent).toBe(
+      'Choose the folder of your project',
+    );
+    expect(harness.root.querySelector('.empty-message')?.textContent).toContain(
+      'File System Access API',
+    );
+    harness.app.dispose();
+  });
+
+  it('lists the tasks of the folder the user chose', async () => {
+    const harness = await createHarness(3, { mode: 'filesystem' });
+
+    const rows = harness.root.querySelectorAll('.task-table tbody tr');
+    expect(rows).toHaveLength(3);
+    expect(harness.root.querySelector('.project-path')?.textContent).toBe('project');
+    expect(harness.root.querySelector('.result-count')?.textContent).toBe('3 tasks');
+    harness.app.dispose();
+  });
+
+  it('shows the notes of the folder', async () => {
+    const harness = await createHarness(0, {
+      mode: 'filesystem',
+      notes: [{ id: 1, title: 'A note' }],
+    });
+    await openNotes(harness);
+
+    expect(harness.root.querySelectorAll('.note-table tbody tr')).toHaveLength(1);
+    harness.app.dispose();
+  });
+
+  it('opens the picker of the browser to choose a folder', async () => {
+    const harness = await createHarness(2, { mode: 'filesystem', folderKnown: false });
+
+    click(buttonByText(harness.doc, 'Choose folder…'));
+    await flush();
+
+    // The folder is chosen: the tasks of the project are shown.
+    expect(harness.root.querySelectorAll('.task-table tbody tr').length).toBeGreaterThan(0);
+    expect(harness.root.querySelector('.project-path')?.textContent).toBe('project');
+    harness.app.dispose();
+  });
+
+  it('does not need the service', async () => {
+    const harness = await createHarness(3, { mode: 'filesystem' });
+
+    expect(harness.root.querySelector('.service-text')?.textContent).toBe('Service not needed');
+    // The banner of the unreachable service is not shown.
+    expect(harness.root.querySelector('.banner')?.hasAttribute('hidden')).toBe(true);
+    // The token would be useless: the button is hidden.
+    const tokenButton = [...harness.root.querySelectorAll('button')].find(
+      (node) => node.textContent?.trim() === 'API token',
+    );
+    expect(tokenButton === undefined || tokenButton.hasAttribute('hidden')).toBe(true);
+    harness.app.dispose();
+  });
+
+  it('asks for the permission of the folder', async () => {
+    const harness = await createHarness(3, { mode: 'filesystem', folderKnown: false });
+
+    // The browser asks for the permission again.
+    const handle = fakeDirectoryHandle('project') as unknown as {
+      queryPermission?: () => Promise<PermissionState>;
+    };
+    handle.queryPermission = async (): Promise<PermissionState> => 'prompt';
+    await harness.handleStorage.write(handle as unknown as FileSystemDirectoryHandle);
+    await harness.app.start();
+    await flush();
+
+    expect(harness.root.querySelector('.empty-title')?.textContent).toBe(
+      'Give the access to the folder "project"',
+    );
+    expect(harness.root.querySelector('.empty-state button')?.textContent).toBe(
+      'Grant the access',
+    );
+    harness.app.dispose();
+  });
+
+  it('offers the three choices in the dialog of the project', async () => {
+    const harness = await createHarness(0);
+
+    click(buttonByText(harness.doc, 'Project…'));
+    await flush();
+
+    const choices = harness.doc.querySelectorAll('.project-choice');
+    expect(choices).toHaveLength(3);
+    expect(choices[0]?.textContent).toContain('Gnumarus OS Bridge');
+    expect(choices[1]?.textContent).toContain('embedded project');
+    expect(choices[2]?.textContent).toContain('File System Access API');
+    // The test environment offers the File System Access API, but not the
+    // Origin Private File System.
+    expect(choices[1]?.hasAttribute('disabled')).toBe(true);
+    expect(choices[1]?.textContent).toContain('does not offer the Origin Private File System');
+    expect(choices[2]?.hasAttribute('disabled')).toBe(false);
+    harness.app.dispose();
+  });
+
+  it('refuses the choices the browser does not offer', async () => {
+    const harness = await createHarness(0, { fileSystemAvailable: false });
+
+    click(buttonByText(harness.doc, 'Project…'));
+    await flush();
+
+    const choices = harness.doc.querySelectorAll('.project-choice');
+    expect(choices).toHaveLength(3);
+    expect(choices[2]?.hasAttribute('disabled')).toBe(true);
+    expect(choices[2]?.textContent).toContain('does not offer the File System Access API');
     harness.app.dispose();
   });
 });

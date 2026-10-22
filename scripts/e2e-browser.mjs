@@ -303,11 +303,16 @@ async function run() {
   const appUrl = `http://127.0.0.1:${httpPort}/index.html`;
   await session.send('Page.navigate', { url: appUrl });
   await delay(1200);
-  if (token !== null) {
-    await evaluate(`localStorage.setItem('gnumarus-project-manager.token', ${JSON.stringify(token)})`);
-    await session.send('Page.reload', { ignoreCache: true });
-    await delay(1500);
-  }
+
+  // The application works on the project of the service: the kind of storage
+  // is chosen, so the browser does not ask for a folder.
+  const tokenScript =
+    token === null ? '' : `localStorage.setItem('gnumarus-project-manager.token', ${JSON.stringify(token)});`;
+  await evaluate(
+    `${tokenScript} localStorage.setItem('gnumarus-project-manager.mode', 'service');`,
+  );
+  await session.send('Page.reload', { ignoreCache: true });
+  await delay(1500);
 
   await runChecks();
 }
@@ -1343,15 +1348,23 @@ async function checkEmbeddedProject() {
     button.click();
     return true;
   })()`);
-  await waitFor(`document.querySelectorAll('.project-choice').length === 2`);
+  await waitFor(`document.querySelectorAll('.project-choice').length === 3`);
   const choices = await evaluate(
     `[...document.querySelectorAll('.project-choice-title')].map((node) => node.textContent).join(' | ')`,
   );
   check(
-    typeof choices === 'string' && choices.includes('embedded'),
-    'the dialog of the project offers the embedded project',
+    typeof choices === 'string' &&
+      choices.includes('embedded') &&
+      choices.includes('File System Access API'),
+    'the dialog of the project offers the embedded project and the File System Access API',
     String(choices),
   );
+
+  // The browser is a Chromium one: it offers the File System Access API.
+  const fileSystemEnabled = await evaluate(
+    `document.querySelectorAll('.project-choice')[2]?.hasAttribute('disabled') === false`,
+  );
+  check(fileSystemEnabled === true, 'the File System Access API can be chosen');
   await capture('project-dialog');
 
   // --- the switch to the embedded project -----------------------------------
@@ -1421,7 +1434,7 @@ async function checkEmbeddedProject() {
     button.click();
     return true;
   })()`);
-  await waitFor(`document.querySelectorAll('.project-choice').length === 2`);
+  await waitFor(`document.querySelectorAll('.project-choice').length === 3`);
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Download the project');
     button.click();
@@ -1508,7 +1521,7 @@ async function checkEmbeddedProject() {
     button.click();
     return true;
   })()`);
-  await waitFor(`document.querySelectorAll('.project-choice').length === 2`);
+  await waitFor(`document.querySelectorAll('.project-choice').length === 3`);
   await evaluate(`(() => {
     const choices = [...document.querySelectorAll('.project-choice')];
     choices[0].click();

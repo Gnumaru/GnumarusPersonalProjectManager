@@ -615,15 +615,59 @@ to the amount of tasks per page: `notePageSize` in
 
 ## 6. The project of the user
 
-**Files:** `src/core/projectStore.ts`, `src/core/serviceStore.ts`, `src/core/embeddedStore.ts`, `src/core/browserStorage.ts`, `src/core/zip.ts`, `src/ui/projectDialog.ts`
+**Files:** `src/core/projectStore.ts`, `src/core/serviceStore.ts`, `src/core/embeddedStore.ts`, `src/core/browserStorage.ts`, `src/core/fileSystemAccess.ts`, `src/core/fileSystemStore.ts`, `src/core/zip.ts`, `src/ui/projectDialog.ts`
 
-The files of the project can live in two places:
+The files of the project can live in three places:
 
 * **the Gnumarus OS Bridge service**: the files are on the disk of the machine;
-* an **embedded project**: the files are kept in the browser.
+* an **embedded project**: the files are kept in the browser;
+* a **folder of the disk, reached with the File System Access API**: the files
+  are read and written directly by the browser.
 
 The dialog of the project (the button **Project…** of the top bar) chooses
 between them, and offers the export and the import of a ZIP archive.
+
+### The three choices
+
+| Choice | Where the files live | Needs |
+| ------ | -------------------- | ----- |
+| The Gnumarus OS Bridge service | the disk, through the service | the service |
+| An embedded project, in this browser | the OPFS of the browser | the Origin Private File System |
+| File System Access API (Chromium based browsers only) | a folder of the disk, chosen by the user | `window.showDirectoryPicker` |
+
+A choice the browser does not offer is **disabled**: the description says why.
+The test environment (jsdom) offers neither API, so only the service is
+possible there.
+
+### The default of the browser
+
+When the browser knows nothing about a project that was opened before, the
+application chooses the best kind of storage it can offer:
+
+1. the **File System Access API**, when the browser offers it;
+2. the **OPFS**, when the browser offers it;
+3. the **Gnumarus OS Bridge service**, everywhere else.
+
+The choice is kept in the local storage of the browser, under the key
+`gnumarus-project-manager.mode`.
+
+### The File System Access API
+
+The user chooses the folder of the project with the picker of the browser
+(`window.showDirectoryPicker`). The **handle** of the folder is kept in an
+**IndexedDB** database, so the project is still there the next time the page is
+opened. The *permission* is not kept: the browser asks the user again, and the
+application shows a button ("Grant the access") that gives it back.
+
+The API offers no `find` and no `grep`: the listing and the search are done in
+JavaScript, over the entries of the directory. Only the files that are needed
+are read: the metadata of a task is read from the first bytes of its file, so
+the descriptions never reach the memory.
+
+The types of the API are declared in the project
+(`src/types/fileSystemAccess.d.ts`): the DOM library of TypeScript already
+declares the handles, only the picker and the permission methods were missing.
+No dependency was added.
 
 ### The facade
 
@@ -785,12 +829,14 @@ be entered with a double click.
 | `src/core/task.test.ts` | Format, parsing, serialization, round trip, tags, moving a task under another parent. |
 | `src/core/pagination.test.ts` | Page count, clamping, slicing, page information. |
 | `src/core/taskTree.test.ts` | The tree of the tasks: roots, children, orphan tasks, cycles, focus, expansion, search and subtree of a task. |
-| `src/core/config.test.ts` | Configuration parsing and serialization. |
+| `src/core/config.test.ts` | Configuration parsing and serialization, the kind of storage and its default. |
 | `src/api/client.test.ts` | Tagged values, headers, error handling, shell calls, authentication policy of the service (mocked `fetch`). |
 | `src/core/serviceStore.test.ts` | The store of the service against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
 | `src/core/zip.test.ts` | The ZIP archives: the checksum, the round trip, the empty archive, the damaged file and the unicode characters. |
 | `src/core/embeddedStore.test.ts` | The embedded project: the creation of a task, the metadata, the search, the children, the comments, the export and the import. |
 | `src/core/browserStorage.test.ts` | The storage of the browser: the storages the browser offers, and the files it keeps. |
+| `src/core/fileSystemStore.test.ts` | The store over a folder of the disk: the tasks, the comments, the notes, the search, the export and the import. |
+| `src/core/fileSystemAccess.test.ts` | The picker of the browser, the state of the permission and the storage of the handle of the folder. |
 | `src/core/note.test.ts` | The note file format: the names, the parsing, the serialization, the round trip, the search scopes and the summary of the body. |
 | `src/core/markdown.test.ts` | The markdown parser: the headings, the paragraphs, the lists, the quotes, the code blocks, the rules and the inline marks. |
 | `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons) and the pagination bar (jsdom). |
@@ -803,7 +849,7 @@ be entered with a double click.
 | `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
 | `src/ui/markdownView.test.ts` | The rendering of the markdown: the blocks, the inline marks, the safe URLs and the fact that the text of a note is never injected as markup. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
-| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. It also drives the **notes** (the listing, the pagination, the jump to a page, the search scopes, the preview and the creation) and the **embedded project**: the switch, the creation of a task, the export of the ZIP archive and its import. |
+| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. It also drives the **notes** (the listing, the pagination, the jump to a page, the search scopes, the preview and the creation), the **three choices** of the dialog of the project and the **embedded project**: the switch, the creation of a task, the export of the ZIP archive and its import. |
 
 Commands:
 

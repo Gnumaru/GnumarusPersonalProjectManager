@@ -18,11 +18,22 @@ import {
   writeMode,
   clampNotePageSize,
   type AppConfig,
+  type ConfigStorage,
 } from '../core/config.js';
 import { DEFAULT_PAGE_SIZE, computePageInfo, type PageInfo } from '../core/pagination.js';
-import { createBrowserFileStorage } from '../core/browserStorage.js';
+import { createBrowserFileStorage, supportsOpfs } from '../core/browserStorage.js';
 import { EmbeddedProjectStore } from '../core/embeddedStore.js';
 import { ServiceProjectStore } from '../core/serviceStore.js';
+import { FileSystemProjectStore } from '../core/fileSystemStore.js';
+import {
+  checkPermission,
+  createDirectoryHandleStorage,
+  pickProjectDirectory,
+  requestPermission,
+  supportsFileSystemAccess,
+  type DirectoryHandle,
+  type DirectoryHandleStorage,
+} from '../core/fileSystemAccess.js';
 import type { ProjectStore, TaskHierarchy, TaskSummary } from '../core/projectStore.js';
 import { commentFileName, type TaskComment } from '../core/comment.js';
 import {
@@ -96,7 +107,7 @@ export const TOKEN_STORAGE_KEY = 'gnumarus-project-manager.token';
  * `window.localStorage` satisfies it; keeping the contract small avoids
  * depending on the whole `Storage` interface.
  */
-export interface TokenStorage {
+export interface TokenStorage extends ConfigStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 }
@@ -112,6 +123,8 @@ export interface AppOptions {
   readonly api?: ApiClient;
   readonly storage?: TokenStorage;
   readonly tokenStorageKey?: string;
+  /** Where the handle of the folder of the project is kept. */
+  readonly handleStorage?: DirectoryHandleStorage;
 }
 
 const SERVICE_CHECK_INTERVAL_MS = 5000;
@@ -125,6 +138,14 @@ export class App {
   private readonly api: ApiClient;
   private readonly storage: TokenStorage | undefined;
   private readonly tokenStorageKey: string;
+  /** Where the handle of the folder of the project is kept. */
+  private readonly handleStorage: DirectoryHandleStorage;
+  /** The handle of the folder of the project, `null` when there is none. */
+  private fileSystemHandle: DirectoryHandle | null = null;
+  /** The state of the permission of the browser on the folder. */
+  private fileSystemPermission: PermissionState = 'prompt';
+  /** The name of the folder of the project. */
+  private fileSystemDirectoryName: string | null = null;
 
   private token: string | null = null;
   /**
@@ -232,6 +253,12 @@ export class App {
     this.api = options.api ?? new ApiClient();
     this.storage = options.storage;
     this.tokenStorageKey = options.tokenStorageKey ?? TOKEN_STORAGE_KEY;
+    this.handleStorage = options.handleStorage ?? createDirectoryHandleStorage();
+  }
+
+  /** The window of the page, `null` when there is none. */
+  private window(): Window | null {
+    return this.doc.defaultView;
   }
 
   /** Stops the background service watcher. */
@@ -250,11 +277,18 @@ export class App {
     this.token = this.readStoredToken();
     this.api.setToken(this.token);
 
+    // The kind of storage is known before the service is checked: the service
+    // is not needed at all when the project lives in the browser.
+    this.config = { ...this.config, mode: readMode(this.storage, this.window()) };
+
     this.setServiceState('checking');
     await this.checkService();
 
     await this.loadConfig();
     await this.openStore();
+    // The path of the project can be known only once the store is open: the
+    // name of the folder comes from the handle of the browser.
+    this.updateProjectPath();
     await this.refresh();
 
     this.startServiceWatch();
@@ -269,6 +303,10 @@ export class App {
    */
   private async openStore(): Promise<void> {
     const config = this.config;
+    if (config.mode === 'filesystem') {
+      await this.openFileSystemStore();
+      return;
+    }
     if (config.mode === 'embedded') {
       try {
         const storage = await createBrowserFileStorage();
@@ -301,6 +339,32 @@ export class App {
       return;
     }
     this.store = new ServiceProjectStore(this.api, config.projectDir);
+  }
+
+  /**
+   * Opens the folder of the project, reached with the File System Access API.
+   *
+   * The handle of the folder is kept between two visits, but the permission
+   * is not: the browser asks the user again, and the application offers a
+   * button to give the access back.
+   */
+  private async openFileSystemStore(): Promise<void> {
+    const handle = await this.handleStorage.read();
+    if (handle === null) {
+      this.fileSystemHandle = null;
+      this.fileSystemDirectoryName = null;
+      this.fileSystemPermission = 'prompt';
+      this.store = null;
+      return;
+    }
+    this.fileSystemHandle = handle;
+    this.fileSystemDirectoryName = handle.name;
+    this.fileSystemPermission = await checkPermission(handle);
+    if (this.fileSystemPermission !== 'granted') {
+      this.store = null;
+      return;
+    }
+    this.store = new FileSystemProjectStore(handle);
   }
 
   // ---------------------------------------------------------------- layout --
@@ -604,6 +668,12 @@ export class App {
   // -------------------------------------------------------------- service --
 
   private async checkService(): Promise<void> {
+    if (this.config.mode !== 'service') {
+      // The project lives in the browser: the service is not used at all.
+      this.updateAuthUi();
+      this.setServiceState('online');
+      return;
+    }
     const status = await this.api.fetchServiceStatus();
     if (!status.available) {
       this.setServiceState('offline');
@@ -630,14 +700,18 @@ export class App {
    * pill always describes the current policy.
    */
   private updateAuthUi(): void {
-    const tokenIsUseless = this.authRequired === false;
+    // The projects that live in the browser never talk to the service: the
+    // token would be useless.
+    const tokenIsUseless = this.authRequired === false || this.config.mode !== 'service';
     this.tokenButton.toggleAttribute('hidden', tokenIsUseless);
     this.servicePillElement.title =
-      this.authRequired === false
-        ? 'The service accepts every request without an API token.'
-        : this.authRequired === true
-          ? 'The service requires an API token.'
-          : 'The authentication policy of the service is unknown.';
+      this.config.mode !== 'service'
+        ? 'The project lives in the browser: the service is not used.'
+        : this.authRequired === false
+          ? 'The service accepts every request without an API token.'
+          : this.authRequired === true
+            ? 'The service requires an API token.'
+            : 'The authentication policy of the service is unknown.';
   }
 
   private startServiceWatch(): void {
@@ -664,13 +738,30 @@ export class App {
       offline: 'Service unavailable',
       unauthorized: 'Invalid token',
     };
+    if (this.config.mode !== 'service') {
+      // The project lives in the browser: the service is never used.
+      this.serviceTextElement.textContent = 'Service not needed';
+      this.servicePillElement.classList.remove(
+        'state-checking',
+        'state-offline',
+        'state-unauthorized',
+      );
+      this.servicePillElement.classList.add('state-online');
+      this.hideBanner();
+      return;
+    }
     this.serviceTextElement.textContent = labels[state];
 
     if (state === 'offline') {
-      this.showBanner(
-        'The Gnumarus OS Bridge service is not reachable. The application retries automatically every few seconds.',
-        'error',
-      );
+      if (this.config.mode === 'service') {
+        this.showBanner(
+          'The Gnumarus OS Bridge service is not reachable. The application retries automatically every few seconds.',
+          'error',
+        );
+      } else {
+        // The project lives in the browser: the service is not needed.
+        this.hideBanner();
+      }
     } else if (state === 'unauthorized') {
       this.showBanner(
         'The API token was rejected by the Gnumarus OS Bridge service. Open the token dialog and paste the current token.',
@@ -704,8 +795,8 @@ export class App {
   // --------------------------------------------------------------- config --
 
   private async loadConfig(): Promise<void> {
-    const mode = readMode();
-    this.config = await loadConfig(this.api, mode);
+    const mode = readMode(this.storage, this.window());
+    this.config = await loadConfig(this.api, mode, this.storage);
     this.config = { ...this.config, mode };
     this.pageSize = this.config.pageSize;
     this.notePageSize = this.config.notePageSize;
@@ -714,12 +805,16 @@ export class App {
 
   private async persistConfig(): Promise<void> {
     try {
-      await saveConfig(this.api, {
-        mode: this.config.mode,
-        projectDir: this.config.projectDir,
-        pageSize: this.pageSize,
-        notePageSize: this.notePageSize,
-      });
+      await saveConfig(
+        this.api,
+        {
+          mode: this.config.mode,
+          projectDir: this.config.projectDir,
+          pageSize: this.pageSize,
+          notePageSize: this.notePageSize,
+        },
+        this.storage,
+      );
     } catch (error) {
       showToast({
         doc: this.doc,
@@ -738,6 +833,15 @@ export class App {
       return;
     }
     this.chooseFolderButton.removeAttribute('hidden');
+    if (this.config.mode === 'filesystem') {
+      const name = this.fileSystemDirectoryName;
+      this.projectPathElement.textContent = name ?? 'No folder selected';
+      this.projectPathElement.title =
+        name === null
+          ? 'Choose the folder of the project with the picker of the browser.'
+          : `The files of the project live in the folder "${name}" of the disk.`;
+      return;
+    }
     if (projectDir === null) {
       this.projectPathElement.textContent = 'No folder selected';
       this.projectPathElement.title = '';
@@ -756,11 +860,17 @@ export class App {
       mode: this.config.mode,
       projectDir: this.config.projectDir,
       storageName: this.storageName,
+      directoryName: this.fileSystemDirectoryName,
+      opfsAvailable: supportsOpfs(),
+      fileSystemAvailable: supportsFileSystemAccess(this.window()),
       onUseService: () => {
         void this.switchToService();
       },
       onUseEmbedded: () => {
         void this.switchToEmbedded();
+      },
+      onUseFileSystem: () => {
+        void this.switchToFileSystem();
       },
       onChooseFolder: () => {
         void this.openFolderPicker();
@@ -784,7 +894,7 @@ export class App {
    * The embedded project is **not** touched: the user can go back to it.
    */
   private async switchToService(): Promise<void> {
-    writeMode('service');
+    writeMode('service', this.storage);
     this.config = { ...this.config, mode: 'service' };
     await this.persistConfig();
     await this.openStore();
@@ -799,9 +909,68 @@ export class App {
    * imports an archive, the current one is discarded completely.
    */
   private async switchToEmbedded(): Promise<void> {
-    writeMode('embedded');
+    writeMode('embedded', this.storage);
     this.config = { ...this.config, mode: 'embedded' };
     await this.persistConfig();
+    await this.openStore();
+    this.updateProjectPath();
+    await this.refresh();
+  }
+
+  /**
+   * Works on a folder of the disk, reached with the File System Access API.
+   *
+   * The picker of the browser is shown right away: the user chooses the
+   * folder that will hold the files of the project.
+   */
+  private async switchToFileSystem(): Promise<void> {
+    const picked = await this.pickFileSystemDirectory();
+    if (!picked) {
+      // The user closed the picker: nothing changes.
+      return;
+    }
+    writeMode('filesystem', this.storage);
+    this.config = { ...this.config, mode: 'filesystem' };
+    await this.persistConfig();
+    await this.openStore();
+    this.updateProjectPath();
+    await this.refresh();
+  }
+
+  /**
+   * Shows the picker of the browser and keeps the handle of the folder.
+   *
+   * `false` when the user closes the picker without choosing anything.
+   */
+  private async pickFileSystemDirectory(): Promise<boolean> {
+    const handle = await pickProjectDirectory(this.window());
+    if (handle === null) {
+      return false;
+    }
+    await this.handleStorage.write(handle);
+    return true;
+  }
+
+  /**
+   * Asks the browser for the access to the folder of the project.
+   *
+   * The browser only allows it when the user clicks the button.
+   */
+  private async grantFileSystemAccess(): Promise<void> {
+    const handle = this.fileSystemHandle;
+    if (handle === null) {
+      return;
+    }
+    const state = await requestPermission(handle);
+    this.fileSystemPermission = state;
+    if (state !== 'granted') {
+      showToast({
+        doc: this.doc,
+        message: 'The browser did not give the access to the folder of the project.',
+        kind: 'error',
+      });
+      return;
+    }
     await this.openStore();
     this.updateProjectPath();
     await this.refresh();
@@ -847,14 +1016,29 @@ export class App {
   /**
    * Imports a ZIP archive as the embedded project.
    *
-   * The files of the current embedded project are discarded completely.
+   * The files of the current embedded project are discarded completely. When
+   * the project lives in a folder of the disk, the archive replaces the files
+   * of that folder instead.
    */
   private async importProjectArchive(file: File): Promise<void> {
-    writeMode('embedded');
-    this.config = { ...this.config, mode: 'embedded' };
     try {
       const buffer = await file.arrayBuffer();
       const files = readZip(new Uint8Array(buffer));
+
+      if (this.config.mode === 'filesystem' && this.store !== null) {
+        // The files of the folder of the project are replaced.
+        await this.store.replaceAll(files);
+        await this.refresh();
+        showToast({
+          doc: this.doc,
+          message: `The archive was imported (${files.length} files).`,
+          kind: 'success',
+        });
+        return;
+      }
+
+      writeMode('embedded', this.storage);
+      this.config = { ...this.config, mode: 'embedded' };
       const storage = await createBrowserFileStorage();
       this.storageName = storage.name;
       const store = new EmbeddedProjectStore(storage);
@@ -905,7 +1089,10 @@ export class App {
       } else {
         await this.refreshList();
       }
-      this.setServiceState('online');
+      if (this.config.mode === 'service') {
+        // The projects that live in the browser never talk to the service.
+        this.setServiceState('online');
+      }
       this.renderCurrentView();
     } catch (error) {
       this.handleError(error);
@@ -1659,6 +1846,28 @@ export class App {
   /** Shows the message of the empty state, when there is nothing to show. */
   private updateEmptyState(isEmpty: boolean): void {
     const notes = this.viewMode === 'notes';
+    if (this.config.mode === 'filesystem' && this.store === null) {
+      if (this.fileSystemHandle === null) {
+        this.showEmptyState(
+          'Choose the folder of your project',
+          'The File System Access API gives the application the access to a folder of your disk, chosen by you. The application then works without the low level service.',
+          'Choose folder…',
+          () => {
+            void this.openFolderPicker();
+          },
+        );
+      } else {
+        this.showEmptyState(
+          `Give the access to the folder "${this.fileSystemDirectoryName ?? ''}"`,
+          'The browser asks for the access to the folder every time the page is opened.',
+          'Grant the access',
+          () => {
+            void this.grantFileSystemAccess();
+          },
+        );
+      }
+      return;
+    }
     if (!this.hasProject()) {
       this.showEmptyState(
         notes
@@ -1712,6 +1921,9 @@ export class App {
    * the browser: the embedded project has no folder at all.
    */
   private hasProject(): boolean {
+    if (this.config.mode === 'filesystem') {
+      return this.store !== null;
+    }
     return this.config.mode === 'embedded' || this.config.projectDir !== null;
   }
 
@@ -2064,6 +2276,17 @@ export class App {
   }
 
   private async openFolderPicker(): Promise<void> {
+    if (this.config.mode === 'filesystem') {
+      // The picker of the browser: the user chooses the folder of the project.
+      const picked = await this.pickFileSystemDirectory();
+      if (!picked) {
+        return;
+      }
+      await this.openStore();
+      this.updateProjectPath();
+      await this.refresh();
+      return;
+    }
     if (this.token === null && this.authRequired !== false) {
       this.openTokenDialog();
       return;

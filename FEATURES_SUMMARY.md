@@ -117,7 +117,11 @@ list or as a tree.
 
 | Feature | Status | Where |
 | ------- | ------ | ----- |
-| **The files live in the service or in an embedded project (in the browser)** | Done | `src/ui/projectDialog.ts` |
+| **The files live in the service, in an embedded project or in a folder of the disk** | Done | `src/ui/projectDialog.ts` |
+| **The File System Access API: the files live in a folder chosen by the user** | Done | `src/core/fileSystemStore.ts` |
+| **The choices the browser does not offer are disabled** | Done | `src/ui/projectDialog.ts` |
+| **The default is the File System Access API, then the OPFS, then the service** | Done | `src/core/config.ts` |
+| **The application works without the low level service in that mode** | Done | `src/ui/app.ts` |
 | **The embedded project is kept in the OPFS, or in an IndexedDB** | Done | `src/core/browserStorage.ts` |
 | **The project can be downloaded as a ZIP archive** | Done | `src/core/zip.ts` |
 | **A ZIP archive can be imported as the embedded project** | Done | `src/ui/app.ts` |
@@ -143,6 +147,7 @@ list or as a tree.
 | Feature | Status | Where |
 | ------- | ------ | ----- |
 | Strict TypeScript (`strict` plus the strictest extra flags, no `any`) | Done | `tsconfig.json` |
+| The types of the File System Access API are declared in the project, without any dependency | Done | `src/types/fileSystemAccess.d.ts` |
 | Unit tests of the format, the pagination, the tree, the client and the widgets | Done | `src/**/*.test.ts` |
 | Unit tests of the embedded project, of the storage of the browser and of the ZIP archives | Done | `src/core/embeddedStore.test.ts`, `src/core/browserStorage.test.ts`, `src/core/zip.test.ts` |
 | Integration tests against the running bridge (with or without a token) | Done | `src/core/serviceStore.test.ts` |

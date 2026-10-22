@@ -2005,6 +2005,17 @@ input[type='date'] {
   background: var(--bg-hover);
 }
 
+.project-choice:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  background: var(--bg-subtle);
+  border-style: dashed;
+}
+
+.project-choice:disabled .project-choice-title {
+  color: var(--text-faint);
+}
+
 .project-choice.is-active {
   border-color: var(--accent);
   background: var(--accent-soft);

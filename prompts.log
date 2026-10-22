@@ -61,6 +61,7 @@ alem disso, os ids de todos os arquivos devem ser guardados dentro do proprio ar
 ====
 crie um novo backend de armazenamento de arquivos do projeto usando a "File System Access API" (antigamente chamada Native File System API) do navegador (nao confundir com a antiga "FileSystem API" de 2010 que já foi depreciada e removida). na modal que permite escolher o backend de armazenamento, que hoje exibe duas opcoes "gnumarus os bridge" e "embedded project", deve haver uma terceira opcao "file system access api (chromium based browsers only)". quando o usuário escolher essa opção o app utilizara um novo backend de armazenamento que ira manipular arquivos em disco diretamente no diretório escolhido pelo usuário usando a "file system access api". esta opcao deve estar desabilitada caso o navegador nao possua essa api. a opcao de OPFS tambem deve estar desabilitada caso o usuario nao possua essa api. a opcao padrao ao abrir o app, caso o navegador nao tenha informacoes sobre nenhum projeto anteriormente aberto, deve ser file system access api caso a api esteja disponivel. se nao, deve ser opfs caso a api esteja disponivel. se não, deve ser o gnumarus os bridge.
 ====
+crie um arquivo README.md na raiz do projeto explicando o que é o projeto, suas funcionalidades e como utilizar. escreva em ingles americano. nao use emojis.
 ====
 ====
 ====

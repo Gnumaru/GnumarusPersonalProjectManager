@@ -3,10 +3,28 @@ import {
   DEFAULT_CONFIG,
   MAX_NOTE_PAGE_SIZE,
   MIN_NOTE_PAGE_SIZE,
+  MODE_STORAGE_KEY,
   clampNotePageSize,
+  defaultMode,
+  isProjectKind,
   parseConfig,
+  readMode,
   serializeConfig,
+  writeMode,
 } from './config.js';
+
+/** A storage of the configuration, in memory. */
+class MemoryStorage {
+  private readonly values = new Map<string, string>();
+
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null;
+  }
+
+  setItem(key: string, value: string): void {
+    this.values.set(key, value);
+  }
+}
 
 describe('parseConfig', () => {
   it('reads a valid configuration', () => {
@@ -47,6 +65,42 @@ describe('clampNotePageSize', () => {
     expect(clampNotePageSize(101)).toBe(100);
     expect(clampNotePageSize(Number.NaN)).toBe(10);
     expect(clampNotePageSize(25.7)).toBe(25);
+  });
+});
+
+describe('the kind of storage', () => {
+  it('knows the three kinds', () => {
+    expect(isProjectKind('service')).toBe(true);
+    expect(isProjectKind('embedded')).toBe(true);
+    expect(isProjectKind('filesystem')).toBe(true);
+    expect(isProjectKind('other')).toBe(false);
+  });
+
+  it('remembers the kind the user chose', () => {
+    const storage = new MemoryStorage();
+
+    writeMode('filesystem', storage);
+    expect(storage.getItem(MODE_STORAGE_KEY)).toBe('filesystem');
+    expect(readMode(storage)).toBe('filesystem');
+
+    writeMode('embedded', storage);
+    expect(readMode(storage)).toBe('embedded');
+  });
+
+  it('chooses the default when the browser knows nothing', () => {
+    const storage = new MemoryStorage();
+    // The window offers neither API: the service is the last choice.
+    expect(readMode(storage, null)).toBe('service');
+    expect(defaultMode(null)).toBe('service');
+  });
+
+  it('prefers the File System Access API, then the OPFS', () => {
+    const withPicker = {} as Window;
+    withPicker.showDirectoryPicker = async (): Promise<FileSystemDirectoryHandle> =>
+      ({}) as FileSystemDirectoryHandle;
+
+    // The File System Access API comes first.
+    expect(defaultMode(withPicker)).toBe('filesystem');
   });
 });
 
