@@ -36,12 +36,29 @@ export interface BrowserFileStorage {
 const DATABASE_NAME = 'gnumarus-project-manager';
 const DATABASE_STORE = 'files';
 
-/** True when the browser offers the Origin Private File System. */
-export function supportsOpfs(): boolean {
-  return (
-    typeof navigator !== 'undefined' &&
-    typeof navigator.storage?.getDirectory === 'function'
-  );
+/** The window of the page, `null` when there is none. */
+function globalWindow(): Window | null {
+  try {
+    return typeof window === 'undefined' ? null : window;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when the browser offers the Origin Private File System.
+ *
+ * The window is a parameter, so the check can be made on any page: the
+ * application always passes the window of the page.
+ */
+export function supportsOpfs(win: Window | null = globalWindow()): boolean {
+  const nav = win?.navigator;
+  if (nav === undefined) {
+    return false;
+  }
+  // The property is missing in the browsers that do not know the OPFS.
+  const storage = nav.storage as StorageManager | undefined;
+  return typeof storage?.getDirectory === 'function';
 }
 
 /** True when the browser offers an IndexedDB database. */
@@ -50,10 +67,12 @@ export function supportsIndexedDb(): boolean {
 }
 
 /** Creates the best storage the browser offers. */
-export async function createBrowserFileStorage(): Promise<BrowserFileStorage> {
-  if (supportsOpfs()) {
+export async function createBrowserFileStorage(
+  win: Window | null = globalWindow(),
+): Promise<BrowserFileStorage> {
+  if (supportsOpfs(win)) {
     try {
-      return new OpfsFileStorage();
+      return new OpfsFileStorage(win);
     } catch {
       // The OPFS is there but it refused to open: fall back to IndexedDB.
     }
@@ -69,8 +88,25 @@ class OpfsFileStorage implements BrowserFileStorage {
   readonly name = 'OPFS';
   readonly persistent = true;
 
+  /** The window of the page, the one that holds the storage. */
+  private readonly win: Window | null;
+
+  constructor(win: Window | null) {
+    this.win = win;
+  }
+
+  /**
+   * The root of the Origin Private File System.
+   *
+   * The files of the project live at its root: the paths of the project are
+   * the paths of the files, relative to it.
+   */
   private async root(): Promise<FileSystemDirectoryHandle> {
-    return navigator.storage.getDirectory();
+    const nav = this.win?.navigator;
+    if (nav === undefined) {
+      throw new Error('The browser does not offer the Origin Private File System.');
+    }
+    return nav.storage.getDirectory();
   }
 
   /** The directory that holds a file, `null` when it does not exist. */
@@ -267,7 +303,7 @@ class IndexedDbFileStorage implements BrowserFileStorage {
  * only way to keep it.
  */
 class MemoryFileStorage implements BrowserFileStorage {
-  readonly name = 'the memory of the page (the project is lost when the page is closed)';
+  readonly name = 'the memory of the page';
   readonly persistent = false;
 
   private readonly files = new Map<string, string>();

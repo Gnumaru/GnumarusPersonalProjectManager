@@ -101,6 +101,17 @@ describe('the kind of storage', () => {
 
     // The File System Access API comes first.
     expect(defaultMode(withPicker)).toBe('filesystem');
+
+    // The Origin Private File System comes next.
+    const withOpfs = {
+      navigator: {
+        storage: {
+          getDirectory: async (): Promise<FileSystemDirectoryHandle> =>
+            ({}) as FileSystemDirectoryHandle,
+        },
+      },
+    } as unknown as Window;
+    expect(defaultMode(withOpfs)).toBe('embedded');
   });
 });
 

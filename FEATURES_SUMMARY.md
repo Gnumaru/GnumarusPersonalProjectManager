@@ -123,6 +123,8 @@ list or as a tree.
 | **The default is the File System Access API, then the OPFS, then the service** | Done | `src/core/config.ts` |
 | **The application works without the low level service in that mode** | Done | `src/ui/app.ts` |
 | **The embedded project is kept in the OPFS, or in an IndexedDB** | Done | `src/core/browserStorage.ts` |
+| **The embedded project needs no folder: the OPFS is the root of the project** | Done | `src/core/browserStorage.ts` |
+| **The tasks and the notes are created right away in the embedded project** | Done | `src/ui/app.ts` |
 | **The project can be downloaded as a ZIP archive** | Done | `src/core/zip.ts` |
 | **A ZIP archive can be imported as the embedded project** | Done | `src/ui/app.ts` |
 | **One storage facade for the service and for the browser** | Done | `src/core/projectStore.ts` |

@@ -107,7 +107,7 @@ export function defaultMode(win: Window | null = null): ProjectKind {
   if (supportsFileSystemAccess(win ?? globalWindow())) {
     return 'filesystem';
   }
-  if (supportsOpfs()) {
+  if (supportsOpfs(win ?? globalWindow())) {
     return 'embedded';
   }
   return 'service';

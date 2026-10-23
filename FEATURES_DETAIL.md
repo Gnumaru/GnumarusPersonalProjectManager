@@ -179,7 +179,9 @@ title before saving. Errors raised by the service are shown inside the dialog
 instead of closing it.
 
 The same actions work the same way with the **embedded project**: the store of
-the browser writes the very same files, in the very same format.
+the browser writes the very same files, in the very same format. The embedded
+project needs **no folder**: the guard of the creation of a task follows the
+store (is it open?), not the folder of the service.
 
 ---
 
@@ -691,6 +693,12 @@ The **Origin Private File System** is used when the browser offers it: it is a
 real file system, the paths of the project are kept as they are and the export
 to a ZIP archive is a straight copy.
 
+The **root of the OPFS is the root of the project**: `task_1.txt` and
+`note_1.txt` live at its root, and there is **no folder to choose**. The
+embedded project is therefore ready as soon as the application is opened: the
+button **New task** opens the editor right away, and the path of the project
+shows the name of the storage (`Embedded project (OPFS)`).
+
 When the OPFS is not available (an old browser, a page that is not in a secure
 context), the files fall back to an **IndexedDB** database, which stores the
 same paths and the same contents.
@@ -834,7 +842,7 @@ be entered with a double click.
 | `src/core/serviceStore.test.ts` | The store of the service against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
 | `src/core/zip.test.ts` | The ZIP archives: the checksum, the round trip, the empty archive, the damaged file and the unicode characters. |
 | `src/core/embeddedStore.test.ts` | The embedded project: the creation of a task, the metadata, the search, the children, the comments, the export and the import. |
-| `src/core/browserStorage.test.ts` | The storage of the browser: the storages the browser offers, and the files it keeps. |
+| `src/core/browserStorage.test.ts` | The storage of the browser: the storages the browser offers, the detection of the OPFS and the files it keeps at its root. |
 | `src/core/fileSystemStore.test.ts` | The store over a folder of the disk: the tasks, the comments, the notes, the search, the export and the import. |
 | `src/core/fileSystemAccess.test.ts` | The picker of the browser, the state of the permission and the storage of the handle of the folder. |
 | `src/core/note.test.ts` | The note file format: the names, the parsing, the serialization, the round trip, the search scopes and the summary of the body. |
@@ -849,7 +857,7 @@ be entered with a double click.
 | `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
 | `src/ui/markdownView.test.ts` | The rendering of the markdown: the blocks, the inline marks, the safe URLs and the fact that the text of a note is never injected as markup. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
-| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. It also drives the **notes** (the listing, the pagination, the jump to a page, the search scopes, the preview and the creation), the **three choices** of the dialog of the project and the **embedded project**: the switch, the creation of a task, the export of the ZIP archive and its import. |
+| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. It also drives the **notes** (the listing, the pagination, the jump to a page, the search scopes, the preview and the creation), the **three choices** of the dialog of the project and the **embedded project**: the switch, the creation of a task, the export of the ZIP archive, its import and the **cold start** (the application opened on the embedded project asks for no folder and creates a task). |
 
 Commands:
 

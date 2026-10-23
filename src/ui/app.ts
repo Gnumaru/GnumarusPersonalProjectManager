@@ -309,7 +309,7 @@ export class App {
     }
     if (config.mode === 'embedded') {
       try {
-        const storage = await createBrowserFileStorage();
+        const storage = await createBrowserFileStorage(this.window());
         this.storageName = storage.name;
         const store = new EmbeddedProjectStore(storage);
         await store.load();
@@ -827,8 +827,13 @@ export class App {
   private updateProjectPath(): void {
     const projectDir = this.config.projectDir;
     if (this.config.mode === 'embedded') {
-      this.projectPathElement.textContent = 'Embedded project';
-      this.projectPathElement.title = 'The files of the project are kept in this browser.';
+      const storage = this.storageName;
+      this.projectPathElement.textContent =
+        storage === null ? 'Embedded project' : `Embedded project (${storage})`;
+      this.projectPathElement.title =
+        storage === null
+          ? 'The files of the project are kept in this browser.'
+          : `The files of the project are kept in this browser, at the root of the ${storage}.`;
       this.chooseFolderButton.setAttribute('hidden', 'hidden');
       return;
     }
@@ -861,7 +866,7 @@ export class App {
       projectDir: this.config.projectDir,
       storageName: this.storageName,
       directoryName: this.fileSystemDirectoryName,
-      opfsAvailable: supportsOpfs(),
+      opfsAvailable: supportsOpfs(this.window()),
       fileSystemAvailable: supportsFileSystemAccess(this.window()),
       onUseService: () => {
         void this.switchToService();
@@ -895,6 +900,15 @@ export class App {
    */
   private async switchToService(): Promise<void> {
     writeMode('service', this.storage);
+    // The folder of the project of the service lives in the configuration file
+    // of the machine: it is read again when the memory does not hold it, so
+    // the folder that was chosen before is restored.
+    if (this.config.projectDir === null) {
+      const stored = await loadConfig(this.api, 'service', this.storage);
+      if (stored.projectDir !== null) {
+        this.config = { ...this.config, projectDir: stored.projectDir };
+      }
+    }
     this.config = { ...this.config, mode: 'service' };
     await this.persistConfig();
     await this.openStore();
@@ -910,6 +924,9 @@ export class App {
    */
   private async switchToEmbedded(): Promise<void> {
     writeMode('embedded', this.storage);
+    // The embedded project has no folder of its own: its files live at the
+    // root of the storage of the browser. The folder of the service is kept
+    // in the memory, so the user finds it again when it comes back.
     this.config = { ...this.config, mode: 'embedded' };
     await this.persistConfig();
     await this.openStore();
@@ -930,6 +947,9 @@ export class App {
       return;
     }
     writeMode('filesystem', this.storage);
+    // The folder of the project is the one of the picker of the browser: the
+    // folder of the service is kept in the memory, so the user finds it again
+    // when it comes back.
     this.config = { ...this.config, mode: 'filesystem' };
     await this.persistConfig();
     await this.openStore();
@@ -1039,7 +1059,7 @@ export class App {
 
       writeMode('embedded', this.storage);
       this.config = { ...this.config, mode: 'embedded' };
-      const storage = await createBrowserFileStorage();
+      const storage = await createBrowserFileStorage(this.window());
       this.storageName = storage.name;
       const store = new EmbeddedProjectStore(storage);
       await store.replaceAll(files);
@@ -1869,6 +1889,19 @@ export class App {
       return;
     }
     if (!this.hasProject()) {
+      if (this.config.mode === 'embedded') {
+        // The files of the embedded project live in the browser: there is no
+        // folder to choose, the storage itself refused to open.
+        this.showEmptyState(
+          'The storage of the browser is not available',
+          'The files of the project live at the root of the storage of the browser. It refused to open, so the project cannot be used for now.',
+          'Try again',
+          () => {
+            void this.reloadProject();
+          },
+        );
+        return;
+      }
       this.showEmptyState(
         notes
           ? 'Choose the folder that will hold your notes'
@@ -1897,8 +1930,11 @@ export class App {
       return;
     }
     if (isEmpty) {
+      // The embedded project has no folder: its files live at the root of the
+      // storage of the browser.
+      const place = this.config.mode === 'embedded' ? 'The project' : 'This folder';
       this.showEmptyState(
-        notes ? 'This folder does not contain any note yet' : 'This folder does not contain any task yet',
+        notes ? `${place} does not contain any note yet` : `${place} does not contain any task yet`,
         notes ? 'Create the first note to get started.' : 'Create the first task to get started.',
         notes ? 'New note' : 'New task',
         () => {
@@ -1917,14 +1953,41 @@ export class App {
   /**
    * True when the project is ready to be used.
    *
-   * The service mode needs a folder, the embedded mode needs the storage of
-   * the browser: the embedded project has no folder at all.
+   * The **store** is the only thing that matters: the service mode needs a
+   * folder, the File System Access mode needs the handle of a folder and the
+   * embedded mode needs the storage of the browser.
+   *
+   * The embedded project has **no folder at all**: its files live at the root
+   * of the storage of the browser (the OPFS when the browser offers it), so
+   * the user is never asked for a folder in that mode.
    */
   private hasProject(): boolean {
+    return this.store !== null;
+  }
+
+  /**
+   * Tells the user why the project cannot be used yet.
+   *
+   * The message depends on the kind of storage: only the service mode asks
+   * for a folder.
+   */
+  private reportMissingProject(): void {
+    let message: string;
     if (this.config.mode === 'filesystem') {
-      return this.store !== null;
+      message = 'Choose the folder of the project first.';
+    } else if (this.config.mode === 'embedded') {
+      message = 'The storage of the browser is not available.';
+    } else {
+      message = 'Choose a project folder first.';
     }
-    return this.config.mode === 'embedded' || this.config.projectDir !== null;
+    showToast({ doc: this.doc, message, kind: 'error' });
+  }
+
+  /** Opens the storage of the project again, after a failure. */
+  private async reloadProject(): Promise<void> {
+    await this.openStore();
+    this.updateProjectPath();
+    await this.refresh();
   }
 
   /** Keeps the state of the toolbar in sync with the current view. */
@@ -2316,8 +2379,8 @@ export class App {
   }
 
   private openCreateDialog(parent?: Task): void {
-    if (this.config.projectDir === null) {
-      showToast({ doc: this.doc, message: 'Choose a project folder first.', kind: 'error' });
+    if (!this.hasProject()) {
+      this.reportMissingProject();
       return;
     }
     const dialog = new TaskDialog({
@@ -2494,7 +2557,7 @@ export class App {
   /** Opens the editor of a new note. */
   private openNoteCreateDialog(): void {
     if (!this.hasProject()) {
-      showToast({ doc: this.doc, message: 'Choose a project folder first.', kind: 'error' });
+      this.reportMissingProject();
       return;
     }
     const dialog = new NoteDialog({
@@ -2699,7 +2762,7 @@ export class App {
       this.searchInput.select();
       return;
     }
-    if (!isTyping && event.key === '/' && this.config.projectDir !== null) {
+    if (!isTyping && event.key === '/' && this.hasProject()) {
       event.preventDefault();
       this.searchInput.focus();
     }

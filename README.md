@@ -68,7 +68,7 @@ The application requires a folder for the project. Choose it with **Choose folde
 The **Project...** button opens a dialog that chooses the storage backend:
 
 - **The Gnumarus OS Bridge service** (default when nothing is known): files live on the disk and are reached through the REST API at `http://127.0.0.1:1423`
-- **An embedded project, in this browser**: the project lives in the browser (OPFS with IndexedDB fallback); only one embedded project can exist at a time
+- **An embedded project, in this browser**: the project lives in the browser (OPFS with IndexedDB fallback); only one embedded project can exist at a time. It needs no folder: the root of the storage is the root of the project
 - **File System Access API (Chromium based browsers only)**: files live in a folder chosen by you; the browser asks for access and the application works without the service
 
 In the embedded and File System Access modes, a ZIP archive can be downloaded (the files are byte-identical to the disk format) and imported (replacing the whole project).
@@ -80,11 +80,17 @@ The service status pill at the top right shows whether the service is online. Wh
 ```bash
 npm install
 npm run build
-npm run verify        # typecheck, 364 tests, build, smoke E2E, browser E2E (86 checks)
+npm run verify        # typecheck, 373 tests, build, smoke E2E, browser E2E (92 checks)
 npm run deploy        # builds and copies dist to /var/www/html/GnumarusProjectManager
 ```
 
 The build command produces `dist/`, which is copied to `/var/www/html/GnumarusProjectManager`. The application works at the domain root (`http://localhost/`) or at a nested path (`http://localhost/my/app/`) because it uses relative asset URLs (`base: './'` in `vite.config.ts`).
+
+## How to use the embedded project
+
+The embedded project is the default in the browsers that do not offer the File System Access API (Firefox, Safari), as long as they offer the Origin Private File System. It needs no folder: the files of the project (`task_<id>.txt`, `note_<id>.txt`) live at the root of the storage of the browser, and the tasks and the notes are created right away.
+
+The top bar shows `Embedded project (OPFS)` when the OPFS holds the files, `Embedded project (IndexedDB)` when the browser offers no OPFS, and the application warns the user when the files can only live in the memory of the page.
 
 ## How to use the File System Access API mode
 
@@ -107,7 +113,7 @@ Every feature has tests:
 - `src/core/fileSystemStore.test.ts` — the File System Access store
 - `src/core/fileSystemAccess.test.ts` — the picker, the permission and the handle storage
 - `src/ui/app.test.ts` — the whole application with the fake bridge
-- `scripts/e2e-browser.mjs` — real headless Chrome, 86 checks (service, embedded, notes, File System Access API)
+- `scripts/e2e-browser.mjs` — real headless Chrome, 92 checks (service, embedded, notes, File System Access API)
 - `scripts/e2e-smoke.sh` — headless Chrome renders the built app at root and at a nested path
 
 ## License

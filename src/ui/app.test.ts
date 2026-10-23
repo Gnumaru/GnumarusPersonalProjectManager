@@ -26,6 +26,8 @@ interface Harness {
   readonly dom: JSDOM;
   /** Where the handle of the folder of the project is kept. */
   readonly handleStorage: DirectoryHandleStorage;
+  /** The root of the Origin Private File System. */
+  readonly opfs: FileSystemDirectoryHandle;
 }
 
 interface HarnessOptions {
@@ -152,6 +154,26 @@ async function createHarness(taskCount = 25, options: HarnessOptions = {}): Prom
     );
   }
 
+  // The browser offers the Origin Private File System: the files of the
+  // embedded project live at its root.
+  const opfsRoot = fakeDirectoryHandle('opfs');
+  const opfs = opfsRoot as unknown as { addFile: (path: string, content: string) => void };
+  for (let id = 1; id <= taskCount; id += 1) {
+    opfs.addFile(`task_${id}.txt`, taskContent(id));
+  }
+  for (const note of options.notes ?? []) {
+    opfs.addFile(
+      `note_${note.id}.txt`,
+      noteContent(note.id, note.title ?? undefined, note.content ?? undefined),
+    );
+  }
+  Object.defineProperty(dom.window.navigator, 'storage', {
+    configurable: true,
+    value: {
+      getDirectory: async (): Promise<FileSystemDirectoryHandle> => opfsRoot,
+    },
+  });
+
   // The browser offers the File System Access API.
   const fileSystemAvailable = options.fileSystemAvailable !== false;
   if (fileSystemAvailable) {
@@ -168,7 +190,7 @@ async function createHarness(taskCount = 25, options: HarnessOptions = {}): Prom
   const app = new App({ doc, root, api, storage, handleStorage });
   await app.start();
 
-  return { app, bridge, doc, root, dom, handleStorage };
+  return { app, bridge, doc, root, dom, handleStorage, opfs: opfsRoot };
 }
 
 async function flush(times = 6): Promise<void> {
@@ -1701,6 +1723,133 @@ describe('the notes', () => {
 });
 
 
+
+describe('the embedded project', () => {
+  it('is the default when the browser offers the OPFS and knows nothing', async () => {
+    // The browser does not offer the File System Access API: the OPFS comes
+    // first, then the service.
+    const harness = await createHarness(0, { mode: 'default', fileSystemAvailable: false });
+
+    // The project needs no folder: the files live at the root of the storage
+    // of the browser.
+    expect(harness.root.querySelector('.empty-title')?.textContent).toBe(
+      'The project does not contain any task yet',
+    );
+    expect(harness.root.querySelector('.project-path')?.textContent).toContain('Embedded project');
+    harness.app.dispose();
+  });
+
+  it('creates a task without asking for a folder', async () => {
+    const harness = await createHarness(0, { mode: 'embedded' });
+
+    click(buttonByText(harness.doc, 'New task'));
+    await flush();
+
+    // The editor of the task opens: there is no folder to choose in the
+    // embedded mode.
+    expect(harness.doc.querySelector('#task-title')).not.toBeNull();
+    expect(harness.root.querySelector('.toast-message')?.textContent).toBeUndefined();
+    harness.app.dispose();
+  });
+
+  it('creates a note without asking for a folder', async () => {
+    const harness = await createHarness(0, { mode: 'embedded' });
+    await openNotes(harness);
+
+    click(buttonByText(harness.doc, 'New note'));
+    await flush();
+
+    expect(harness.doc.querySelector('#note-title')).not.toBeNull();
+    harness.app.dispose();
+  });
+
+  it('writes the files of the project at the root of the OPFS', async () => {
+    const harness = await createHarness(0, { mode: 'embedded' });
+
+    click(buttonByText(harness.doc, 'New task'));
+    await flush();
+    const title = harness.doc.querySelector<HTMLInputElement>('#task-title');
+    expect(title).not.toBeNull();
+    if (title === null) {
+      harness.app.dispose();
+      return;
+    }
+    title.value = 'A task of the embedded project';
+    click(buttonByText(harness.doc, 'Create task'));
+    await flush();
+
+    // The file of the task lives at the root of the storage of the browser.
+    const root = harness.opfs as unknown as { read: (path: string) => string | null };
+    const content = root.read('task_1.txt');
+    expect(content).toContain('id=1');
+    expect(content).toContain('title=A task of the embedded project');
+    harness.app.dispose();
+  });
+
+  it('shows the name of the storage of the browser', async () => {
+    const harness = await createHarness(0, { mode: 'embedded' });
+
+    // The test environment offers the OPFS.
+    expect(harness.root.querySelector('.project-path')?.textContent).toBe(
+      'Embedded project (OPFS)',
+    );
+    const path = harness.root.querySelector('.project-path');
+    expect(path?.getAttribute('title')).toContain('root of the');
+    harness.app.dispose();
+  });
+
+  it('does not ask for a folder in the empty state', async () => {
+    const harness = await createHarness(0, { mode: 'embedded' });
+
+    const button = harness.root.querySelector('.empty-state button');
+    expect(button?.textContent).toBe('New task');
+    expect(button?.textContent).not.toContain('folder');
+    harness.app.dispose();
+  });
+
+  it('finds the folder of the service in the configuration file', async () => {
+    const harness = await createHarness(0, {
+      mode: 'embedded',
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+
+    // The user works on the project of the service: the folder is read again
+    // from the configuration file of the machine.
+    click(buttonByText(harness.doc, 'Project…'));
+    await flush();
+    const choices = harness.doc.querySelectorAll('.project-choice');
+    click(choices[0] ?? null);
+    await flush();
+
+    expect(harness.root.querySelector('.project-path')?.textContent).toBe('/home/user/projects');
+    harness.app.dispose();
+  });
+
+  it('keeps the folder of the service when it comes back', async () => {
+    const harness = await createHarness(0, { mode: 'service' });
+    await selectFolder(harness);
+    const folder = harness.root.querySelector('.project-path')?.textContent;
+    expect(folder).not.toBeNull();
+
+    // The user works on the embedded project.
+    click(buttonByText(harness.doc, 'Project…'));
+    await flush();
+    const choices = harness.doc.querySelectorAll('.project-choice');
+    click(choices[1] ?? null);
+    await flush();
+    expect(harness.root.querySelector('.project-path')?.textContent).toContain('Embedded project');
+
+    // The user comes back to the service: the folder is still there.
+    click(buttonByText(harness.doc, 'Project…'));
+    await flush();
+    const again = harness.doc.querySelectorAll('.project-choice');
+    click(again[0] ?? null);
+    await flush();
+    expect(harness.root.querySelector('.project-path')?.textContent).toBe(folder);
+    harness.app.dispose();
+  });
+});
+
 describe('the File System Access API', () => {
   it('is the default when the browser offers it and knows nothing', async () => {
     const harness = await createHarness(3, { mode: 'default', fileSystemAvailable: true });
@@ -1802,10 +1951,8 @@ describe('the File System Access API', () => {
     expect(choices[0]?.textContent).toContain('Gnumarus OS Bridge');
     expect(choices[1]?.textContent).toContain('embedded project');
     expect(choices[2]?.textContent).toContain('File System Access API');
-    // The test environment offers the File System Access API, but not the
-    // Origin Private File System.
-    expect(choices[1]?.hasAttribute('disabled')).toBe(true);
-    expect(choices[1]?.textContent).toContain('does not offer the Origin Private File System');
+    // The test environment offers both APIs: every choice is possible.
+    expect(choices[1]?.hasAttribute('disabled')).toBe(false);
     expect(choices[2]?.hasAttribute('disabled')).toBe(false);
     harness.app.dispose();
   });

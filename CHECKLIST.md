@@ -404,3 +404,33 @@
 ### Build / deploy
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
+## Batch 12 - The embedded project works without a folder
+
+### Core
+- [x] `src/ui/app.ts` - `hasProject()` follows the store, not the folder
+- [x] `src/ui/app.ts` - the creation of a task and of a note asks for the
+      project, not for a folder
+- [x] `src/ui/app.ts` - the message of the error depends on the kind of
+      storage
+- [x] `src/ui/app.ts` - the empty state and the path of the project of the
+      embedded project speak of the storage of the browser
+- [x] `src/ui/app.ts` - the shortcut `/` works in every kind of storage
+- [x] `src/ui/app.ts` - the folder of the service survives a switch to the
+      embedded project and back
+- [x] `src/core/browserStorage.ts` - the detection of the OPFS takes the
+      window of the page
+
+### Tests
+- [x] `src/ui/app.test.ts` - the embedded project creates a task and a note
+      without a folder, and the file lives at the root of the OPFS
+- [x] `src/core/browserStorage.test.ts` - the detection of the OPFS and the
+      files of the project at its root
+- [x] `src/core/config.test.ts` - the OPFS is the default when the browser
+      offers it
+- [x] `scripts/e2e-browser.mjs` - the application started on the embedded
+      project asks for no folder and creates a task
+
+### Build / deploy
+- [x] `npm run verify`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`

@@ -299,6 +299,8 @@ method, without compression), so no dependency is needed.
     paginated.
 27. [x] The File System Access API: a third kind of storage, the files live in
     a folder of the disk chosen by the user, without the low level service.
+28. [x] The embedded project works without a folder: the OPFS is the root of
+    the project and the tasks and the notes are created right away.
 
 ## Batch 10 - The notes
 
@@ -393,6 +395,44 @@ The store of this backend (`FileSystemProjectStore`) reads and writes the files
 directly. The API offers no `find` and no `grep`: the listing and the search
 are done in JavaScript, over the entries of the directory, and only the files
 that are needed are read.
+
+## Batch 12 - The embedded project works without a folder
+
+### The problem
+
+When the browser does not offer the File System Access API (Firefox, Safari),
+the default kind of storage is the **embedded project**: the files live at the
+root of the Origin Private File System. The embedded project has **no folder**
+of its own, so the user is never asked for one.
+
+But the guard of the creation of a task asked for a folder
+(`config.projectDir === null`), and the folder of the service mode is `null`
+in the embedded mode. The button **New task** therefore always answered
+"Choose a project folder first.", and there was no way to choose a folder of
+the OPFS: the embedded project was unusable.
+
+### The fix
+
+* `hasProject()` is now the single source of truth: the **store** is open.
+  The embedded project counts as a project, because it has its own storage.
+* The creation of a task and of a note asks for `hasProject()`, not for a
+  folder. The message of the error depends on the kind of storage.
+* The empty state of the embedded project offers **New task** (and not
+  "Choose folder…"), and it does not speak of a folder.
+* The path of the project shows the name of the storage of the browser
+  (`Embedded project (OPFS)`), so the user sees where the files are.
+* The shortcut `/` focuses the search in every kind of storage.
+* The folder of the service is kept in the memory when the user goes to the
+  embedded project, and it is read again from the configuration file of the
+  machine when the user comes back.
+
+### The Origin Private File System is the root of the project
+
+The paths of the project are the paths of the files, relative to the root of
+the OPFS: `task_1.txt` and `note_1.txt` live at its root. The detection of
+the API takes the window of the page as a parameter (`supportsOpfs(win)`), like
+the one of the File System Access API, so the storage of the browser can be
+exercised by the test suite.
 
 ## Verification commands
 

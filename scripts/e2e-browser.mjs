@@ -1157,6 +1157,7 @@ async function runChecks() {
 
   await checkNotes();
   await checkEmbeddedProject();
+  await checkEmbeddedColdStart();
 }
 
 /**
@@ -1374,8 +1375,15 @@ async function checkEmbeddedProject() {
     choices[1].click();
     return true;
   })()`);
-  await waitFor(`document.querySelector('.project-path')?.textContent === 'Embedded project'`);
-  check(true, 'the project is now the embedded project');
+  await waitFor(
+    `document.querySelector('.project-path')?.textContent?.startsWith('Embedded project') === true`,
+  );
+  const embeddedPath = await evaluate(`document.querySelector('.project-path')?.textContent`);
+  check(
+    typeof embeddedPath === 'string' && embeddedPath.includes('OPFS'),
+    'the project is now the embedded project, at the root of the OPFS',
+    String(embeddedPath),
+  );
 
   const folderPickerHidden = await evaluate(`(() => {
     const button = [...document.querySelectorAll('.topbar-project button')]
@@ -1531,6 +1539,91 @@ async function checkEmbeddedProject() {
   const serviceRows = await evaluate(`document.querySelectorAll('.task-table tbody tr').length`);
   check(serviceRows === 10, 'the tasks of the service are shown again', `got ${serviceRows}`);
   await evaluate(`document.querySelector('.modal-close')?.click()`);
+}
+
+/**
+ * Checks the embedded project when the application starts with it.
+ *
+ * This is the case of the browsers that do not offer the File System Access
+ * API (Firefox, Safari): the OPFS is the default, the application starts on
+ * the embedded project and it never asks for a folder.
+ */
+async function checkEmbeddedColdStart() {
+  await evaluate(`localStorage.setItem('gnumarus-project-manager.mode', 'embedded')`);
+  await session.send('Page.reload', { ignoreCache: true });
+  await delay(1500);
+
+  const projectPath = await evaluate(`document.querySelector('.project-path')?.textContent`);
+  check(
+    typeof projectPath === 'string' && projectPath.startsWith('Embedded project'),
+    'the application starts on the embedded project',
+    String(projectPath),
+  );
+
+  const emptyTitle = await evaluate(`document.querySelector('.empty-title')?.textContent ?? ''`);
+  check(
+    typeof emptyTitle === 'string' && !emptyTitle.includes('that will hold'),
+    'the embedded project does not ask for a folder',
+    String(emptyTitle),
+  );
+
+  // The button "New task" opens the editor: the project needs no folder.
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'New task');
+    button.click();
+    return true;
+  })()`);
+  const editor = await waitFor(`document.querySelector('#task-title') !== null`);
+  check(editor === true, 'the editor of the task opens without a folder');
+
+  await evaluate(`(() => {
+    document.querySelector('#task-title').value = 'A task of the cold start';
+    return true;
+  })()`);
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Create task');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(
+    `[...document.querySelectorAll('.task-title-button')].some((node) => node.textContent === 'A task of the cold start')`,
+  );
+  const titles = await evaluate(
+    `[...document.querySelectorAll('.task-title-button')].map((node) => node.textContent).join(' | ')`,
+  );
+  check(
+    typeof titles === 'string' && titles.includes('A task of the cold start'),
+    'the task of the embedded project is created',
+    String(titles),
+  );
+
+  // The file of the task lives at the root of the Origin Private File System.
+  const stored = await evaluate(`(async () => {
+    const root = await navigator.storage.getDirectory();
+    const names = [];
+    for await (const [name] of root.entries()) {
+      names.push(name);
+    }
+    for (const name of names) {
+      const handle = await root.getFileHandle(name);
+      const file = await handle.getFile();
+      const content = await file.text();
+      if (content.includes('title=A task of the cold start')) {
+        return name;
+      }
+    }
+    return null;
+  })()`);
+  check(
+    typeof stored === 'string' && /^task_\d+\.txt$/u.test(stored),
+    'the file of the task is at the root of the Origin Private File System',
+    String(stored),
+  );
+
+  // The application goes back to the project of the service.
+  await evaluate(`localStorage.setItem('gnumarus-project-manager.mode', 'service')`);
+  await session.send('Page.reload', { ignoreCache: true });
+  await delay(1200);
 }
 
 /** The names of the files of a ZIP archive. */
