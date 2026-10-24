@@ -963,6 +963,91 @@ describe('App and the tree view', () => {
     harness.app.dispose();
   });
 
+  it('expands the parent of a newly added child task', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    // The task 1 has children and is collapsed from the start. It is expanded
+    // and collapsed again, so the collapse is in place when the child is
+    // added. The other root task (the task 5) stays on the screen.
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row[data-task-id="1"] .tree-twisty'));
+    await flush();
+    expect(treeRows(harness)).toHaveLength(4);
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row[data-task-id="1"] .tree-twisty'));
+    await flush();
+    expect(treeRows(harness)).toHaveLength(2);
+
+    // A child is added through the actions of the row.
+    click(treeAction(harness, 1, 3));
+    await flush();
+    const titleInput = harness.doc.querySelector<HTMLInputElement>('#task-title');
+    expect(titleInput).not.toBeNull();
+    if (titleInput === null) {
+      return;
+    }
+    titleInput.value = 'The new child';
+    click(buttonByText(harness.doc, 'Create task'));
+    await flush();
+
+    // The parent was collapsed: its new child is shown anyway. (The task 5,
+    // the other root task, comes after the children.)
+    const rows = treeRows(harness);
+    expect(rows).toHaveLength(5);
+    expect(rows[3]?.querySelector('.tree-title')?.textContent).toBe('The new child');
+    expect(rows[3]?.dataset['depth']).toBe('1');
+    expect(
+      harness.root
+        .querySelector<HTMLButtonElement>('.tree-row[data-task-id="1"] .tree-twisty')
+        ?.classList.contains('is-expanded'),
+    ).toBe(true);
+    expect(harness.bridge.files.has('/home/user/projects/task_6.txt')).toBe(true);
+    harness.app.dispose();
+  });
+
+  it('expands a parent that had no child when its first child is added', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    // A new root task is created: it has no child yet.
+    click(buttonByText(harness.doc, 'New task'));
+    await flush();
+    const titleInput = harness.doc.querySelector<HTMLInputElement>('#task-title');
+    expect(titleInput).not.toBeNull();
+    if (titleInput === null) {
+      return;
+    }
+    titleInput.value = 'The fresh parent';
+    click(buttonByText(harness.doc, 'Create task'));
+    await flush();
+
+    // A task without a child cannot be expanded.
+    expect(
+      treeRow(harness, 6)?.querySelector<HTMLButtonElement>('.tree-twisty')?.disabled,
+    ).toBe(true);
+
+    // Its first child is added: the branch opens by itself and shows it.
+    click(treeAction(harness, 6, 3));
+    await flush();
+    const childInput = harness.doc.querySelector<HTMLInputElement>('#task-title');
+    expect(childInput).not.toBeNull();
+    if (childInput === null) {
+      return;
+    }
+    childInput.value = 'Its first child';
+    click(buttonByText(harness.doc, 'Create task'));
+    await flush();
+
+    const rows = treeRows(harness);
+    expect(rows).toHaveLength(4);
+    expect(rows[2]?.querySelector('.tree-title')?.textContent).toBe('The fresh parent');
+    expect(rows[3]?.querySelector('.tree-title')?.textContent).toBe('Its first child');
+    expect(rows[3]?.dataset['depth']).toBe('1');
+    expect(
+      treeRow(harness, 6)?.querySelector<HTMLButtonElement>('.tree-twisty')?.classList.contains('is-expanded'),
+    ).toBe(true);
+    harness.app.dispose();
+  });
+
   it('focuses a task so that it becomes the root of the tree', async () => {
     const harness = await createTreeHarness();
     await switchToTree(harness);
@@ -1028,9 +1113,8 @@ describe('App and the tree view', () => {
     expect(file).toContain('parent=3');
     expect(file).not.toContain('parent=2');
 
-    // The tree shows the task 4 under the task 3.
-    click(treeRow(harness, 3)?.querySelector<HTMLButtonElement>('.tree-twisty') ?? null);
-    await flush();
+    // The tree shows the task 4 under the task 3: dropping a child on the task
+    // opens the branch of the new parent by itself.
     expect(treeRow(harness, 4)?.dataset['depth']).toBe('2');
     expect(treeRow(harness, 4)?.querySelector('.tree-title')?.textContent).toBe('Task 4');
 

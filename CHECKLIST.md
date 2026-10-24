@@ -435,6 +435,33 @@
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
 
+## Batch 14 - Tree expansion and board colors
+
+### Tree view
+- [x] Adding a child task (dialog) opens the branch of its parent: a collapsed
+      parent is expanded and a parent without a child becomes expanded
+- [x] Dropping a task on a parent in the tree opens the branch of the target as
+      well
+
+### Kanban board
+- [x] Every column is painted from top to bottom with the colour of its status
+      (soft background, status-coloured border, header separator and title) and
+      the status dot was removed
+- [x] The titles of the cards are shown in full: the text wraps over several
+      lines, so the cards of a column do not have the same height
+
+### Tests
+- [x] `src/ui/app.test.ts` - the branch of a collapsed parent opens when a child
+      is added, and the parent that had no child as well
+- [x] `src/ui/kanbanBoard.test.ts` - the columns hold no status dot
+- [x] `scripts/e2e-browser.mjs` - the branch opened by the drop of a task, no
+      status dot on the board, and the tree section adapted to the automatic
+      expansion
+
+### Build / deploy
+- [x] `npm run verify` (378 tests, 95/95 browser checks)
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
 ## Batch 13 - Default dates of a new task
 
 ### User interface

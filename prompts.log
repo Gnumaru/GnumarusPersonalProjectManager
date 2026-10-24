@@ -71,7 +71,8 @@ na view de kanban, o titulo das tarefas deve estar visivel por completo, com tex
 ====
 
 ====
-é possível 
+o estado colapsado/expandido das tarefas na tree view e kanban deve ser armazenado como metadado na tarefa e carregado ao abrir o app.
+ao usar o webservice como backend, para fazer buscas utilize ripgrep (comando rg) se ele estiver disponivel. se nao estiver pode usar grep.
 ====
 ====
 ====

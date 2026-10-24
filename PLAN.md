@@ -434,6 +434,18 @@ the API takes the window of the page as a parameter (`supportsOpfs(win)`), like
 the one of the File System Access API, so the storage of the browser can be
 exercised by the test suite.
 
+## Batch 14 - Tree expansion and board colors
+
+Three interface refinements:
+
+* the **tree view** opens the branch of a parent when it receives a child,
+  through the creation dialog or through a drop;
+* the **kanban columns** are colored entirely with the colour of their status
+  (soft background, status-coloured border, header separator and title), and
+  the coloured dot of the header was removed;
+* the **titles of the cards** are shown in full, wrapped over several lines, so
+  the cards of a column do not have the same height.
+
 ## Batch 13 - Default dates of a new task
 
 The editor of a task already holds two date pickers (`start` / `end`). When the

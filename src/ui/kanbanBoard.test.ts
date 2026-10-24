@@ -32,6 +32,14 @@ describe('renderKanbanBoard', () => {
     ]);
     expect(columns[0]?.querySelector('.kanban-column-title')?.textContent).toBe('PLANNING');
     expect(columns[3]?.querySelector('.kanban-column-title')?.textContent).toBe('PAUSED');
+
+    // The column is colored entirely: the header holds no dot any more.
+    expect(board.querySelectorAll('.kanban-column-dot')).toHaveLength(0);
+
+    // Every column declares its status, which colors it from end to end.
+    for (const column of columns) {
+      expect(column.getAttribute('data-status') ?? '').not.toBe('');
+    }
   });
 
   it('puts every card in the column of its status', () => {

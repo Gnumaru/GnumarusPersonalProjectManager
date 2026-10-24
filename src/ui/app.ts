@@ -2205,6 +2205,11 @@ export class App {
           : `The task #${taskId} is now a child of the task #${targetId}.`,
       kind: 'success',
     });
+    if (targetId !== null) {
+      // The child that lands on the task has to be visible: the branch of the
+      // target is opened, even when its row was collapsed.
+      this.treeExpanded.add(targetId);
+    }
     await this.updateTaskFields(taskId, (task) => withParent(task, targetId, new Date()));
   }
 
@@ -2504,6 +2509,11 @@ export class App {
     const id = await store.nextTaskId();
     const task = buildTask(taskInput, id, new Date(), parentId);
     await store.createTaskFile(store.taskPath(id), task);
+    if (parentId !== null) {
+      // The new child has to be visible: the branch of the parent is opened,
+      // whether the parent was collapsed or had no child until now.
+      this.treeExpanded.add(parentId);
+    }
     showToast({
       doc: this.doc,
       message:

@@ -36,7 +36,6 @@ export function renderKanbanBoard(
     const columnCards = cards.filter((card) => card.status === status);
     const column = el(doc, 'section', { class: 'kanban-column' }, [
       el(doc, 'header', { class: 'kanban-column-header' }, [
-        el(doc, 'span', { class: 'kanban-column-dot' }),
         el(doc, 'span', { class: 'kanban-column-title', text: STATUS_LABELS[status] }),
         el(doc, 'span', { class: 'kanban-column-count', text: String(columnCards.length) }),
       ]),

@@ -684,8 +684,8 @@ async function runChecks() {
     `[...document.querySelectorAll('.tree-row')].map((node) => node.dataset['taskId']).join('|')`,
   );
   check(
-    treeRoots === '1|2|3|4|5|6|7|8|9|10|11|12',
-    'the tree shows the tasks that have no parent',
+    treeRoots === '1|13|2|3|4|5|6|7|8|9|10|11|12',
+    'the branch of the parent of a child task is opened when the child is created',
     treeRoots,
   );
 
@@ -694,11 +694,29 @@ async function runChecks() {
   );
   check(treeTitles.includes('Browser test task 1'), 'the tree shows the name of the tasks', treeTitles);
 
-  // The child of the first task is hidden until its parent is expanded.
+  // A simple click collapses the branch: the child goes out of the screen.
+  await evaluate(`(() => {
+    const row = document.querySelector('.tree-row[data-task-id="1"]');
+    row.querySelector('.tree-twisty').click();
+    return true;
+  })()`);
+  await waitFor(
+    `document.querySelectorAll('.tree-row').length === 12 &&
+      document.querySelector('.tree-row[data-task-id="13"]') === null`,
+  );
   const childHidden = await evaluate(
     `document.querySelector('.tree-row[data-task-id="13"]') === null`,
   );
-  check(childHidden === true, 'the child task is hidden when its parent is collapsed');
+  check(childHidden === true, 'a simple click collapses the branch of the parent');
+
+  // The grand child (14) stays hidden: its own parent was never expanded.
+  const grandChildStillHidden = await evaluate(
+    `document.querySelector('.tree-row[data-task-id="14"]') === null`,
+  );
+  check(
+    grandChildStillHidden === true,
+    'the state of the children is kept along the branch',
+  );
 
   await evaluate(`(() => {
     const row = document.querySelector('.tree-row[data-task-id="1"]');
@@ -762,9 +780,28 @@ async function runChecks() {
     breadcrumb,
   );
 
-  // The general root shows every task without a parent again.
+  // The general root shows every task again.
   await evaluate(`document.querySelector('.tree-crumb').click()`);
-  await waitFor(`document.querySelectorAll('.tree-row').length === 12`);
+  await waitFor(`document.querySelector('.tree-crumb')?.textContent === 'General root'`);
+
+  // The branch of the task 1 is opened again, up to the task 14: it has to be
+  // on the screen to be dragged.
+  await evaluate(`(() => {
+    const twisty = document.querySelector('.tree-row[data-task-id="1"]')?.querySelector('.tree-twisty');
+    if (twisty && !twisty.classList.contains('is-expanded')) {
+      twisty.click();
+    }
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.tree-row[data-task-id="13"]') !== null`);
+  await evaluate(`(() => {
+    const twisty = document.querySelector('.tree-row[data-task-id="13"]')?.querySelector('.tree-twisty');
+    if (twisty && !twisty.classList.contains('is-expanded')) {
+      twisty.click();
+    }
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.tree-row[data-task-id="14"]') !== null`);
 
   // The name of a task opens its view.
   await evaluate(`(() => {
@@ -829,14 +866,19 @@ async function runChecks() {
     movedContent.content,
   );
 
-  // The task is dragged on the general root: it becomes a root task again.
-  await evaluate(`(() => {
-    const row = document.querySelector('.tree-row[data-task-id="2"]');
-    row.querySelector('.tree-twisty').click();
-    return true;
-  })()`);
+  // The branch of the new parent was opened by the drop itself: the task 14
+  // shows up without any manual expansion.
   await waitFor(`document.querySelector('.tree-row[data-task-id="14"]') !== null`);
+  const droppedOpenedTwisty = await evaluate(
+    `document.querySelector('.tree-row[data-task-id="2"] .tree-twisty')?.classList.contains('is-expanded') ?? false`,
+  );
+  check(
+    droppedOpenedTwisty === true,
+    'the branch of the parent opens when a task is dropped on it',
+    String(droppedOpenedTwisty),
+  );
 
+  // The task is dragged on the general root: it becomes a root task again.
   const rootPoints = await evaluate(`(() => {
     const source = document.querySelector('.tree-row[data-task-id="14"] .tree-title').getBoundingClientRect();
     const target = document.querySelector('.tree-root-target').getBoundingClientRect();
@@ -882,6 +924,14 @@ async function runChecks() {
     boardColumns === 'planning|todo|next|paused|doing|done|canceled',
     'the board has one column per status, in the expected order',
     boardColumns,
+  );
+
+  // The columns are colored entirely: no status dot inside them.
+  const boardDots = await evaluate(`document.querySelectorAll('.kanban-column-dot').length`);
+  check(
+    boardDots === 0,
+    'the columns show no status dot: they are colored by their status',
+    String(boardDots),
   );
 
   // The task 1 has a child: it is not on the board.

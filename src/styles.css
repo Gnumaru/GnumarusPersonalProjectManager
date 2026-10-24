@@ -713,16 +713,8 @@ button[hidden] {
   align-items: center;
   gap: 7px;
   padding: 8px 10px;
-  background: var(--bg-subtle);
+  background: transparent;
   border-bottom: 1px solid var(--border);
-}
-
-.kanban-column-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-faint);
-  flex: none;
 }
 
 .kanban-column-title {
@@ -739,40 +731,100 @@ button[hidden] {
 .kanban-column-count {
   font-size: 11.5px;
   font-family: var(--mono);
-  color: var(--text-faint);
+  color: var(--text-muted);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0 7px;
 }
 
-/* The dot of a column carries the colour of the status. */
-.kanban-column[data-status='planning'] .kanban-column-dot {
-  background: var(--info);
+/* Every column is painted with the colour of its status, instead of showing a
+   single dot: the background is the soft colour of the status and the border,
+   the separator of the header and the name carry the full colour. */
+.kanban-column[data-status='planning'] {
+  background: var(--info-soft);
+  border-color: color-mix(in srgb, var(--info) 55%, var(--border));
 }
 
-.kanban-column[data-status='todo'] .kanban-column-dot {
-  background: var(--text-faint);
+.kanban-column[data-status='todo'] {
+  background: color-mix(in srgb, var(--text-faint) 12%, var(--bg-elevated));
 }
 
-.kanban-column[data-status='next'] .kanban-column-dot {
-  background: var(--accent);
+.kanban-column[data-status='next'] {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 
-.kanban-column[data-status='paused'] .kanban-column-dot {
-  background: var(--paused);
+.kanban-column[data-status='paused'] {
+  background: var(--paused-soft);
+  border-color: color-mix(in srgb, var(--paused) 55%, var(--border));
 }
 
-.kanban-column[data-status='doing'] .kanban-column-dot {
-  background: var(--warning);
+.kanban-column[data-status='doing'] {
+  background: var(--warning-soft);
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
 }
 
-.kanban-column[data-status='done'] .kanban-column-dot {
-  background: var(--success);
+.kanban-column[data-status='done'] {
+  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border));
 }
 
-.kanban-column[data-status='canceled'] .kanban-column-dot {
-  background: var(--danger);
+.kanban-column[data-status='canceled'] {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+}
+
+.kanban-column[data-status='planning'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--info) 55%, var(--border));
+}
+
+.kanban-column[data-status='todo'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--text-faint) 35%, var(--border));
+}
+
+.kanban-column[data-status='next'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+.kanban-column[data-status='paused'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--paused) 55%, var(--border));
+}
+
+.kanban-column[data-status='doing'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+}
+
+.kanban-column[data-status='done'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--success) 55%, var(--border));
+}
+
+.kanban-column[data-status='canceled'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+}
+
+.kanban-column[data-status='planning'] .kanban-column-title {
+  color: var(--info);
+}
+
+.kanban-column[data-status='next'] .kanban-column-title {
+  color: var(--accent);
+}
+
+.kanban-column[data-status='paused'] .kanban-column-title {
+  color: var(--paused);
+}
+
+.kanban-column[data-status='doing'] .kanban-column-title {
+  color: var(--warning);
+}
+
+.kanban-column[data-status='done'] .kanban-column-title {
+  color: var(--success);
+}
+
+.kanban-column[data-status='canceled'] .kanban-column-title {
+  color: var(--danger);
 }
 
 .kanban-cards {
@@ -814,9 +866,10 @@ button[hidden] {
   border: none;
   background: transparent;
   color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* The title is never cut: it takes all the lines it needs, so the cards of
+     a column do not have the same height. */
+  white-space: normal;
+  overflow-wrap: anywhere;
   width: 100%;
 }
 

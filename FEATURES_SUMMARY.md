@@ -30,6 +30,7 @@ list or as a tree.
 | **Collapse and expand the children of a task** | Done | `src/ui/taskTreeView.ts`, `src/core/taskTree.ts` |
 | **Ctrl+click collapses or expands the whole branch** | Done | `src/ui/app.ts`, `src/core/taskTree.ts` |
 | **Drag and drop: a task dropped on another one becomes its child** | Done | `src/ui/treeDrag.ts`, `src/ui/app.ts` |
+| **The branch of the parent opens when a child task is added to it** | Done | `src/ui/app.ts` |
 | **Drag and drop: a task dropped on the general root becomes a root task** | Done | `src/ui/treeDrag.ts`, `src/ui/app.ts` |
 | **Focus the tree on a task (it becomes the root of the tree)** | Done | `src/ui/app.ts` |
 | **Focus the general root (every task without a parent)** | Done | `src/ui/app.ts` |
@@ -77,6 +78,8 @@ list or as a tree.
 | Feature | Status | Where |
 | ------- | ------ | ----- |
 | **Kanban board: one column per status** | Done | `src/ui/kanbanBoard.ts` |
+| **Board columns colored from top to bottom with the colour of their status** | Done | `src/styles.css` |
+| **The titles of the cards are shown in full (the text wraps, cards of unequal height)** | Done | `src/styles.css` |
 | **Columns in the order PLANNING, TODO, NEXT, PAUSED, DOING, DONE, CANCELED** | Done | `src/core/task.ts` |
 | **Only the tasks that have no child are on the board** | Done | `src/core/projectStore.ts` |
 | **Drag and drop between the columns changes the status** | Done | `src/ui/kanbanDrag.ts` |

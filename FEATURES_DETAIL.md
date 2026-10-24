@@ -360,6 +360,23 @@ A task can **never** become a child of one of its own descendants: that would
 build a cycle, so the move is refused with a message and the file is left
 alone.
 
+### The branch opens by itself
+
+When a task **receives a child**, its branch opens: the parent becomes an
+expanded row in the tree. This covers the two ways of adding a child:
+
+* a child task **created from the interface** (the dialog `Add a child task`);
+* a task **dropped on another one** by drag and drop.
+
+A parent that was collapsed shows its children again, and a parent that had no
+child becomes expandable and shows when it happens. Without this, a new child
+would be invisible (its row hidden under a collapsed parent), and the tree
+would look like the creation failed.
+
+The expansion of the children that already existed is kept: with a simple
+click the user manages each level; the ctrl+click manages the whole branch,
+and it keeps that behaviour.
+
 ### The search
 
 The search uses the same recursive `grep` as the flat list. In the tree, only
@@ -382,9 +399,19 @@ The columns are always in the same order (`BOARD_STATUSES`):
 PLANNING | TODO | NEXT | PAUSED | DOING | DONE | CANCELED
 ```
 
-Each column carries the colour of its status and the amount of cards it holds.
-A card shows the name and the tags of the task; clicking it opens the task and
-the pencil opens its editor.
+Each column carries the number of cards it holds. The column itself is
+**colored by its status from top to bottom**: the background is the soft
+variant of the status colour, the border, the separator of the header and the
+name of the status carry the full colour. (The previous coloured dot of the
+header was removed: the whole column carries the colour now.) A card shows the
+name and the tags of the task on a plain card, so it stands out from the
+coloured column behind it; clicking it opens the task and the pencil opens its
+editor.
+
+The **title of a card is never cut**: the text wraps over the lines it needs
+(`overflow-wrap: anywhere`), so the cards of the same column do not have the
+same height. The tags, the actions and the drag keep working on a card of any
+height.
 
 ### Changing the status
 
