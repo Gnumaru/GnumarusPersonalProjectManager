@@ -3,6 +3,7 @@ import {
   applyTaskInput,
   buildTask,
   dateInputValue,
+  dateInputValueOfDate,
   formatTaskTimestamp,
   isTaskFileName,
   isTaskStatus,
@@ -113,6 +114,11 @@ describe('the date pickers', () => {
     expect(dateInputValue('20261019100000000')).toBe('2026-10-19');
     expect(dateInputValue('')).toBe('');
     expect(dateInputValue('nonsense')).toBe('');
+  });
+
+  it('gives the value of the picker for a local date', () => {
+    expect(dateInputValueOfDate(new Date(2026, 9, 24, 15, 45, 30))).toBe('2026-10-24');
+    expect(dateInputValueOfDate(new Date(2026, 0, 5))).toBe('2026-01-05');
   });
 
   it('reads the value of the picker as a timestamp', () => {

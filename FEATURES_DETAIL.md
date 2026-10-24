@@ -79,6 +79,12 @@ dateInputValue('20261019100000000')  ->  '2026-10-19'   (the value of the picker
 timestampFromDateInput('2026-10-19') ->  '20261019000000000'
 ```
 
+When the dialog opens to **create** a task, the pickers are prefilled with the
+default range of a new task: the **current day** for the start and the **next
+day** for the end. The user can change or clear them; the existing tasks keep
+their own dates when they are edited (`dateInputValueOfDate` gives the picker
+value of a local `Date`, used by the defaults).
+
 The end date cannot be before the start date: the editor refuses to save the
 task and explains why.
 

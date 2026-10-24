@@ -612,6 +612,51 @@ describe('App', () => {
     harness.app.dispose();
   });
 
+  it('prefills the dates of a new task with today and tomorrow', async () => {
+    const harness = await createHarness(3);
+    await selectFolder(harness);
+
+    click(buttonByText(harness.doc, 'New task'));
+    await flush();
+
+    const startInput = harness.doc.querySelector<HTMLInputElement>('#task-start');
+    const endInput = harness.doc.querySelector<HTMLInputElement>('#task-end');
+    expect(startInput).not.toBeNull();
+    expect(endInput).not.toBeNull();
+    if (startInput === null || endInput === null) {
+      return;
+    }
+
+    // The default range of a new task: one day, today until tomorrow.
+    const opened = new Date();
+    const tomorrow = new Date(opened);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const two = (value: number): string => String(value).padStart(2, '0');
+    const pickerValue = (date: Date): string =>
+      `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`;
+    const midnightValue = (date: Date): string =>
+      `${date.getFullYear()}${two(date.getMonth() + 1)}${two(date.getDate())}000000000`;
+
+    // The dialog opens with today as the start and tomorrow as the end.
+    expect(startInput.value).toBe(pickerValue(opened));
+    expect(endInput.value).toBe(pickerValue(tomorrow));
+
+    // The user only names the task: the default dates are saved as they are.
+    const titleInput = harness.doc.querySelector<HTMLInputElement>('#task-title');
+    if (titleInput === null) {
+      return;
+    }
+    titleInput.value = 'Dated task';
+    click(buttonByText(harness.doc, 'Create task'));
+    await flush();
+
+    const created = harness.bridge.files.get('/home/user/projects/task_4.txt');
+    expect(created).toContain('title=Dated task');
+    expect(created).toContain(`start=${midnightValue(opened)}`);
+    expect(created).toContain(`end=${midnightValue(tomorrow)}`);
+    harness.app.dispose();
+  });
+
   it('creates a child task from a parent task', async () => {
     const harness = await createHarness(3);
     await selectFolder(harness);

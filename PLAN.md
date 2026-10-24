@@ -434,6 +434,13 @@ the API takes the window of the page as a parameter (`supportsOpfs(win)`), like
 the one of the File System Access API, so the storage of the browser can be
 exercised by the test suite.
 
+## Batch 13 - Default dates of a new task
+
+The editor of a task already holds two date pickers (`start` / `end`). When the
+dialog is opened to **create** a task, the pickers are now prefilled with the
+default range: the **current day** for the start and the **next day** for the
+end. The existing files keep their own dates.
+
 ## Verification commands
 
 ```bash

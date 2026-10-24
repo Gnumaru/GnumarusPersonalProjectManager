@@ -419,6 +419,20 @@ async function runChecks() {
     'the editor holds a date picker for the start and for the end date',
     datePickers,
   );
+  // The default range of a new task: the current day until the next day.
+  const two = (value) => String(value).padStart(2, '0');
+  const pickerOf = (date) => `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`;
+  const openedAt = new Date();
+  const tomorrow = new Date(openedAt);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const dateDefaults = await evaluate(
+    `document.querySelector('#task-start').value + '/' + document.querySelector('#task-end').value`,
+  );
+  check(
+    dateDefaults === `${pickerOf(openedAt)}/${pickerOf(tomorrow)}`,
+    'a new task starts today and ends tomorrow',
+    dateDefaults,
+  );
   await evaluate(`(() => {
     document.querySelector('#task-title').value = 'Created by the browser test';
     document.querySelector('#task-tags').value = 'browser created';
@@ -876,7 +890,16 @@ async function runChecks() {
   );
   check(parentOnBoard === false, 'the tasks that have a child are not on the board');
 
-  // The card of the second task is dragged on the DOING column.
+  // The card of the second task is dragged on the DOING column. The board may
+  // scroll: both elements are brought into the view before the coordinates of
+  // the drag are computed, otherwise the pointer events would land outside of
+  // the window.
+  await evaluate(`(() => {
+    document.querySelector('.kanban-card[data-task-id="2"]')?.scrollIntoView({ block: 'center' });
+    document.querySelector('.kanban-column[data-status="doing"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    return true;
+  })()`);
+  await delay(300);
   const boardPoints = await evaluate(`(() => {
     const source = document.querySelector('.kanban-card[data-task-id="2"] .kanban-card-title').getBoundingClientRect();
     const target = document.querySelector('.kanban-column[data-status="doing"] .kanban-cards').getBoundingClientRect();
@@ -884,7 +907,7 @@ async function runChecks() {
       sx: source.left + 12,
       sy: source.top + source.height / 2,
       tx: target.left + 60,
-      ty: target.top + 30,
+      ty: Math.max(Math.min(target.top + 30, window.innerHeight - 20), 20),
     };
   })()`);
 

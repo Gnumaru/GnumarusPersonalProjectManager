@@ -56,6 +56,7 @@ list or as a tree.
 | **A task moved under another one (drag and drop)** | Done | `src/core/task.ts`, `src/core/projectStore.ts` |
 | **Dates written in the compact format `YYYYMMDDHHNNSSIII` (local time, no timezone)** | Done | `src/core/task.ts` |
 | **`start=...` and `end=...`: the start and the end date of a task** | Done | `src/core/task.ts` |
+| **A new task is created with the start date of today and the end date of tomorrow** | Done | `src/ui/taskDialog.ts` |
 | **Date pickers for the start and the end date in the editor** | Done | `src/ui/taskDialog.ts` |
 | Amount of children per task (read with `grep`) | Done | `src/core/serviceStore.ts`, `src/core/embeddedStore.ts` |
 

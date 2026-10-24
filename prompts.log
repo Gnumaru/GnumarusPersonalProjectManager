@@ -63,8 +63,13 @@ crie um novo backend de armazenamento de arquivos do projeto usando a "File Syst
 ====
 crie um arquivo README.md na raiz do projeto explicando o que é o projeto, suas funcionalidades e como utilizar. escreva em ingles americano. nao use emojis.
 ====
+ao criar uma nova tarefa a start date default deve ser o dia atual e o end date default deve ser o dia seguinte
 ====
+no tree view, apos adicionar uma tarefa filha, o pai deve ser automaticamente expandido caso estivesse colapsado ou caso ainda não tivesse filho algum.
+na view de kanban, faca com que cada coluna fique colorida por inteiro com a cor do status ao inves de ter apenas uma bolinha colorida.
+na view de kanban, o titulo das tarefas deve estar visivel por completo, com texto wrapped, mesmo se isso fizer os cards ficarem com altura desigual.
 ====
+
 ====
 é possível 
 ====

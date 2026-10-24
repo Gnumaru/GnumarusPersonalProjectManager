@@ -434,3 +434,25 @@
 ### Build / deploy
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
+## Batch 13 - Default dates of a new task
+
+### User interface
+- [x] `dateInputValueOfDate` - the picker value of a local `Date`
+- [x] The create dialog opens with the start date of **today**
+- [x] The create dialog opens with the end date of **tomorrow**
+- [x] Editing an existing task keeps its own dates (no default change)
+
+### Tests
+- [x] `src/core/task.test.ts` - the picker value of a `Date`
+- [x] `src/ui/app.test.ts` - the defaults of the create dialog and the values
+      written to the file
+- [x] `scripts/e2e-browser.mjs` - the values written for a task created in a
+      real browser
+- [x] Fix of the board drag of the browser test: the card and the column are
+      scrolled into the view before the drag coordinates are computed (the
+      failures already happened on the previous version)
+
+### Build / deploy
+- [x] `npm run verify` (376 tests, 92/92 browser checks)
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`

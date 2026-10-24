@@ -4,6 +4,7 @@ import {
   STATUS_LABELS,
   TASK_STATUSES,
   dateInputValue,
+  dateInputValueOfDate,
   normalizeTags,
   timestampFromDateInput,
   type Task,
@@ -347,11 +348,19 @@ export class TaskDialog {
       placeholder: 'tags separated by spaces',
     });
 
+    // When the editor creates a task, the dates default to a range of one day:
+    // the task starts today and ends tomorrow. An existing task keeps its own
+    // dates.
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
     this.startInput = input(this.doc, {
       class: 'field-input',
       id: 'task-start',
       type: 'date',
-      value: dateInputValue(task?.start ?? ''),
+      value:
+        task !== undefined ? dateInputValue(task.start) : dateInputValueOfDate(today),
       title: 'The day the task starts',
     });
 
@@ -359,7 +368,8 @@ export class TaskDialog {
       class: 'field-input',
       id: 'task-end',
       type: 'date',
-      value: dateInputValue(task?.end ?? ''),
+      value:
+        task !== undefined ? dateInputValue(task.end) : dateInputValueOfDate(tomorrow),
       title: 'The day the task ends',
     });
 

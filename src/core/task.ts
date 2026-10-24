@@ -213,6 +213,11 @@ export function dateInputValue(timestamp: string): string {
   if (date === null) {
     return '';
   }
+  return dateInputValueOfDate(date);
+}
+
+/** The value of a date picker (`YYYY-MM-DD`) for a local date. */
+export function dateInputValueOfDate(date: Date): string {
   const pad = (value: number, length = 2): string => String(value).padStart(length, '0');
   return `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
