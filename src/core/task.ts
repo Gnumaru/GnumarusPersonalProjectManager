@@ -25,6 +25,12 @@
  * time of the machine: **no timezone is stored**.
  *
  * Root tasks (the ones without a parent) simply have no `parent` key.
+ *
+ * A task can also carry an `expanded=true` key: it is the **view preference** of
+ * the tree view (the Gantt chart reads it as well, and every other view ignores
+ * it). It is written only when the branch of the task is shown expanded: the
+ * key is simply removed when the branch is collapsed. Updating it does not
+ * change the `updated` timestamp: it is not a change of the task content.
  */
 
 export const METADATA_SEPARATOR = '----';
@@ -103,6 +109,13 @@ export interface Task {
   readonly blockedBy: readonly number[];
   /** The ids of the tasks that are related to this one. */
   readonly related: readonly number[];
+  /**
+   * Whether the branch of the task is expanded in the tree view.
+   *
+   * It is a view preference, not a part of the task content: only the tree and
+   * the Gantt views read it.
+   */
+  readonly expanded: boolean;
   readonly description: string;
 }
 
@@ -414,6 +427,7 @@ export function parseTask(content: string, idHint?: number): Task {
     end: normalizeTaskTimestamp(metadata.get('end') ?? ''),
     blockedBy: parseIdList(metadata.get('blocked_by') ?? ''),
     related: parseIdList(metadata.get('related') ?? ''),
+    expanded: (metadata.get('expanded') ?? '').trim().toLowerCase() === 'true',
     description,
   };
 }
@@ -441,6 +455,11 @@ export function serializeTask(task: Task): string {
   if (task.related.length > 0) {
     lines.push(`related=${task.related.join(',')}`);
   }
+  // The expanded key is written only when the branch is shown expanded: an
+  // absent key means collapsed, so files stay small.
+  if (task.expanded) {
+    lines.push('expanded=true');
+  }
   lines.push(METADATA_SEPARATOR);
 
   const description = task.description.replace(/\r\n/gu, '\n').replace(/^\n+/u, '').replace(/\s+$/u, '');
@@ -467,6 +486,7 @@ export function buildTask(
     end: input.end,
     blockedBy: [...input.blockedBy],
     related: [...input.related],
+    expanded: false,
     description: input.description,
   };
 }
@@ -517,5 +537,18 @@ export function withDates(task: Task, start: string, end: string, now: Date): Ta
     start,
     end,
     updated: formatTaskTimestamp(now),
+  };
+}
+
+/**
+ * Returns a copy of the task with another expanded state.
+ *
+ * The expanded key is a **view preference**: changing it does not touch the
+ * `updated` timestamp of the file.
+ */
+export function withExpandedState(task: Task, expanded: boolean): Task {
+  return {
+    ...task,
+    expanded,
   };
 }

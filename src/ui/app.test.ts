@@ -40,7 +40,11 @@ interface HarnessOptions {
   /** Routes of the fake that always answer `401`. */
   readonly rejectPaths?: readonly string[];
   /** The tasks created on the fake disk. */
-  readonly tasks?: readonly { readonly id: number; readonly parentId?: number }[];
+  readonly tasks?: readonly {
+    readonly id: number;
+    readonly parentId?: number;
+    readonly expanded?: boolean;
+  }[];
   /** The notes created on the fake disk. */
   readonly notes?: readonly {
     readonly id: number;
@@ -64,7 +68,11 @@ interface HarnessOptions {
   readonly folderKnown?: boolean;
 }
 
-function taskContent(id: number, parentId: number | null = null): string {
+function taskContent(
+  id: number,
+  parentId: number | null = null,
+  expanded = false,
+): string {
   const lines = [`id=${id}`, `title=Task ${id}`, 'status=todo'];
   if (parentId !== null) {
     lines.push(`parent=${parentId}`);
@@ -75,9 +83,11 @@ function taskContent(id: number, parentId: number | null = null): string {
     'updated=20261002100000000',
     'start=',
     'end=',
-    '----',
-    `marker-${id}`,
   );
+  if (expanded) {
+    lines.push('expanded=true');
+  }
+  lines.push('----', `marker-${id}`);
   return lines.join('\n');
 }
 
@@ -110,7 +120,7 @@ async function createHarness(taskCount = 25, options: HarnessOptions = {}): Prom
     for (const task of options.tasks) {
       bridge.addFile(
         `/home/user/projects/task_${task.id}.txt`,
-        taskContent(task.id, task.parentId ?? null),
+        taskContent(task.id, task.parentId ?? null, task.expanded ?? false),
       );
     }
   } else {
@@ -860,6 +870,66 @@ describe('App and the tree view', () => {
     expect(harness.root.querySelector('.pagination-footer')?.hasAttribute('hidden')).toBe(true);
     expect(harness.root.querySelector('.tree-wrap')?.hasAttribute('hidden')).toBe(false);
 
+    harness.app.dispose();
+  });
+
+  it('persists the expanded state in the file of the task', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    // The branch is expanded: the file of the task carries the key.
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row[data-task-id="1"] .tree-twisty'));
+    await flush();
+    let file = harness.bridge.files.get('/home/user/projects/task_1.txt');
+    expect(file).toContain('expanded=true');
+    // The key is a view preference: the content of the task is untouched.
+    expect(file).toContain('updated=20261002100000000');
+    expect(file).toContain('marker-1');
+
+    // Collapsed again: the key is simply removed.
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row[data-task-id="1"] .tree-twisty'));
+    await flush();
+    file = harness.bridge.files.get('/home/user/projects/task_1.txt');
+    expect(file).not.toContain('expanded=');
+    harness.app.dispose();
+  });
+
+  it('persists the state of the whole branch on a ctrl+click', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    const row = harness.root.querySelector<HTMLElement>('.tree-row[data-task-id="1"]');
+    ctrlClick(row?.querySelector<HTMLButtonElement>('.tree-twisty'), harness.dom);
+    await flush();
+
+    // Every task of the branch is expanded on the disk.
+    for (const id of [1, 2, 3, 4]) {
+      expect(harness.bridge.files.get(`/home/user/projects/task_${id}.txt`)).toContain('expanded=true');
+    }
+    // The tasks outside of the branch are untouched.
+    expect(harness.bridge.files.get('/home/user/projects/task_5.txt')).not.toContain('expanded=');
+    harness.app.dispose();
+  });
+
+  it('restores the expanded state of the files when the app opens', async () => {
+    const harness = await createHarness(0, {
+      tasks: [
+        { id: 1, expanded: true },
+        { id: 2, parentId: 1, expanded: true },
+        { id: 3, parentId: 1 },
+        { id: 4, parentId: 2 },
+        { id: 5 },
+      ],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+    await switchToTree(harness);
+
+    // The branches whose files carry `expanded=true` are open: the task 4 has
+    // to be on the screen, three levels deep, without any click.
+    const rows = treeRows(harness);
+    expect(rows).toHaveLength(5);
+    expect(rows[1]?.dataset['depth']).toBe('1');
+    expect(harness.root.querySelector<HTMLElement>('.tree-row[data-task-id="4"]')?.dataset['depth']).toBe('2');
     harness.app.dispose();
   });
 

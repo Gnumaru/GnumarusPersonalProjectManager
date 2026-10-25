@@ -20,6 +20,7 @@ import {
   taskFileName,
   timestampFromDateInput,
   withParent,
+  withExpandedState,
 } from './task.js';
 
 describe('task file names', () => {
@@ -214,6 +215,7 @@ describe('the blocking and the related tasks', () => {
       end: '',
       blockedBy: [] as number[],
       related: [] as number[],
+      expanded: false,
       description: '',
     };
 
@@ -394,6 +396,7 @@ describe('serializeTask', () => {
       description: 'Some description',
       blockedBy: [],
       related: [],
+      expanded: false,
     };
 
     expect(serializeTask(task)).toBe(
@@ -426,9 +429,57 @@ describe('serializeTask', () => {
       description: '',
       blockedBy: [],
       related: [],
+      expanded: false,
     };
     expect(serializeTask({ ...base, parentId: null })).not.toContain('parent=');
     expect(serializeTask({ ...base, parentId: 4 })).toContain('parent=4');
+  });
+
+  it('writes the expanded key only when the branch is expanded', () => {
+    const base = {
+      id: 1,
+      title: 'T',
+      status: 'todo' as const,
+      parentId: null,
+      tags: [],
+      created: '',
+      updated: '',
+      start: '',
+      end: '',
+      description: '',
+      blockedBy: [],
+      related: [],
+    };
+    expect(serializeTask({ ...base, expanded: false })).not.toContain('expanded=');
+    expect(serializeTask({ ...base, expanded: true })).toContain('expanded=true');
+  });
+
+  it('parses the expanded key and leaves it out when it is collapsed', () => {
+    expect(parseTask('id=1\nexpanded=true\n----\nbody').expanded).toBe(true);
+    expect(parseTask('id=1\n----\nbody').expanded).toBe(false);
+    expect(parseTask('id=1\nexpanded=false\n----\nbody').expanded).toBe(false);
+  });
+
+  it('does not change the update time when the expanded state changes', () => {
+    const base = {
+      id: 1,
+      title: 'T',
+      status: 'todo' as const,
+      parentId: null,
+      tags: [],
+      created: '20260101000000000',
+      updated: '20260202000000000',
+      start: '',
+      end: '',
+      description: '',
+      blockedBy: [],
+      related: [],
+      expanded: false,
+    };
+    const expanded = withExpandedState(base, true);
+    expect(expanded).toEqual({ ...base, expanded: true });
+    const collapsed = withExpandedState(expanded, false);
+    expect(collapsed.updated).toBe('20260202000000000');
   });
 
   it('keeps a title on a single line', () => {
@@ -445,6 +496,7 @@ describe('serializeTask', () => {
       description: '',
       blockedBy: [],
       related: [],
+      expanded: false,
     };
     const content = serializeTask(task);
     expect(content).toContain('title=first second');
@@ -467,6 +519,7 @@ describe('round trip', () => {
       description: 'Line one\nLine two',
       blockedBy: [],
       related: [],
+      expanded: false,
     };
 
     const parsed = parseTask(serializeTask(original));
@@ -487,6 +540,7 @@ describe('round trip', () => {
       description: 'a=b\nc ---- d',
       blockedBy: [],
       related: [],
+      expanded: false,
     };
     expect(parseTask(serializeTask(original))).toEqual(original);
   });

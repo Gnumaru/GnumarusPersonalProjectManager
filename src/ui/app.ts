@@ -74,6 +74,7 @@ import {
   formatTaskTimestamp,
   parseTaskIdFromFileName,
   withDates,
+  withExpandedState,
   withParent,
   withStatus,
   type Task,
@@ -1284,10 +1285,17 @@ export class App {
   private applyHierarchy(summaries: readonly TaskSummary[]): void {
     const parents = new Map<number, number | null>();
     const paths = new Map<number, string>();
+    const expanded = new Set<number>();
     for (const task of summaries) {
       parents.set(task.id, task.parentId);
       paths.set(task.id, task.path);
+      // The files carry the expanded state: every refresh re-derives the set
+      // from them, so the disk is always the source of truth.
+      if (task.expanded) {
+        expanded.add(task.id);
+      }
     }
+    this.treeExpanded = expanded;
     this.treeHierarchy = { parents, paths };
     this.treeStructure = buildTaskTree(parents);
   }
@@ -2116,8 +2124,10 @@ export class App {
     }
     this.treeFocusId = id;
     if (id !== null) {
-      // The focused task shows its children right away.
+      // The focused task shows its children right away, and it stays expanded
+      // the next time the app is opened.
       this.treeExpanded.add(id);
+      await this.persistExpandedState(id, true);
     }
     await this.updateTree();
   }
@@ -2128,31 +2138,65 @@ export class App {
    * A simple click only changes the task itself: the state of its children is
    * kept. With the control key the whole branch is collapsed or expanded, the
    * task and every one of its descendants.
+   *
+   * Every change is written into the `expanded=` key of the files, so the state
+   * is restored when the app is opened again.
    */
   private async toggleTreeNode(id: number, recursive: boolean): Promise<void> {
     const expanded = !this.treeExpanded.has(id);
+    let changed: readonly number[] = [id];
     if (recursive) {
-      this.setSubtreeExpanded(id, expanded);
+      changed = this.setSubtreeExpanded(id, expanded);
     } else if (expanded) {
       this.treeExpanded.add(id);
     } else {
       this.treeExpanded.delete(id);
     }
     await this.updateTree();
+    for (const changedId of changed) {
+      void this.persistExpandedState(changedId, expanded);
+    }
   }
 
   /** Collapses or expands a task and all its descendants. */
-  private setSubtreeExpanded(id: number, expanded: boolean): void {
+  private setSubtreeExpanded(id: number, expanded: boolean): readonly number[] {
     const structure = this.treeStructure;
     if (structure === null) {
-      return;
+      return [];
     }
+    const changed: number[] = [];
     for (const descendant of subtreeOf(structure, id)) {
+      const isChanged = expanded ? !this.treeExpanded.has(descendant) : this.treeExpanded.has(descendant);
+      if (isChanged) {
+        changed.push(descendant);
+      }
       if (expanded) {
         this.treeExpanded.add(descendant);
       } else {
         this.treeExpanded.delete(descendant);
       }
+    }
+    return changed;
+  }
+
+  /**
+   * Writes the `expanded=` key of the file of a task.
+   *
+   * It is a view preference, not a change of the content: the write is silent
+   * (a failure must not disturb the user) and **follows** the change of the
+   * screen (the state of the interface is not held back by the disk).
+   */
+  private async persistExpandedState(taskId: number, expanded: boolean): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      return;
+    }
+    try {
+      const path = this.pathOfTask(taskId);
+      const task = await store.readTask(path);
+      await store.writeTask(path, withExpandedState(task, expanded));
+    } catch {
+      // The tree has already been drawn: an unreachable file cannot break it.
     }
   }
 
@@ -2207,10 +2251,15 @@ export class App {
     });
     if (targetId !== null) {
       // The child that lands on the task has to be visible: the branch of the
-      // target is opened, even when its row was collapsed.
+      // target is opened, even when its row was collapsed. It is persisted
+      // before the move, because the refresh of the move re-derives the set
+      // from the files.
       this.treeExpanded.add(targetId);
+      await this.persistExpandedState(targetId, true);
     }
-    await this.updateTaskFields(taskId, (task) => withParent(task, targetId, new Date()));
+    // The moved task becomes expanded as well: its children are shown when the
+    // user opens the branch of its new parent.
+    await this.updateTaskFields(taskId, (task) => withExpandedState(withParent(task, targetId, new Date()), true));
   }
 
   /**
@@ -2511,8 +2560,11 @@ export class App {
     await store.createTaskFile(store.taskPath(id), task);
     if (parentId !== null) {
       // The new child has to be visible: the branch of the parent is opened,
-      // whether the parent was collapsed or had no child until now.
+      // whether the parent was collapsed or had no child until now. The state
+      // is persisted before the refresh, which re-derives the set from the
+      // files.
       this.treeExpanded.add(parentId);
+      await this.persistExpandedState(parentId, true);
     }
     showToast({
       doc: this.doc,

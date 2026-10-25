@@ -39,6 +39,12 @@ export interface TaskSummary {
   readonly tags: readonly string[];
   readonly start: string;
   readonly end: string;
+  /**
+   * Whether the branch of the task is expanded in the tree view.
+   *
+   * Only the tree and the Gantt views read it; the other views ignore it.
+   */
+  readonly expanded: boolean;
   /** The path of the file, relative to the project folder. */
   readonly path: string;
 }

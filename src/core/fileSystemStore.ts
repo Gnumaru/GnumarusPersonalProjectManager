@@ -439,6 +439,7 @@ export class FileSystemProjectStore implements ProjectStore {
       tags: task.tags,
       start: task.start,
       end: task.end,
+      expanded: task.expanded,
       path,
     };
   }

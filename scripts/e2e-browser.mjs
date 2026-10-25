@@ -709,6 +709,16 @@ async function runChecks() {
   );
   check(childHidden === true, 'a simple click collapses the branch of the parent');
 
+  // The collapse was written into the file: the key is gone.
+  await delay(700);
+  const collapsedContent = await apiRequest(
+    `/api/file?path=${encodeURIComponent(`${taskDirectory}/task_1.txt`)}`,
+  );
+  check(
+    !collapsedContent.content.includes('expanded=true'),
+    'the collapse is stored in the file of the task',
+  );
+
   // The grand child (14) stays hidden: its own parent was never expanded.
   const grandChildStillHidden = await evaluate(
     `document.querySelector('.tree-row[data-task-id="14"]') === null`,
@@ -758,6 +768,35 @@ async function runChecks() {
     `document.querySelector('.tree-row[data-task-id="14"]')?.dataset['depth'] ?? ''`,
   );
   check(grandChildDepth === '2', 'a ctrl+click expands the whole branch', grandChildDepth);
+
+  // The whole branch was written into the files, one key per task.
+  await delay(700);
+  const persistedContent = await apiRequest(
+    `/api/file?path=${encodeURIComponent(`${taskDirectory}/task_14.txt`)}`,
+  );
+  check(
+    persistedContent.content.includes('expanded=true'),
+    'the expanded state is stored in the file of every task of the branch',
+  );
+
+  // Opening the application again restores the state from the files: the task
+  // 14 shows up three rows deep without any click.
+  await session.send('Page.reload', { ignoreCache: true });
+  await delay(2500);
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Tree');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.tree-row[data-task-id="14"]') !== null`);
+  const restoredDepth = await evaluate(
+    `document.querySelector('.tree-row[data-task-id="14"]')?.dataset['depth'] ?? ''`,
+  );
+  check(
+    restoredDepth === '2',
+    'a new session restores the expanded state from the files',
+    restoredDepth,
+  );
 
   // Focusing a task makes it the root of the tree.
   await evaluate(`(() => {

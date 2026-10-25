@@ -434,6 +434,33 @@ the API takes the window of the page as a parameter (`supportsOpfs(win)`), like
 the one of the File System Access API, so the storage of the browser can be
 exercised by the test suite.
 
+## Batch 15 - Task expansion metadata and ripgrep searches
+
+The collapsed/expanded state of a task in the tree view (and the Gantt chart,
+which shares the same state) is now stored **in the task file itself** as an
+`expanded=` metadata key:
+
+* `expanded=true` is written when the branch of the task is expanded; the key
+  is removed when the branch is collapsed (absent means collapsed). It is a
+  view preference: writing it does **not** touch `updated=`;
+* the state is read back when the app opens, and the tree is seeded with it;
+* only the tree and the Gantt views use the key: every other view ignores the
+  metadata it does not care about.
+
+The searches of the service backend now prefer **ripgrep** (`rg`) when it is
+available on the machine, and fall back to `grep` otherwise.
+
+## Batch 15 - Task expansion metadata and ripgrep searches
+
+Two improvements:
+
+* the **collapsed/expanded state** of the tasks of the tree (and the Gantt, that
+  shares its state) is stored **in the task files** as an `expanded=` key and is
+  restored when the app opens (only the tree and the Gantt read it, every other
+  view ignores it, and writing it never touches `updated=`);
+* the **searches of the service backend** use ripgrep (`rg`) when it is
+  available on the machine, and fall back to `grep` otherwise.
+
 ## Batch 14 - Tree expansion and board colors
 
 Three interface refinements:

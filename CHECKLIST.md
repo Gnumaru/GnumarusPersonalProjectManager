@@ -435,6 +435,43 @@
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
 
+## Batch 15 - Task expansion metadata and ripgrep searches
+
+### Task format
+
+- [x] `src/core/task.ts` - `expanded` on `Task`, parsed and serialized
+      (`expanded=true` written only when expanded; removed when collapsed)
+- [x] `withExpandedState(task, expanded)`: does not touch `updated=`
+
+### Stores
+
+- [x] `TaskSummary.expanded` in `src/core/projectStore.ts`
+- [x] `src/core/embeddedStore.ts` and `src/core/fileSystemStore.ts` pass it
+- [x] `src/core/serviceStore.ts` reads `expanded=` with the metadata command
+
+### Ripgrep
+
+- [x] `rg` probe and `rg` search commands in `src/core/serviceStore.ts`
+- [x] `grep` fallback when `rg` is unavailable
+
+### App
+
+- [x] `src/ui/app.ts` seeds the tree state from the summaries and persists every
+      expansion change (toggle, subtree, focus, parent of a new child, drop)
+
+### Tests
+
+- [x] `src/core/task.test.ts` format tests
+- [x] `src/test-support/fakeBridge.ts` emulates the new commands
+- [x] `src/ui/app.test.ts` persistence of the expansion
+- [x] live `src/core/serviceStore.test.ts` metadata includes `expanded`
+- [x] `scripts/e2e-browser.mjs` reload restores the state
+
+### Build / deploy
+
+- [x] `npm run verify` (385 tests, 98/98 browser checks)
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
 ## Batch 14 - Tree expansion and board colors
 
 ### Tree view

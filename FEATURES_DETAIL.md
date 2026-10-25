@@ -57,6 +57,10 @@ Rules:
 * `related` - the ids of the tasks that are **related** to this one: a relation
   the user makes explicit, that is neither a blocking relation nor a
   parent/child relation. The key is absent when there is none.
+* `expanded` - `true` only when the branch of the task is shown expanded in the
+  tree view. The key is **removed** when the branch is collapsed (absent means
+  collapsed). It is a view preference: writing it does not change `updated`,
+  and every view but the tree and the Gantt ignores it.
 
 ### The blocking and the related tasks in the editor
 
@@ -153,6 +157,18 @@ grep -rIl --fixed-strings --ignore-case --include='task_*.txt' \
   line, so no quoting or escaping problem can happen whatever the user types.
 * `grep` exits with `1` when nothing matched; that is not an error and yields an
   empty result.
+
+The store first probes **ripgrep** (`command -v rg`) once, and caches the
+answer. When it is installed, the same search runs through `rg`, which is much
+faster on big projects:
+
+```
+rg -il --fixed-strings --no-ignore -g 'task_*.txt' -f - .
+```
+
+The contract is the same (stdin pattern, one path per line, exit code `1` for
+"no match"), so the fallback on `grep` is transparent. The notes are searched
+the same way (`-g 'note_*.txt'`).
 
 In the **embedded** mode, the shell is not available: the same search is done in
 JavaScript, over the files of the storage of the browser.
@@ -285,6 +301,31 @@ The indentation of a row is the depth of the task in the displayed tree.
 | **Ctrl+click** on the twisty | The **whole branch** is collapsed or expanded: the task and every one of its descendants, at any depth. |
 
 The tooltip of the twisty tells which gesture does what.
+
+### The expanded state lives in the files
+
+The collapsed/expanded state of **every** task is stored in the task file
+itself, as an `expanded=` metadata key:
+
+```
+id=12
+title=Implement pagination
+status=todo
+expanded=true
+----
+```
+
+The key is written **only** when the branch is expanded: an absent key means
+collapsed, so collapsed tasks leave no trace and the files stay small. It is a
+**view preference**: writing or removing it does not touch the `updated`
+timestamp of the task. Only the tree view and the Gantt chart (which shares the
+same state) read it; the board, the list and the notes ignore the keys they do
+not care about.
+
+The state survives the closing of the application: every refresh re-derives the
+set of expanded rows from the files, so the **disk is always the source of
+truth**. Toggling, a ctrl+click on a branch, focusing the tree, adding a child
+and dropping a task all write the key of the tasks they touch.
 
 ### The focus
 

@@ -4,6 +4,7 @@ import { ServiceProjectStore } from './serviceStore.js';
 import { buildNote } from './note.js';
 import {
   buildTask,
+  withExpandedState,
   withParent,
   type Task,
   type TaskInput,
@@ -108,6 +109,30 @@ describeLive('ServiceProjectStore against the live service', () => {
     expect(found.length).toBe(1);
   });
 
+  it('persists and reads back the expanded state of the tasks', async () => {
+    const id = await store.nextTaskId();
+    const path = store.taskPath(id);
+    const absolute = `${testDirectory}/task_${id}.txt`;
+    await store.createTaskFile(path, buildTask(input('The expanded one'), id, new Date()));
+
+    const before = await store.readTask(path);
+    expect(before.expanded).toBe(false);
+    await store.writeTask(path, withExpandedState(before, true));
+
+    // The file holds the key, and the metadata of the listing carries it.
+    const file = await api.readFile(absolute);
+    expect(file.content).toContain('expanded=true');
+    expect(file.content).not.toContain('expanded=false');
+    const tasks = await store.listTasks();
+    expect(tasks.find((task) => task.id === id)?.expanded).toBe(true);
+
+    // Collapsed again: the key is simply removed.
+    await store.writeTask(path, withExpandedState(before, false));
+    const afterFile = await api.readFile(absolute);
+    expect(afterFile.content).not.toContain('expanded=');
+    const after = await store.listTasks();
+    expect(after.find((task) => task.id === id)?.expanded).toBe(false);
+  });
   it('updates a task keeping its id', async () => {
     const id = 1;
     const path = store.taskPath(id);

@@ -23,6 +23,7 @@ const task: Task = {
   description: 'The description of the task',
   blockedBy: [],
   related: [],
+  expanded: false,
 };
 
 describe('renderTaskRows', () => {

@@ -209,8 +209,11 @@ export class FakeBridge {
     const stdin = typeof body['stdin'] === 'string' ? (body['stdin'] as string) : '';
 
     const prefix = cwd === '/' ? '/' : `${cwd}/`;
-    // The `--include='...'` option of `grep` tells which files are read.
-    const include = /--include='([^']*)'/u.exec(command)?.[1] ?? null;
+    // The `--include='...'` option of `grep` and the `-g '...'` option of `rg`
+    // tell which files are read.
+    const commandLine = command;
+    const include =
+      /--include='([^']*)'/u.exec(commandLine)?.[1] ?? /-g '([^']*)'/u.exec(commandLine)?.[1] ?? null;
     const includePattern = include === null ? null : globToRegExp(include);
     /** The text files of the folder, the ones the command asks for. */
     const files = (): [string, string][] =>
@@ -225,7 +228,18 @@ export class FakeBridge {
       });
 
     let stdout = '';
-    if (command.startsWith('find ')) {
+    if (command === 'command -v rg') {
+      // The fake machine has ripgrep installed: the searches use it.
+      stdout = '/usr/bin/rg\n';
+    } else if (command.startsWith('rg ')) {
+      // Same contract as the grep search: one path per matching file.
+      const pattern = stdin.split('\n')[0] ?? '';
+      const lower = pattern.toLowerCase();
+      const matches = files()
+        .filter(([, content]) => content.toLowerCase().includes(lower))
+        .map(([filePath]) => `./${filePath.slice(prefix.length)}`);
+      stdout = matches.length > 0 ? `${matches.join('\n')}\n` : '';
+    } else if (command.startsWith('find ')) {
       const namePattern = globToRegExp(/-name '([^']*)'/u.exec(command)?.[1] ?? '*.txt');
       stdout = [...this.files.keys()]
         .filter((filePath) => filePath.startsWith(prefix))
@@ -253,7 +267,7 @@ export class FakeBridge {
           if (line.trim() === '----') {
             break;
           }
-          if (/^(id|parent|status|title|tags|start|end)=/u.test(line)) {
+          if (/^(id|parent|status|title|tags|start|end|expanded)=/u.test(line)) {
             lines.push(`${relative}:${line}`);
           }
         }

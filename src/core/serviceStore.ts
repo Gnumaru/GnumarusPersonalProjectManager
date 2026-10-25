@@ -47,6 +47,7 @@ interface MutableMetadata {
   tags: string[];
   start: string;
   end: string;
+  expanded: boolean;
 }
 
 /** Command used to list the task files of the project. */
@@ -99,7 +100,27 @@ export const COUNT_CHILDREN_COMMAND =
  * dates. The description of the tasks never reaches the browser.
  */
 export const READ_METADATA_COMMAND =
-  "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' -e '^start=' -e '^end=' .";
+  "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' -e '^start=' -e '^end=' -e '^expanded=' .";
+
+/**
+ * Command used to detect the presence of ripgrep (`rg`) on the machine.
+ *
+ * When the command answers (exit code 0) the searches may use ripgrep, which is
+ * much faster than `grep` on big projects.
+ */
+export const DETECT_RIPGREP_COMMAND = 'command -v rg';
+
+/**
+ * Command used to search the task files with **ripgrep**.
+ *
+ * Same contract as `GREP_TASK_FILES_COMMAND`: the pattern is fed through stdin
+ * (`-f -`) and the answer is one path per matching file. `rg` exits with 1 when
+ * nothing matched, which is not an error.
+ */
+export const RG_TASK_SEARCH_COMMAND = "rg -il --fixed-strings --no-ignore -g 'task_*.txt' -f - .";
+
+/** Command used to search the note files with **ripgrep**. */
+export const RG_NOTE_SEARCH_COMMAND = "rg -il --fixed-strings --no-ignore -g 'note_*.txt' -f - .";
 
 /**
  * Command used to search the task files.
@@ -150,10 +171,34 @@ export class ServiceProjectStore implements ProjectStore {
   readonly kind: ProjectKind = 'service';
   private readonly api: ApiClient;
   private readonly projectDir: string;
+  /** Cached answer of the ripgrep probe: `null` until it ran once. */
+  private ripgrep: boolean | null = null;
 
   constructor(api: ApiClient, projectDir: string) {
     this.api = api;
     this.projectDir = projectDir;
+  }
+
+  /**
+   * Whether `rg` is available on the machine.
+   *
+   * The presence of ripgrep is probed once and cached: the searches then prefer
+   * it, and fall back to `grep` when it is not installed.
+   */
+  private async hasRipgrep(): Promise<boolean> {
+    if (this.ripgrep === null) {
+      try {
+        const result = await this.api.execShell({
+          command: DETECT_RIPGREP_COMMAND,
+          cwd: this.projectDir,
+          timeout: 10,
+        });
+        this.ripgrep = result.returncode === 0;
+      } catch {
+        this.ripgrep = false;
+      }
+    }
+    return this.ripgrep;
   }
 
   /** The absolute path of a file of the project. */
@@ -207,7 +252,7 @@ export class ServiceProjectStore implements ProjectStore {
       if (trimmed.length === 0) {
         continue;
       }
-      const match = /^(.*?):(id|parent|status|title|tags|start|end)=(.*)$/u.exec(trimmed);
+      const match = /^(.*?):(id|parent|status|title|tags|start|end|expanded)=(.*)$/u.exec(trimmed);
       if (match === null) {
         continue;
       }
@@ -225,6 +270,7 @@ export class ServiceProjectStore implements ProjectStore {
         tags: [] as string[],
         start: '',
         end: '',
+        expanded: false,
       };
       if (key === 'id') {
         const id = Number.parseInt(value, 10);
@@ -242,6 +288,8 @@ export class ServiceProjectStore implements ProjectStore {
         current.start = value;
       } else if (key === 'end') {
         current.end = value;
+      } else if (key === 'expanded') {
+        current.expanded = value.trim().toLowerCase() === 'true';
       }
       values.set(relative, current);
     }
@@ -260,6 +308,7 @@ export class ServiceProjectStore implements ProjectStore {
         tags: current.tags,
         start: current.start,
         end: current.end,
+        expanded: current.expanded,
         path: relative,
       });
     }
@@ -532,13 +581,14 @@ export class ServiceProjectStore implements ProjectStore {
 
   /** The absolute paths of the note files whose content holds the term. */
   private async searchNotePathsInternal(term: string): Promise<string[]> {
+    const useRipgrep = await this.hasRipgrep();
     const result = await this.api.execShell({
-      command: GREP_NOTE_FILES_COMMAND,
+      command: useRipgrep ? RG_NOTE_SEARCH_COMMAND : GREP_NOTE_FILES_COMMAND,
       cwd: this.projectDir,
       stdin: `${term.replace(/[\r\n]+/gu, ' ')}\n`,
       timeout: 60,
     });
-    // grep exits with 1 when nothing matched, which is not an error.
+    // grep and rg exit with 1 when nothing matched, which is not an error.
     if (result.returncode !== 0 && result.returncode !== 1) {
       throw new Error(
         `Unable to search the notes of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
@@ -614,13 +664,14 @@ export class ServiceProjectStore implements ProjectStore {
     if (normalized.length === 0) {
       return this.listTaskPathsInternal();
     }
+    const useRipgrep = await this.hasRipgrep();
     const result = await this.api.execShell({
-      command: GREP_TASK_FILES_COMMAND,
+      command: useRipgrep ? RG_TASK_SEARCH_COMMAND : GREP_TASK_FILES_COMMAND,
       cwd: this.projectDir,
       stdin: `${normalized.replace(/[\r\n]+/gu, ' ')}\n`,
       timeout: 60,
     });
-    // grep exits with 1 when nothing matched, which is not an error.
+    // grep and rg exit with 1 when nothing matched, which is not an error.
     if (result.returncode !== 0 && result.returncode !== 1) {
       throw new Error(
         `Unable to search the tasks of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,

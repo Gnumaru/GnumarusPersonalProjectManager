@@ -69,12 +69,14 @@ no tree view, apos adicionar uma tarefa filha, o pai deve ser automaticamente ex
 na view de kanban, faca com que cada coluna fique colorida por inteiro com a cor do status ao inves de ter apenas uma bolinha colorida.
 na view de kanban, o titulo das tarefas deve estar visivel por completo, com texto wrapped, mesmo se isso fizer os cards ficarem com altura desigual.
 ====
-
-====
 o estado colapsado/expandido das tarefas na tree view e kanban deve ser armazenado como metadado na tarefa e carregado ao abrir o app.
 ao usar o webservice como backend, para fazer buscas utilize ripgrep (comando rg) se ele estiver disponivel. se nao estiver pode usar grep.
 ====
+eu respondi errado a pergunta. a view de kanban nao precisa do metadado expanded, apenas as views de tree e gantt. toda view apenas ignora aqueles metadados que não interessam pra ela.
 ====
+====
+os cards no kanban tambem precisa estar coloridos com a mesma cor da coluna onde estiverem e mudar de cor ao arrastar pra outra coluna, mas a cor do card vai ser mais escura do que a cor da coluna
+ao carregar uma nota que nao tenha start date o dia atual deve ser atribuido a ela. e se a nota nao tiver end date o dia seguinte é atribuido a ela
 ====
 ====
 ====

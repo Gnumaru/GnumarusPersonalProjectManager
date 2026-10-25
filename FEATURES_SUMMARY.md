@@ -28,6 +28,7 @@ list or as a tree.
 | **List / Tree / Kanban / Gantt toggle** | Done | `src/ui/app.ts` |
 | **One row per task, with its name and its tags** | Done | `src/ui/taskTreeView.ts` |
 | **Collapse and expand the children of a task** | Done | `src/ui/taskTreeView.ts`, `src/core/taskTree.ts` |
+| **The expanded state is stored in the task file and restored on open** | Done | `src/core/task.ts`, `src/ui/app.ts` |
 | **Ctrl+click collapses or expands the whole branch** | Done | `src/ui/app.ts`, `src/core/taskTree.ts` |
 | **Drag and drop: a task dropped on another one becomes its child** | Done | `src/ui/treeDrag.ts`, `src/ui/app.ts` |
 | **The branch of the parent opens when a child task is added to it** | Done | `src/ui/app.ts` |
@@ -155,6 +156,7 @@ list or as a tree.
 | Strict TypeScript (`strict` plus the strictest extra flags, no `any`) | Done | `tsconfig.json` |
 | The types of the File System Access API are declared in the project, without any dependency | Done | `src/types/fileSystemAccess.d.ts` |
 | Unit tests of the format, the pagination, the tree, the client and the widgets | Done | `src/**/*.test.ts` |
+| **Task and note searches through the service use ripgrep when it is available** | Done | `src/core/serviceStore.ts` |
 | Unit tests of the embedded project, of the storage of the browser and of the ZIP archives | Done | `src/core/embeddedStore.test.ts`, `src/core/browserStorage.test.ts`, `src/core/zip.test.ts` |
 | Integration tests against the running bridge (with or without a token) | Done | `src/core/serviceStore.test.ts` |
 | Browser end to end test driving a real Chrome | Done | `scripts/e2e-browser.mjs` |
