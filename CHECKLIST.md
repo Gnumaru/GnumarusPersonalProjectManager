@@ -435,6 +435,31 @@
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
 
+## Batch 17 - The search on the board and the chart
+
+### Gantt chart
+
+- [x] The search shows the tasks that match and their whole chain of ancestors,
+      with the branches of the ancestors opened (same behaviour as the tree)
+- [x] Clearing the search brings back the default of the tree
+
+### Kanban board
+
+- [x] Only the leaf tasks (without a child) that match stay on the board
+- [x] The other cards disappear and come back when the search is emptied
+
+### Tests
+
+- [x] `src/ui/app.test.ts` - the ancestors on the chart, the single leaf on the
+      board and the cards coming back
+- [x] `scripts/e2e-browser.mjs` - the board search and the chart search,
+      including the clearing
+
+### Build / deploy
+
+- [x] `npm run verify` (390 tests, 105/105 browser checks)
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
 ## Batch 16 - Card colours and default dates on load
 
 ### Kanban board

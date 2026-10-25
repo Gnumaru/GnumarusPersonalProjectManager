@@ -423,9 +423,15 @@ and it keeps that behaviour.
 
 ### The search
 
-The search uses the same recursive `grep` as the flat list. In the tree, only
-the branches that hold a match are kept and the ancestors of the matches are
-expanded, so a match is never hidden behind a collapsed task.
+The search uses the same recursive `grep` (`rg` when it is available) as the
+flat list. In the tree, only the branches that hold a match are kept and the
+ancestors of the matches are expanded, so a match is never hidden behind a
+collapsed task.
+
+The search works on the **Gantt chart** the same way: the chart shows the tasks
+that match **and their whole chain of ancestors**, with the branches of the
+ancestors opened by the search itself. Emptying the search box brings back the
+default of the tree.
 
 ---
 
@@ -463,6 +469,13 @@ carries a stronger mix of it, so the card stands out from the column without
 leaving its colour family. The colour follows the card: dragging it onto
 another column repaints the card in an instant, because the colour comes from
 the column the card sits in.
+
+### The search
+
+The search box filters the board as well: **only the leaves that match** stay
+on the board, every other card disappears, and all of them come back when the
+search box is emptied. The parent tasks are never on the board, with or without
+a search.
 
 ### Changing the status
 

@@ -1227,22 +1227,33 @@ export class App {
     const summaries = await store.listTasks();
     this.applyHierarchy(summaries);
     await this.seedTaskDates(summaries);
-
-    if (this.query.length > 0) {
-      const paths = await store.searchTaskPaths(this.query);
-      const ids = new Set<number>();
-      for (const path of paths) {
-        const id = parseTaskIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
-        if (id !== null) {
-          ids.add(id);
-        }
-      }
-      this.treeMatches = ids;
-    } else {
-      this.treeMatches = null;
-    }
+    this.treeMatches = await this.searchTaskIds();
 
     await this.updateTreeRows();
+  }
+
+  /**
+   * The ids of the tasks that match the term of the search.
+   *
+   * `null` when the search box is empty: the views then show everything.
+   */
+  private async searchTaskIds(): Promise<Set<number> | null> {
+    if (this.query.length === 0) {
+      return null;
+    }
+    const store = this.store;
+    if (store === null) {
+      return new Set<number>();
+    }
+    const paths = await store.searchTaskPaths(this.query);
+    const ids = new Set<number>();
+    for (const path of paths) {
+      const id = parseTaskIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
+      if (id !== null) {
+        ids.add(id);
+      }
+    }
+    return ids;
   }
 
   /**
@@ -1264,8 +1275,13 @@ export class App {
         parents.add(task.parentId);
       }
     }
+    const matches = await this.searchTaskIds();
+    this.treeMatches = matches;
     this.kanbanCards = summaries
       .filter((task) => !parents.has(task.id))
+      // The search of the board shows only the leaves that match: the other
+      // cards come back when the search box is emptied.
+      .filter((task) => matches === null || matches.has(task.id))
       .map((task) => ({
         id: task.id,
         title: task.title,
@@ -1291,6 +1307,7 @@ export class App {
     const summaries = await store.listTasks();
     const seededDates = await this.seedTaskDates(summaries);
     this.applyHierarchy(summaries);
+    this.treeMatches = await this.searchTaskIds();
     this.ganttMetadata = new Map<number, TaskSummary>(
       summaries.map((task) => {
         const seeded = seededDates.get(task.id);
@@ -1772,6 +1789,9 @@ export class App {
     return flattenTaskTree(structure, {
       focusId: this.treeFocusId,
       expanded: this.treeExpanded,
+      // The search works like the one of the tree: the matches are shown,
+      // together with their whole chain of ancestors.
+      matches: this.treeMatches,
     });
   }
 

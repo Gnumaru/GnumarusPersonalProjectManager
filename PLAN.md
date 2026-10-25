@@ -450,6 +450,17 @@ which shares the same state) is now stored **in the task file itself** as an
 The searches of the service backend now prefer **ripgrep** (`rg`) when it is
 available on the machine, and fall back to `grep` otherwise.
 
+## Batch 17 - The search on the board and the chart
+
+The search box works on **every** view now, not only on the list and the tree:
+
+* on the **Gantt chart** it works exactly like on the tree: the tasks that match
+  the term are displayed, together with their whole chain of ancestors (the
+  branches of the ancestors are opened by the search);
+* on the **kanban board** only the **leaf** tasks (the ones without a child)
+  that match are shown as cards: every other card disappears, and all of them
+  come back when the search box is emptied.
+
 ## Batch 16 - Card colours and default dates on load
 
 * the **cards of the board** are painted with the colour of their column, one

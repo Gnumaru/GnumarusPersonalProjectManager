@@ -1431,6 +1431,40 @@ describe('App and the board', () => {
     harness.app.dispose();
   });
 
+  it('searches the board and shows only the matching leaves', async () => {
+    const harness = await createBoardHarness();
+    await switchToBoard(harness);
+
+    const search = harness.root.querySelector<HTMLInputElement>('#search-input');
+    expect(search).not.toBeNull();
+    if (search === null) {
+      return;
+    }
+    search.value = 'marker-4';
+    click(buttonByText(harness.doc, 'Search'));
+    await flush();
+
+    // The leaf that matches stays on the board; every other card is gone.
+    let cards = [...harness.root.querySelectorAll('.kanban-card')];
+    expect(cards.map((card) => card.getAttribute('data-task-id'))).toEqual(['4']);
+
+    // Emptying the search box brings every card back.
+    search.value = '';
+    click(buttonByText(harness.doc, 'Search'));
+    await flush();
+    cards = [...harness.root.querySelectorAll('.kanban-card')];
+    expect(cards.map((card) => card.getAttribute('data-task-id'))).toEqual(['3', '4', '5']);
+
+    // Another search replaces the cards of the board.
+    search.value = 'marker-5';
+    click(buttonByText(harness.doc, 'Search'));
+    await flush();
+    cards = [...harness.root.querySelectorAll('.kanban-card')];
+    expect(cards.map((card) => card.getAttribute('data-task-id'))).toEqual(['5']);
+
+    harness.app.dispose();
+  });
+
   it('changes the status of a task when its card is dropped on another column', async () => {
     const harness = await createBoardHarness();
     await switchToBoard(harness);
@@ -1464,6 +1498,37 @@ describe('App and the board', () => {
 });
 
 describe('App and the Gantt chart', () => {
+  it('searches the chart and keeps the ancestors of the matches', async () => {
+    const harness = await createGanttHarness();
+    await switchToGantt(harness);
+
+    const search = harness.root.querySelector<HTMLInputElement>('#search-input');
+    expect(search).not.toBeNull();
+    if (search === null) {
+      return;
+    }
+    const names = (): (string | undefined)[] =>
+      [...harness.root.querySelectorAll('.gantt-row-name')].map((row) => row.textContent);
+
+    // Without a search only the task without a parent is on the chart.
+    expect(names()).toEqual(['Task 1']);
+
+    // The search shows the matches and their whole chain of ancestors: the
+    // branch of the ancestor is opened by the search itself.
+    search.value = 'marker-3';
+    click(buttonByText(harness.doc, 'Search'));
+    await flush();
+    expect(names()).toEqual(['Task 1', 'Task 3']);
+
+    // Emptying the search box brings back the default of the tree.
+    search.value = '';
+    click(buttonByText(harness.doc, 'Search'));
+    await flush();
+    expect(names()).toEqual(['Task 1']);
+
+    harness.app.dispose();
+  });
+
   async function createGanttHarness(): Promise<Harness> {
     const harness = await createHarness(0, {
       tasks: [

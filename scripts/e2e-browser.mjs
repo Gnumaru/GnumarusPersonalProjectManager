@@ -1007,6 +1007,37 @@ async function runChecks() {
   );
   check(parentOnBoard === false, 'the tasks that have a child are not on the board');
 
+  // The search of the board shows only the leaves that match: every other
+  // card is gone, and it comes back when the search is cleared.
+  const cardsBeforeSearch = await evaluate(`document.querySelectorAll('.kanban-card').length`);
+  await evaluate(`(() => {
+    const input = document.querySelector('#search-input');
+    input.value = 'unique-marker-3';
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Search');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.kanban-card').length === 1`);
+  const boardSearchIds = await evaluate(
+    `[...document.querySelectorAll('.kanban-card')].map((node) => node.dataset['taskId']).join('|')`,
+  );
+  check(
+    boardSearchIds === '3',
+    'the search of the board shows only the leaf that matches',
+    boardSearchIds,
+  );
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Clear');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.kanban-card').length === ${cardsBeforeSearch}`);
+  check(
+    true,
+    'clearing the search of the board brings every card back',
+    String(cardsBeforeSearch),
+  );
+
   // The card of the second task is dragged on the DOING column. The board may
   // scroll: both elements are brought into the view before the coordinates of
   // the drag are computed, otherwise the pointer events would land outside of
@@ -1077,6 +1108,38 @@ async function runChecks() {
     return true;
   })()`);
   await waitFor(`document.querySelector('.gantt-wrap') !== null`);
+
+  // The search of the chart shows the matches and their whole chain of
+  // ancestors: the branch of the ancestor is opened by the search itself.
+  const ganttRowsBeforeSearch = await evaluate(`document.querySelectorAll('.gantt-row').length`);
+  await evaluate(`(() => {
+    const input = document.querySelector('#search-input');
+    input.value = 'Child of the first task';
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Search');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.gantt-row').length === 2`);
+  const ganttSearchNames = await evaluate(
+    `[...document.querySelectorAll('.gantt-row-name')].map((node) => node.textContent).join('|')`,
+  );
+  check(
+    ganttSearchNames.includes('Browser test task 1') &&
+      ganttSearchNames.includes('Child of the first task'),
+    'the search of the chart keeps the ancestors of the matches',
+    ganttSearchNames,
+  );
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Clear');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.gantt-row').length === ${ganttRowsBeforeSearch}`);
+  check(
+    true,
+    'clearing the search of the chart brings the default back',
+    String(ganttRowsBeforeSearch),
+  );
 
   const ganttMonths = await evaluate(
     `[...document.querySelectorAll('.gantt-month')].map((node) => node.textContent).join('|')`,

@@ -80,6 +80,7 @@ ao carregar uma nota que nao tenha start date o dia atual deve ser atribuido a e
 na view gantt a busca nao esta funcionando. ela deve funcionar do mesmo jeito que na view tree: todas as tasks que derem match com o termo de busca sao exibidas bem como toda sua hierarquia de tasks pai.
 a busca tambem deve funcionar no kanban. apenas as tasks 'folha' (sem filhas) que derem match no termo de busca devem ser exibidas, todas as outras devem "sumir" e voltar apenas quando a busca for limpada
 ====
+na view list deve ser possivel ordenar a lista ascendentemente ou descendentemente por qualquer coluna (exceto tags) clicando no nome dela. se a coluna clicada ainda não é a coluna de ordenação, ao clicar ela se torna a coluna de ordenação e ordena descendentemente (ordem numerica pra numeros, alfabetica pra strings e ordem de data para colunas de data). se a coluna já for a coluna de ordenacao, a direcao da ordenacao vai inverter (se era ascendente vira descendente e vice versa). essa regra de ordenacao vale tambem pra view de notas, mas apenas para essas duas
 ====
 ====
 ====

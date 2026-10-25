@@ -82,6 +82,7 @@ list or as a tree.
 | **Kanban board: one column per status** | Done | `src/ui/kanbanBoard.ts` |
 | **Board columns colored from top to bottom with the colour of their status** | Done | `src/styles.css` |
 | **Cards colored with the colour of their column, a shade darker, changing when dragged** | Done | `src/styles.css` |
+| **Search on the board: only the matching leaves stay on the board** | Done | `src/ui/app.ts` |
 | **The titles of the cards are shown in full (the text wraps, cards of unequal height)** | Done | `src/styles.css` |
 | **Columns in the order PLANNING, TODO, NEXT, PAUSED, DOING, DONE, CANCELED** | Done | `src/core/task.ts` |
 | **Only the tasks that have no child are on the board** | Done | `src/core/projectStore.ts` |
@@ -93,6 +94,7 @@ list or as a tree.
 | Feature | Status | Where |
 | ------- | ------ | ----- |
 | **Gantt chart: the tasks on the left, the chart on the right** | Done | `src/ui/ganttView.ts` |
+| **Search on the chart: the matches and their chain of ancestors** | Done | `src/core/taskTree.ts`, `src/ui/app.ts` |
 | **One column per day** | Done | `src/core/gantt.ts` |
 | **The days grouped by week and the weeks by month** | Done | `src/core/gantt.ts` |
 | **The weeks and the months numbered and named, counting from one** | Done | `src/core/gantt.ts` |
