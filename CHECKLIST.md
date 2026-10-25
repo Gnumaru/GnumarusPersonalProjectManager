@@ -435,6 +435,40 @@
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
 
+## Batch 18 - Sortable columns in the list and in the notes
+
+### Task list
+
+- [x] A click on the name of a sortable column sorts the table by it: ID, Title,
+      Parent, Status, Updated (tags and actions are never sortable)
+- [x] A new sort column sorts **descending** first; clicking the same column
+      again **inverts** the direction
+- [x] The comparison follows the column: numeric for the ids and the parents,
+      alphabetical (numbers inside the text compared as numbers) for the titles
+      and the statuses, and by date for the `updated=` timestamps
+- [x] The sort is global, across the pages: one metadata command reads every
+      task, only the page is read in full, and the sort goes back to page 1
+
+### Notes list
+
+- [x] The same sorting rule on the ID, Title and Updated columns
+- [x] The note summaries (id, title, updated) are read with one `grep` command
+      when the sort is active
+
+### Tests
+
+- [x] `src/core/tableSort.test.ts` - the state machine of the sort and the three
+      kinds of comparison, with the ties kept in place
+- [x] `src/ui/app.test.ts` - the header clicks on both tables, the parents
+      without value sorting first, the page going back to 1, and the notes view
+- [x] `scripts/e2e-browser.mjs` - the descending click, the inversion, the
+      non-sortable tags and the notes sorted by title
+
+### Build / deploy
+
+- [x] `npm run verify` (404 tests, 110/110 browser checks)
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
 ## Batch 17 - The search on the board and the chart
 
 ### Gantt chart

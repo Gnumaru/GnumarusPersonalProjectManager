@@ -38,7 +38,7 @@ import {
   type NoteSearchScope,
 } from './note.js';
 import type { BrowserFileStorage } from './browserStorage.js';
-import type { ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
+import type { NoteSummary, ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
 
 export class EmbeddedProjectStore implements ProjectStore {
   readonly kind: ProjectKind = 'embedded';
@@ -100,6 +100,7 @@ export class EmbeddedProjectStore implements ProjectStore {
         tags: task.tags,
         start: task.start,
         end: task.end,
+        updated: task.updated,
         expanded: task.expanded,
         path,
       });
@@ -204,6 +205,19 @@ export class EmbeddedProjectStore implements ProjectStore {
       (path) => isNoteFileName(path.slice(path.lastIndexOf('/') + 1)),
       parseNoteIdFromFileName,
     );
+  }
+
+  async listNoteSummaries(): Promise<readonly NoteSummary[]> {
+    const summaries: NoteSummary[] = [];
+    for (const path of await this.listNotePaths()) {
+      const content = this.files.get(path);
+      if (content === undefined) {
+        continue;
+      }
+      const note = parseNote(content, parseNoteIdFromFileName(path.slice(path.lastIndexOf('/') + 1)) ?? undefined);
+      summaries.push({ id: note.id, title: note.title, updated: note.updated, path });
+    }
+    return summaries;
   }
 
   async searchNotePaths(term: string, scope: NoteSearchScope): Promise<readonly string[]> {

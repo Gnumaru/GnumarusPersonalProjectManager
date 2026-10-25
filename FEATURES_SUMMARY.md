@@ -18,6 +18,8 @@ list or as a tree.
 | View a task | Done | `src/ui/taskDialog.ts` |
 | Delete a task (with confirmation) | Done | `src/ui/taskDialog.ts`, `src/core/projectStore.ts` |
 | Recursive search of the tasks (grep) | Done | `src/core/serviceStore.ts`, `src/core/embeddedStore.ts` |
+| **Sortable columns: click a name to sort descending, click again to invert** | Done | `src/core/tableSort.ts`, `src/ui/app.ts` |
+| **Global sort across the pages, numeric / alphabetical / date per column** | Done | `src/core/tableSort.ts`, `src/ui/app.ts` |
 | Free form tags (add and remove) | Done | `src/core/task.ts` |
 | Task status (planning, next, to do, doing, paused, done, canceled) | Done | `src/core/task.ts` |
 
@@ -121,6 +123,7 @@ list or as a tree.
 | **An input jumps to the page the user types** | Done | `src/ui/paginationBar.ts` |
 | **The amount of notes per page is configurable, from 10 to 100** | Done | `src/core/config.ts` |
 | **The notes work in the service mode and in the embedded mode** | Done | `src/core/projectStore.ts` |
+| **Sortable notes: ID, Title and Updated, same first-descending rule** | Done | `src/core/tableSort.ts`, `src/ui/app.ts` |
 
 ## The project
 

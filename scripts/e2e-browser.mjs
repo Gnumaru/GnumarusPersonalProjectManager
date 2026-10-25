@@ -1376,6 +1376,7 @@ async function runChecks() {
   await evaluate(`document.querySelector('.modal-close').click()`);
 
   await checkNotes();
+  await checkSorting();
   await checkEmbeddedProject();
   await checkEmbeddedColdStart();
 }
@@ -1549,6 +1550,85 @@ async function checkNotes() {
   check(deleted === false, 'the note is deleted');
 
   // Back to the tasks.
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'List');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.task-table tbody tr').length === 10`);
+}
+
+/**
+ * Checks the sorting of the task list and of the notes list: a first click on
+ * a column sorts it descending, and the next clicks of the same column invert
+ * the direction.
+ */
+async function checkSorting() {
+  // --- the task list ---------------------------------------------------------
+
+  await waitFor(`document.querySelectorAll('.task-table tbody tr').length === 10`);
+
+  await evaluate(`(() => {
+    const header = document.querySelector('.task-table thead .cell-id .th-sort');
+    header.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.task-table thead .cell-id .th-sort')?.textContent === 'ID ▼'`);
+  const descendingIds = await evaluate(
+    `[...document.querySelectorAll('.task-table tbody td.cell-id')].map((node) => Number(node.textContent))`,
+  );
+  check(descendingIds.length >= 2, 'sorting by ID shows the tasks of the page', `${descendingIds.length}`);
+  check(
+    descendingIds[0] > descendingIds[1],
+    'the first click on the ID column sorts it descending',
+    `${descendingIds[0]} / ${descendingIds[1]}`,
+  );
+
+  await evaluate(`(() => {
+    document.querySelector('.task-table thead .cell-id .th-sort').click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.task-table thead .cell-id .th-sort')?.textContent === 'ID ▲'`);
+  const ascendingIds = await evaluate(
+    `[...document.querySelectorAll('.task-table tbody td.cell-id')].map((node) => Number(node.textContent))`,
+  );
+  check(ascendingIds[0] < ascendingIds[1], 'the second click on the same column inverts the direction', `${ascendingIds[0]} / ${ascendingIds[1]}`);
+
+  const tagsButton = await evaluate(
+    `document.querySelector('.task-table thead .cell-tags .th-sort')`,
+  );
+  check(tagsButton === null, 'the tags column is not sortable');
+
+  // Leave the tasks sorted ascending, which is the natural order of the ids.
+
+  // --- the notes -------------------------------------------------------------
+
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Notes');
+    button.click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.note-table tbody tr').length === 10`);
+
+  await evaluate(`(() => {
+    document.querySelector('.note-table thead .cell-title .th-sort').click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('.note-table thead .cell-title .th-sort')?.textContent === 'Title ▼'`);
+  const noteTitles = await evaluate(
+    `[...document.querySelectorAll('.note-table tbody td.cell-title .task-title-button')].map((node) => node.textContent)`,
+  );
+  const noteNumber = (title) => {
+    const match = /Browser test note (\d+)/u.exec(title);
+    return match === null ? 0 : Number(match[1]);
+  };
+  check(
+    noteNumber(noteTitles[0]) > noteNumber(noteTitles[1]),
+    'the first click on the title column sorts the notes descending',
+    `${noteTitles[0]} / ${noteTitles[1]}`,
+  );
+
+  // Leave the application where the previous checks expect it.
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'List');
     button.click();

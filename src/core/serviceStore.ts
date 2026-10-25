@@ -36,7 +36,7 @@ import {
   type Note,
   type NoteSearchScope,
 } from './note.js';
-import type { ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
+import type { NoteSummary, ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
 
 /** The metadata of a task, while it is being read. */
 interface MutableMetadata {
@@ -47,6 +47,7 @@ interface MutableMetadata {
   tags: string[];
   start: string;
   end: string;
+  updated: string;
   expanded: boolean;
 }
 
@@ -78,7 +79,7 @@ export const GREP_NOTE_FILES_COMMAND =
  * to be downloaded to search a title.
  */
 export const READ_NOTE_TITLES_COMMAND =
-  "grep -rH --include='note_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^title=' .";
+  "grep -rH --include='note_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^title=' -e '^updated=' .";
 
 /** Command used to list every file of the project. */
 export const FIND_ALL_FILES_COMMAND =
@@ -100,7 +101,7 @@ export const COUNT_CHILDREN_COMMAND =
  * dates. The description of the tasks never reaches the browser.
  */
 export const READ_METADATA_COMMAND =
-  "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' -e '^start=' -e '^end=' -e '^expanded=' .";
+  "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' -e '^start=' -e '^end=' -e '^updated=' -e '^expanded=' .";
 
 /**
  * Command used to detect the presence of ripgrep (`rg`) on the machine.
@@ -252,7 +253,7 @@ export class ServiceProjectStore implements ProjectStore {
       if (trimmed.length === 0) {
         continue;
       }
-      const match = /^(.*?):(id|parent|status|title|tags|start|end|expanded)=(.*)$/u.exec(trimmed);
+      const match = /^(.*?):(id|parent|status|title|tags|start|end|updated|expanded)=(.*)$/u.exec(trimmed);
       if (match === null) {
         continue;
       }
@@ -270,6 +271,7 @@ export class ServiceProjectStore implements ProjectStore {
         tags: [] as string[],
         start: '',
         end: '',
+        updated: '',
         expanded: false,
       };
       if (key === 'id') {
@@ -288,6 +290,8 @@ export class ServiceProjectStore implements ProjectStore {
         current.start = value;
       } else if (key === 'end') {
         current.end = value;
+      } else if (key === 'updated') {
+        current.updated = value;
       } else if (key === 'expanded') {
         current.expanded = value.trim().toLowerCase() === 'true';
       }
@@ -308,6 +312,7 @@ export class ServiceProjectStore implements ProjectStore {
         tags: current.tags,
         start: current.start,
         end: current.end,
+        updated: current.updated,
         expanded: current.expanded,
         path: relative,
       });
@@ -406,6 +411,63 @@ export class ServiceProjectStore implements ProjectStore {
   async listNotePaths(): Promise<readonly string[]> {
     const paths = await this.listNotePathsInternal();
     return paths.map((path) => this.relative(path));
+  }
+
+  async listNoteSummaries(): Promise<readonly NoteSummary[]> {
+    const result = await this.api.execShell({
+      command: READ_NOTE_TITLES_COMMAND,
+      cwd: this.projectDir,
+      timeout: 60,
+    });
+    if (result.returncode !== 0 && result.returncode !== 1) {
+      throw new Error(
+        `Unable to list the notes of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
+      );
+    }
+    const values = new Map<string, { id: number | null; title: string; updated: string }>();
+    for (const line of result.stdout.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) {
+        continue;
+      }
+      const match = /^(.*?):(title|updated)=(.*)$/u.exec(trimmed);
+      if (match === null) {
+        continue;
+      }
+      const path = (match[1] ?? '').replace(/^\.\//u, '');
+      if (path.length === 0) {
+        continue;
+      }
+      const key = match[2] ?? '';
+      const value = match[3] ?? '';
+      const current = values.get(path) ?? { id: null, title: '', updated: '' };
+      if (key === 'title') {
+        current.title = value;
+      } else {
+        current.updated = value;
+      }
+      if (current.id === null) {
+        const id = parseNoteIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
+        if (id !== null) {
+          current.id = id;
+        }
+      }
+      values.set(path, current);
+    }
+    const summaries: NoteSummary[] = [];
+    for (const [path, current] of values) {
+      if (current.id === null) {
+        continue;
+      }
+      summaries.push({
+        id: current.id,
+        title: current.title,
+        updated: current.updated,
+        path: this.relative(path),
+      });
+    }
+    // Sorted by id, like the listing itself.
+    return summaries.sort((left, right) => left.id - right.id);
   }
 
   /**

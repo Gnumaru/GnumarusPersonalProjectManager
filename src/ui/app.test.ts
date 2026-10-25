@@ -44,12 +44,14 @@ interface HarnessOptions {
     readonly id: number;
     readonly parentId?: number;
     readonly expanded?: boolean;
+    readonly updated?: string;
   }[];
   /** The notes created on the fake disk. */
   readonly notes?: readonly {
     readonly id: number;
     readonly title?: string;
     readonly content?: string;
+    readonly updated?: string;
   }[];
   /**
    * The kind of storage the project uses.
@@ -72,15 +74,16 @@ function taskContent(
   id: number,
   parentId: number | null = null,
   expanded = false,
+  updated = '20261002100000000',
 ): string {
   const lines = [`id=${id}`, `title=Task ${id}`, 'status=todo'];
   if (parentId !== null) {
     lines.push(`parent=${parentId}`);
   }
   lines.push(
+    `updated=${updated}`,
     `tags=tag${id}`,
     'created=20261001100000000',
-    'updated=20261002100000000',
     'start=',
     'end=',
   );
@@ -91,18 +94,18 @@ function taskContent(
   return lines.join('\n');
 }
 
-function noteContent(id: number, title = `Note ${id}`, content = `body-${id}`): string {
+function noteContent(id: number, title = `Note ${id}`, content = `body-${id}`, updated = '20261002100000000'): string {
   return [
     `id=${id}`,
     `title=${title}`,
     'created=20261001100000000',
-    'updated=20261002100000000',
+    `updated=${updated}`,
     '----',
     content,
   ].join('\n');
 }
 
-async function createHarness(taskCount = 25, options: HarnessOptions = {}): Promise<Harness> {
+export async function createHarness(taskCount = 25, options: HarnessOptions = {}): Promise<Harness> {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost/' });
   const doc = dom.window.document;
   const root = doc.createElement('div');
@@ -120,7 +123,7 @@ async function createHarness(taskCount = 25, options: HarnessOptions = {}): Prom
     for (const task of options.tasks) {
       bridge.addFile(
         `/home/user/projects/task_${task.id}.txt`,
-        taskContent(task.id, task.parentId ?? null, task.expanded ?? false),
+        taskContent(task.id, task.parentId ?? null, task.expanded ?? false, task.updated),
       );
     }
   } else {
@@ -131,7 +134,7 @@ async function createHarness(taskCount = 25, options: HarnessOptions = {}): Prom
   for (const note of options.notes ?? []) {
     bridge.addFile(
       `/home/user/projects/note_${note.id}.txt`,
-      noteContent(note.id, note.title ?? undefined, note.content ?? undefined),
+      noteContent(note.id, note.title ?? undefined, note.content ?? undefined, note.updated),
     );
   }
   if (options.config !== undefined) {
@@ -160,7 +163,7 @@ async function createHarness(taskCount = 25, options: HarnessOptions = {}): Prom
   for (const note of options.notes ?? []) {
     fake.addFile(
       `note_${note.id}.txt`,
-      noteContent(note.id, note.title ?? undefined, note.content ?? undefined),
+      noteContent(note.id, note.title ?? undefined, note.content ?? undefined, note.updated),
     );
   }
 
@@ -174,7 +177,7 @@ async function createHarness(taskCount = 25, options: HarnessOptions = {}): Prom
   for (const note of options.notes ?? []) {
     opfs.addFile(
       `note_${note.id}.txt`,
-      noteContent(note.id, note.title ?? undefined, note.content ?? undefined),
+      noteContent(note.id, note.title ?? undefined, note.content ?? undefined, note.updated),
     );
   }
   Object.defineProperty(dom.window.navigator, 'storage', {
@@ -203,13 +206,13 @@ async function createHarness(taskCount = 25, options: HarnessOptions = {}): Prom
   return { app, bridge, doc, root, dom, handleStorage, opfs: opfsRoot };
 }
 
-async function flush(times = 6): Promise<void> {
+export async function flush(times = 6): Promise<void> {
   for (let index = 0; index < times; index += 1) {
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
 }
 
-function click(element: Element | null | undefined): void {
+export function click(element: Element | null | undefined): void {
   if (element === null || element === undefined) {
     return;
   }
@@ -739,6 +742,173 @@ describe('App', () => {
     await flush();
     const openedTitle = harness.doc.querySelector('.modal-title')?.textContent;
     expect(openedTitle).toContain('Task #4 - The only child');
+    harness.app.dispose();
+  });
+});
+
+describe('Sorting of the task list and of the notes list', () => {
+  it('sorts by ID descending at the first click and inverts on the next one', async () => {
+    const harness = await createHarness(25);
+    await selectFolder(harness);
+
+    const idHeader = harness.root.querySelector<HTMLButtonElement>(
+      '.task-table thead .cell-id .th-sort',
+    );
+    expect(idHeader?.textContent).toBe('ID ↕');
+    click(idHeader);
+    await flush();
+    expect(
+      [...harness.root.querySelectorAll('.task-table tbody tr td.cell-id')].slice(0, 2).map(
+        (cell) => cell.textContent,
+      ),
+    ).toEqual(['25', '24']);
+    expect(harness.root.querySelector('.task-table thead .cell-id .th-sort')?.textContent).toBe(
+      'ID ▼',
+    );
+
+    click(harness.root.querySelector('.task-table thead .cell-id .th-sort'));
+    await flush();
+    expect(
+      [...harness.root.querySelectorAll('.task-table tbody tr td.cell-id')].slice(0, 2).map(
+        (cell) => cell.textContent,
+      ),
+    ).toEqual(['1', '2']);
+    expect(harness.root.querySelector('.task-table thead .cell-id .th-sort')?.textContent).toBe(
+      'ID ▲',
+    );
+    harness.app.dispose();
+  });
+
+  it('sorts by title, alphabetically', async () => {
+    const harness = await createHarness(25);
+    await selectFolder(harness);
+
+    click(harness.root.querySelector('.task-table thead .cell-title .th-sort'));
+    await flush();
+    // The numbers inside the titles are compared as numbers: Task 25 sorts
+    // before Task 9 when descending.
+    expect(
+      [...harness.root.querySelectorAll('.task-table tbody tr td.cell-title .task-title-button')]
+        .slice(0, 1)
+        .map((cell) => cell.textContent),
+    ).toEqual(['Task 25']);
+    harness.app.dispose();
+  });
+
+  it('sorts by the updated timestamp by date', async () => {
+    const harness = await createHarness(0, {
+      tasks: [
+        { id: 1, updated: '20261001100000000' },
+        { id: 2, updated: '20261005120000000' },
+        { id: 3, updated: '20261003080000000' },
+        { id: 4, updated: '20261002090000000' },
+      ],
+    });
+    await selectFolder(harness);
+
+    click(harness.root.querySelector('.task-table thead .cell-updated .th-sort'));
+    await flush();
+    expect(
+      [...harness.root.querySelectorAll('.task-table tbody tr td.cell-id')].map(
+        (cell) => cell.textContent,
+      ),
+    ).toEqual(['2', '3', '4', '1']);
+    harness.app.dispose();
+  });
+
+  it('sorts by parent, the tasks without a parent first', async () => {
+    const harness = await createHarness(0, {
+      tasks: [
+        { id: 1, parentId: 5 },
+        { id: 2 },
+        { id: 3, parentId: 2 },
+        { id: 4 },
+      ],
+    });
+    await selectFolder(harness);
+
+    click(harness.root.querySelector('.task-table thead .cell-parent .th-sort'));
+    await flush();
+    // Descending: the tasks without a parent come first, then the larger
+    // parent before the smaller one.
+    expect(
+      [...harness.root.querySelectorAll('.task-table tbody tr td.cell-id')].map(
+        (cell) => cell.textContent,
+      ),
+    ).toEqual(['2', '4', '1', '3']);
+    harness.app.dispose();
+  });
+
+  it('makes the tags and the actions columns not sortable', async () => {
+    const harness = await createHarness(3);
+    await selectFolder(harness);
+
+    expect(harness.root.querySelector('.task-table thead .cell-tags .th-sort')).toBeNull();
+    expect(harness.root.querySelector('.task-table thead .cell-actions .th-sort')).toBeNull();
+    harness.app.dispose();
+  });
+
+  it('goes back to the first page when the sort changes', async () => {
+    const harness = await createHarness(25);
+    await selectFolder(harness);
+
+    click(harness.root.querySelector<HTMLButtonElement>('.page-last'));
+    await flush();
+    expect(harness.root.querySelector('.page-current')?.textContent).toBe('3');
+
+    click(harness.root.querySelector('.task-table thead .cell-id .th-sort'));
+    await flush();
+    expect(harness.root.querySelector('.page-current')?.textContent).toBe('1');
+    expect(harness.root.querySelectorAll('.task-table tbody tr td.cell-id')[0]?.textContent).toBe(
+      '25',
+    );
+    harness.app.dispose();
+  });
+
+  it('sorts the notes by title and by updated', async () => {
+    const harness = await createHarness(0, {
+      tasks: [
+        { id: 1, updated: '20261001100000000' },
+        { id: 2, updated: '20261005120000000' },
+        { id: 3, updated: '20261003080000000' },
+      ],
+      notes: [
+        { id: 1, title: 'banana', updated: '20261001100000000' },
+        { id: 2, title: 'apple', updated: '20261005120000000' },
+        { id: 3, title: 'cherry', updated: '20261003080000000' },
+      ],
+    });
+    await selectFolder(harness);
+
+    click(buttonByText(harness.doc, 'Notes'));
+    await flush();
+
+    click(harness.root.querySelector('.note-table thead .cell-title .th-sort'));
+    await flush();
+    expect(
+      [...harness.root.querySelectorAll('.note-table tbody tr td.cell-title .task-title-button')].map(
+        (cell) => cell.textContent,
+      ),
+    ).toEqual(['cherry', 'banana', 'apple']);
+
+    click(harness.root.querySelector('.note-table thead .cell-updated .th-sort'));
+    await flush();
+    expect(
+      [...harness.root.querySelectorAll('.note-table tbody tr td.cell-id')].map(
+        (cell) => cell.textContent,
+      ),
+    ).toEqual(['2', '3', '1']);
+
+    // The other views keep their own order.
+    click(buttonByText(harness.doc, 'List'));
+    await flush();
+    console.log('LIST-BUTTON', buttonByText(harness.doc, 'List')?.outerHTML?.slice(0, 80));
+    console.log('VIEW-TABLES', [...harness.root.querySelectorAll('table')].map((t) => t.className), harness.root.querySelector('.task-table tbody')?.innerHTML.slice(0, 200));
+    expect(
+      [...harness.root.querySelectorAll('.task-table tbody tr td.cell-id')].map(
+        (cell) => cell.textContent,
+      ),
+    ).toEqual(['1', '2', '3']);
     harness.app.dispose();
   });
 });
@@ -2290,7 +2460,7 @@ async function openNotes(harness: Harness): Promise<void> {
   await flush();
 }
 
-async function selectFolder(harness: Harness): Promise<void> {
+export async function selectFolder(harness: Harness): Promise<void> {
   click(buttonByText(harness.doc, 'Choose folder…'));
   await flush();
 

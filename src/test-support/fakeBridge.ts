@@ -267,7 +267,7 @@ export class FakeBridge {
           if (line.trim() === '----') {
             break;
           }
-          if (/^(id|parent|status|title|tags|start|end|expanded)=/u.test(line)) {
+          if (/^(id|parent|status|title|tags|start|end|updated|expanded)=/u.test(line)) {
             lines.push(`${relative}:${line}`);
           }
         }
@@ -282,7 +282,7 @@ export class FakeBridge {
           if (line.trim() === '----') {
             break;
           }
-          if (line.startsWith('title=')) {
+          if (line.startsWith('title=') || line.startsWith('updated=')) {
             lines.push(`${relative}:${line}`);
           }
         }

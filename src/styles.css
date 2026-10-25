@@ -477,6 +477,30 @@ button[hidden] {
   white-space: nowrap;
 }
 
+/* The sortable columns carry a button: the active sort column shows the
+   direction of the sort, and clicking another column sorts by it. */
+.th-sort {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.th-sort:hover {
+  color: var(--accent);
+}
+
+.th-sort:active {
+  color: var(--accent-hover);
+}
+
 .task-table td,
 .note-table td {
   padding: 8px 12px;

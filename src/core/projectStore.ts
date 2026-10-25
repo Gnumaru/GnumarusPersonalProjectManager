@@ -39,6 +39,8 @@ export interface TaskSummary {
   readonly tags: readonly string[];
   readonly start: string;
   readonly end: string;
+  /** The timestamp of the last update, empty when unknown. */
+  readonly updated: string;
   /**
    * Whether the branch of the task is expanded in the tree view.
    *
@@ -64,6 +66,17 @@ export interface TaskHierarchy {
   readonly paths: ReadonlyMap<number, string>;
 }
 
+/** The metadata of a note: everything the listing needs, and nothing more. */
+export interface NoteSummary {
+  /** Unique incremental integer, also encoded in the file name. */
+  readonly id: number;
+  readonly title: string;
+  /** The timestamp of the last update, empty when unknown. */
+  readonly updated: string;
+  /** The path of the file, relative to the project folder. */
+  readonly path: string;
+}
+
 export interface ProjectStore {
   /** The kind of storage this store uses. */
   readonly kind: ProjectKind;
@@ -76,6 +89,9 @@ export interface ProjectStore {
 
   /** The metadata of every task of the project. */
   listTasks(): Promise<readonly TaskSummary[]>;
+
+  /** The metadata of every note of the project. */
+  listNoteSummaries(): Promise<readonly NoteSummary[]>;
 
   /** The amount of children of every task, indexed by the id of the parent. */
   childCounts(): Promise<ReadonlyMap<number, number>>;

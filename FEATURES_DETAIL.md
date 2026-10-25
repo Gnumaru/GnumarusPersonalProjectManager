@@ -712,6 +712,55 @@ to the amount of tasks per page: `notePageSize` in
 
 ---
 
+## 5 quinquies. Sorting of the task list and of the notes list
+
+Every sortable column of the two tables carries a button in its header. A click
+on it sorts the table, and the way the table is sorted follows one rule:
+
+* the click on a column that does not sort the table yet makes it the sort
+  column and orders it **descending**;
+* the click on the column that already sorts the table **inverts** the
+  direction: descending becomes ascending, ascending becomes descending.
+
+The rule holds for the **flat list of the tasks** (ID, Title, Parent, Status and
+Updated are sortable; the tags and the actions are not) and for the **listing of
+the notes** (ID, Title and Updated). No other view is affected.
+
+### The three kinds of comparison
+
+A column declares how two of its values are compared, in
+`src/core/tableSort.ts`:
+
+* **number** - the ids and the parents compare numerically (`10` after `9`);
+* **string** - the titles and the statuses compare alphabetically, without
+  taking the case into account, and **the numbers inside the text compare as
+  numbers**, so `Task 9` sorts before `Task 25`;
+* **date** - the timestamps of the `updated=` key go through
+  `parseTaskTimestamp`, so the compact `YYYYMMDDHHNNSSIII` format and the legacy
+  ISO format sort together by their real moment.
+
+A row that holds no value (a task without a parent, a note without any update)
+always sorts before the rows that have one; the rows that tie keep their
+previous order (the sort is stable), and the input array is never modified.
+
+### A global sort, across the pages
+
+The tables are paginated, so a sort has to be **global**: it would be wrong to
+order only the ten rows of the current page. The sorted path therefore reads
+**the metadata of every task with one command** (`READ_METADATA_COMMAND`, which
+now also asks for the `updated=` key), filters it with the search term when one
+is active, orders it in memory, and reads **only the tasks of the page in full**.
+The notes do the same through a new listing of the note summaries
+(`NoteSummary`: id, title, updated and path), read with one `grep` command that
+asks for the `title=` and the `updated=` keys of every note. When the sort is
+not active, the previous path-based pagination runs unchanged.
+
+One click also goes **back to the first page** of the sorted table. The two
+tables keep their sort states separately: sorting the notes never changes the
+order of the task list and the other way round.
+
+---
+
 ## 6. The project of the user
 
 **Files:** `src/core/projectStore.ts`, `src/core/serviceStore.ts`, `src/core/embeddedStore.ts`, `src/core/browserStorage.ts`, `src/core/fileSystemAccess.ts`, `src/core/fileSystemStore.ts`, `src/core/zip.ts`, `src/ui/projectDialog.ts`

@@ -34,7 +34,13 @@ import {
   type DirectoryHandle,
   type DirectoryHandleStorage,
 } from '../core/fileSystemAccess.js';
-import type { ProjectStore, TaskHierarchy, TaskSummary } from '../core/projectStore.js';
+import type { NoteSummary, ProjectStore, TaskHierarchy, TaskSummary } from '../core/projectStore.js';
+import {
+  nextSortState,
+  sortRows,
+  type SortState,
+  type SortType,
+} from '../core/tableSort.js';
 import { commentFileName, type TaskComment } from '../core/comment.js';
 import {
   NOTE_SCOPE_LABELS,
@@ -134,7 +140,28 @@ const SERVICE_CHECK_INTERVAL_MS = 5000;
 /** Amount of task files read at the same time when the tree is drawn. */
 const TREE_READ_CONCURRENCY = 8;
 
-export class App {
+/** The columns of the flat list of the tasks that can be sorted. */
+const TASK_SORT_FIELDS: Readonly<
+  Record<string, { readonly type: SortType; readonly value: (task: TaskSummary) => number | string | null }>
+> = {
+  id: { type: 'number', value: (task) => task.id },
+  title: { type: 'string', value: (task) => task.title.toLowerCase() },
+  parent: { type: 'number', value: (task) => task.parentId },
+  status: { type: 'string', value: (task) => STATUS_LABELS[task.status] },
+  updated: { type: 'date', value: (task) => task.updated },
+};
+
+/** The columns of the listing of the notes that can be sorted. */
+const NOTE_SORT_FIELDS: Readonly<
+  Record<string, { readonly type: SortType; readonly value: (note: NoteSummary) => number | string | null }>
+> = {
+  id: { type: 'number', value: (note) => note.id },
+  title: { type: 'string', value: (note) => note.title.toLowerCase() },
+  updated: { type: 'date', value: (note) => note.updated },
+};
+
+export class App
+ {
   private readonly doc: Document;
   private readonly root: HTMLElement;
   private readonly api: ApiClient;
@@ -204,6 +231,14 @@ export class App {
   private treeStructure: TaskTree | null = null;
   /** The tasks matching the current search, `null` when there is no search. */
   private treeMatches: Set<number> | null = null;
+  /** The sort of the flat list of the tasks. */
+  private taskSort: SortState | null = null;
+  /** The sort of the listing of the notes. */
+  private noteSort: SortState | null = null;
+  /** The header row of the task table, rebuilt on every render. */
+  private taskTableHead!: HTMLElement;
+  /** The header row of the note table, rebuilt on every render. */
+  private noteTableHead!: HTMLElement;
   /** The cards of the board: the tasks that have no child. */
   private kanbanCards: TaskCard[] = [];
   /** The metadata of the tasks, read for the Gantt chart. */
@@ -574,35 +609,20 @@ export class App {
     ]);
 
     this.rowsElement = this.doc.createElement('tbody');
+    this.taskTableHead = this.doc.createElement('thead');
     this.emptyStateElement = el(this.doc, 'div', { class: 'empty-state', attrs: { hidden: 'hidden' } });
 
     const table = el(this.doc, 'table', { class: 'task-table' }, [
-      el(this.doc, 'thead', {}, [
-        el(this.doc, 'tr', {}, [
-          el(this.doc, 'th', { class: 'cell-id', text: 'ID' }),
-          el(this.doc, 'th', { class: 'cell-title', text: 'Title' }),
-          el(this.doc, 'th', { class: 'cell-parent', text: 'Parent' }),
-          el(this.doc, 'th', { class: 'cell-tags', text: 'Tags' }),
-          el(this.doc, 'th', { class: 'cell-status', text: 'Status' }),
-          el(this.doc, 'th', { class: 'cell-updated', text: 'Updated' }),
-          el(this.doc, 'th', { class: 'cell-actions' }),
-        ]),
-      ]),
+      this.taskTableHead,
       this.rowsElement,
     ]);
 
     this.tableWrapElement = el(this.doc, 'div', { class: 'table-wrap' }, [table]);
 
     this.noteRowsElement = this.doc.createElement('tbody');
+    this.noteTableHead = this.doc.createElement('thead');
     const noteTable = el(this.doc, 'table', { class: 'note-table' }, [
-      el(this.doc, 'thead', {}, [
-        el(this.doc, 'tr', {}, [
-          el(this.doc, 'th', { class: 'cell-id', text: 'ID' }),
-          el(this.doc, 'th', { class: 'cell-title', text: 'Title' }),
-          el(this.doc, 'th', { class: 'cell-updated', text: 'Updated' }),
-          el(this.doc, 'th', { class: 'cell-actions' }),
-        ]),
-      ]),
+      this.noteTableHead,
       this.noteRowsElement,
     ]);
     this.notesWrapElement = el(
@@ -1129,6 +1149,81 @@ export class App {
    * Only the files of the page are read: the memory holds the notes that are
    * on the screen and nothing else.
    */
+  /**
+   * Renders the header of the task table.
+   *
+   * Every sortable column carries a button: clicking it sorts the table by the
+   * column, descending at first, and inverts the direction on the next clicks
+   * of the same column. The tags and the actions are not sortable.
+   */
+  private renderTaskTableHead(): void {
+    clear(this.taskTableHead);
+    this.taskTableHead.append(
+      el(this.doc, 'tr', {}, [
+        this.sortHeader('cell-id', 'ID', 'id', 'task'),
+        this.sortHeader('cell-title', 'Title', 'title', 'task'),
+        this.sortHeader('cell-parent', 'Parent', 'parent', 'task'),
+        el(this.doc, 'th', { class: 'cell-tags', text: 'Tags' }),
+        this.sortHeader('cell-status', 'Status', 'status', 'task'),
+        this.sortHeader('cell-updated', 'Updated', 'updated', 'task'),
+        el(this.doc, 'th', { class: 'cell-actions' }),
+      ]),
+    );
+  }
+
+  /** The header of each notes table cell. */
+  private renderNoteTableHead(): void {
+    clear(this.noteTableHead);
+    this.noteTableHead.append(
+      el(this.doc, 'tr', {}, [
+        this.sortHeader('cell-id', 'ID', 'id', 'note'),
+        this.sortHeader('cell-title', 'Title', 'title', 'note'),
+        this.sortHeader('cell-updated', 'Updated', 'updated', 'note'),
+        el(this.doc, 'th', { class: 'cell-actions' }),
+      ]),
+    );
+  }
+
+  /**
+   * One sortable header cell of the two tables.
+   *
+   * The active sort column shows its direction (descending ▼ or ascending ▲);
+   * the other sortable columns show a small indicator that they can be
+   * clicked.
+   */
+  private sortHeader(
+    cssClass: string,
+    label: string,
+    field: string,
+    table: 'task' | 'note',
+  ): HTMLElement {
+    const state = table === 'task' ? this.taskSort : this.noteSort;
+    const active = state?.field === field;
+    const text = active
+      ? `${label} ${state?.direction === 'asc' ? '▲' : '▼'}`
+      : `${label} ↕`;
+    const header = el(this.doc, 'button', {
+      class: 'th-sort',
+      text,
+      attrs: {
+        title: active
+          ? `Sorted ${state?.direction === 'asc' ? 'ascending' : 'descending'}: click to invert`
+          : `Sort by ${label.toLowerCase()}`,
+      },
+    });
+    header.addEventListener('click', () => {
+      if (table === 'task') {
+        this.taskSort = nextSortState(this.taskSort, field);
+        this.page = 1;
+      } else {
+        this.noteSort = nextSortState(this.noteSort, field);
+        this.notePage = 1;
+      }
+      void this.refresh();
+    });
+    return el(this.doc, 'th', { class: cssClass }, [header]);
+  }
+
   private async refreshNotes(): Promise<void> {
     const store = this.store;
     if (store === null) {
@@ -1136,14 +1231,30 @@ export class App {
       this.noteInfo = computePageInfo(1, this.notePageSize, 0);
       return;
     }
-    const paths =
-      this.query.length === 0
-        ? await store.listNotePaths()
-        : await store.searchNotePaths(this.query, this.noteScope);
+    const sort = this.noteSort;
+    const sortField = sort === null ? null : (NOTE_SORT_FIELDS[sort.field] ?? null);
+    let candidatePaths: string[];
+    if (sort !== null && sortField !== null) {
+      // The notes are sorted globally: the metadata of every note is read with
+      // one command, only the notes of the page are read in full afterwards.
+      let summaries = await store.listNoteSummaries();
+      if (this.query.length > 0) {
+        const matches = new Set(await store.searchNotePaths(this.query, this.noteScope));
+        summaries = summaries.filter((note) => matches.has(note.path));
+      }
+      const ordered = sortRows(summaries, sort, sortField.value, sortField.type);
+      candidatePaths = ordered.map((note) => note.path);
+    } else {
+      candidatePaths = [
+        ...(this.query.length === 0
+          ? await store.listNotePaths()
+          : await store.searchNotePaths(this.query, this.noteScope)),
+      ];
+    }
 
-    const info = computePageInfo(this.notePage, this.notePageSize, paths.length);
+    const info = computePageInfo(this.notePage, this.notePageSize, candidatePaths.length);
     const start = (info.page - 1) * this.notePageSize;
-    const pagePaths = paths.slice(start, start + this.notePageSize);
+    const pagePaths = candidatePaths.slice(start, start + this.notePageSize);
 
     const notes: Note[] = [];
     for (const path of pagePaths) {
@@ -1171,14 +1282,35 @@ export class App {
       this.info = computePageInfo(1, this.pageSize, 0);
       return;
     }
-    const paths =
-      this.query.length === 0
-        ? await store.listTaskPaths()
-        : await store.searchTaskPaths(this.query);
+    const sort = this.taskSort;
+    const sortField = sort === null ? null : (TASK_SORT_FIELDS[sort.field] ?? null);
+    let candidatePaths: string[] | null;
+    let ordered: readonly TaskSummary[] | null = null;
+    if (sort !== null && sortField !== null) {
+      // The list is sorted globally: the metadata of every task is read with
+      // one command, only the tasks of the page are read in full afterwards.
+      let summaries = await store.listTasks();
+      if (this.query.length > 0) {
+        const matching = await store.searchTaskPaths(this.query);
+        const matches = new Set(matching);
+        summaries = summaries.filter((task) => matches.has(task.path));
+      }
+      ordered = sortRows(summaries, sort, sortField.value, sortField.type);
+      candidatePaths = null;
+    } else {
+      candidatePaths =
+        this.query.length === 0
+          ? [...(await store.listTaskPaths())]
+          : [...(await store.searchTaskPaths(this.query))];
+    }
 
-    const info = computePageInfo(this.page, this.pageSize, paths.length);
+    const total = ordered === null ? (candidatePaths as string[]).length : ordered.length;
+    const info = computePageInfo(this.page, this.pageSize, total);
     const start = (info.page - 1) * this.pageSize;
-    const pagePaths = paths.slice(start, start + this.pageSize);
+    const pagePaths =
+      ordered === null
+        ? (candidatePaths as string[]).slice(start, start + this.pageSize)
+        : ordered.slice(start, start + this.pageSize).map((task) => task.path);
 
     const tasks: Task[] = [];
     for (const path of pagePaths) {
@@ -1493,6 +1625,7 @@ export class App {
 
   /** Draws the list of the notes. */
   private renderNotes(): void {
+    this.renderNoteTableHead();
     clear(this.noteRowsElement);
     for (const row of renderNoteRows(this.doc, this.notes, {
       onView: (note) => {
@@ -1533,6 +1666,8 @@ export class App {
 
   /** Draws the flat list of the tasks. */
   private renderList(): void {
+    this.renderTaskTableHead();
+
     clear(this.rowsElement);
     for (const row of renderTaskRows(this.doc, this.tasks, {
       onView: (task) => {

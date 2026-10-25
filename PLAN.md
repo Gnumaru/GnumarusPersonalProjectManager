@@ -29,6 +29,7 @@ Browser (SPA, no framework, strict TypeScript)
   |-- src/core/fileSystemStore.ts the implementation over a folder of the disk
   |-- src/core/zip.ts          the reader and the writer of the ZIP archives
   |-- src/core/taskTree.ts     tree of the tasks: build / flatten (pure)
+  |-- src/core/tableSort.ts    sorting state machine of the tables (pure)
   |-- src/core/pagination.ts   pure pagination math
   |-- src/core/config.ts       ~/.config/GnumarusProjectManager/config.json
   |-- src/ui/*                 DOM widgets (top bar, task table, task tree, dialogs, file picker)
@@ -449,6 +450,35 @@ which shares the same state) is now stored **in the task file itself** as an
 
 The searches of the service backend now prefer **ripgrep** (`rg`) when it is
 available on the machine, and fall back to `grep` otherwise.
+
+## Batch 18 - Sorting of the list and of the notes
+
+Every column of the **flat list of the tasks** and of the **listing of the
+notes** can sort its table, by clicking on its name in the header:
+
+* a click on a column that does not sort the table yet makes it the sort
+  column, **descending** first (numeric order for the numbers, alphabetical
+  order for the strings, date order for the timestamps);
+* a click on the column that already sorts the table only **inverts** its
+  direction (descending becomes ascending and the other way round);
+* the **tags** and the **actions** of the tasks are never sortable, on the
+  task table; the note table sorts by ID, Title and Updated;
+* the score is **global**: the metadata of every task (or of every note) is
+  read with one command, the rows are ordered by it, and only the tasks of the
+  page are then read in full. The pagination follows the ordered list, and a
+  click goes back to the first page. When the search box holds a term, only
+  the matching rows are sorted;
+* a column keeps its sort state until another column is clicked, and the two
+  tables hold their states separately: the notes view does not change the
+  order of the task list and the other way round.
+
+The comparison is done by a small pure module (`src/core/tableSort.ts`): the
+sort of a column is a `{ field, direction }` pair and a stable sort by one of
+the three kinds of comparison. The numbers inside a text are compared as
+numbers (`Task 9` before `Task 25`): the alphabetical comparison is done by
+hand instead of relying on `localeCompare`, whose `numeric` option is not
+honoured by every implementation. The rows that hold no value (a task without
+a parent, a note without an update timestamp) always sort first.
 
 ## Batch 17 - The search on the board and the chart
 

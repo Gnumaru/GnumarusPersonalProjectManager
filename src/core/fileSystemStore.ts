@@ -39,7 +39,7 @@ import {
   type Note,
   type NoteSearchScope,
 } from './note.js';
-import type { ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
+import type { NoteSummary, ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
 import type { DirectoryHandle } from './fileSystemAccess.js';
 
 /**
@@ -161,6 +161,21 @@ export class FileSystemProjectStore implements ProjectStore {
 
   async listNotePaths(): Promise<readonly string[]> {
     return this.listNotePathsInternal();
+  }
+
+  async listNoteSummaries(): Promise<readonly NoteSummary[]> {
+    const paths = await this.listNotePathsInternal();
+    const summaries: NoteSummary[] = [];
+    for (const path of paths) {
+      const head = await this.readHead(path, METADATA_BYTES);
+      const content = head === null ? null : head.includes('----') ? head : await this.readFile(path);
+      if (content === null) {
+        continue;
+      }
+      const note = parseNote(content, parseNoteIdFromFileName(nameOf(path)) ?? undefined);
+      summaries.push({ id: note.id, title: note.title, updated: note.updated, path });
+    }
+    return summaries;
   }
 
   async searchNotePaths(term: string, scope: NoteSearchScope): Promise<readonly string[]> {
@@ -439,6 +454,7 @@ export class FileSystemProjectStore implements ProjectStore {
       tags: task.tags,
       start: task.start,
       end: task.end,
+      updated: task.updated,
       expanded: task.expanded,
       path,
     };
