@@ -74,6 +74,7 @@ import {
   formatTaskTimestamp,
   parseTaskIdFromFileName,
   withDates,
+  withDefaultDates,
   withExpandedState,
   withParent,
   withStatus,
@@ -1193,7 +1194,18 @@ export class App {
     }
 
     const childCounts = await store.childCounts().catch(() => new Map<number, number>());
-    this.tasks = tasks;
+    const seededDates = await this.seedTaskDates(
+      tasks.map((task) => ({
+        id: task.id,
+        path: this.pathOfTask(task.id),
+        start: task.start,
+        end: task.end,
+      })),
+    );
+    this.tasks = tasks.map((task) => {
+      const seeded = seededDates.get(task.id);
+      return seeded === undefined ? task : { ...task, ...seeded };
+    });
     this.info = info;
     this.page = info.page;
     this.childCounts = new Map(childCounts);
@@ -1214,6 +1226,7 @@ export class App {
     }
     const summaries = await store.listTasks();
     this.applyHierarchy(summaries);
+    await this.seedTaskDates(summaries);
 
     if (this.query.length > 0) {
       const paths = await store.searchTaskPaths(this.query);
@@ -1244,6 +1257,7 @@ export class App {
       return;
     }
     const summaries = await store.listTasks();
+    await this.seedTaskDates(summaries);
     const parents = new Set<number>();
     for (const task of summaries) {
       if (task.parentId !== null) {
@@ -1275,9 +1289,13 @@ export class App {
       return;
     }
     const summaries = await store.listTasks();
+    const seededDates = await this.seedTaskDates(summaries);
     this.applyHierarchy(summaries);
     this.ganttMetadata = new Map<number, TaskSummary>(
-      summaries.map((task) => [task.id, task]),
+      summaries.map((task) => {
+        const seeded = seededDates.get(task.id);
+        return seeded === undefined ? [task.id, task] : [task.id, { ...task, ...seeded }];
+      }),
     );
   }
 
@@ -1701,6 +1719,48 @@ export class App {
     } finally {
       this.setBusy(false);
     }
+  }
+
+  /**
+   * Assigns the dates the loaded tasks do not have.
+   *
+   * A task is loaded without a start date: **today** is assigned to it; without
+   * an end date: **tomorrow**. The change is written into the file of the task
+   * (only the ones that miss a date, so it happens once), and the dates that
+   * were assigned are given back, so the current view can show them without
+   * another refresh.
+   */
+  private async seedTaskDates(
+    tasks: readonly {
+      readonly id: number;
+      readonly path: string;
+      readonly start: string;
+      readonly end: string;
+    }[],
+  ): Promise<ReadonlyMap<number, { readonly start: string; readonly end: string }>> {
+    const store = this.store;
+    const assigned = new Map<number, { readonly start: string; readonly end: string }>();
+    if (store === null) {
+      return assigned;
+    }
+    const today = new Date();
+    for (const entry of tasks) {
+      if (entry.start.length > 0 && entry.end.length > 0) {
+        continue;
+      }
+      try {
+        const task = await store.readTask(entry.path);
+        const seeded = withDefaultDates(task, today);
+        if (seeded.start !== task.start || seeded.end !== task.end) {
+          await store.writeTask(entry.path, seeded);
+        }
+        assigned.set(entry.id, { start: seeded.start, end: seeded.end });
+      } catch {
+        // The file cannot be read (it disappeared, it is not a task any more):
+        // it is skipped.
+      }
+    }
+    return assigned;
   }
 
   /** The rows of the Gantt chart: the visible rows of the tree. */

@@ -438,9 +438,11 @@ describe('App', () => {
 
     const error = harness.doc.querySelector('.form-error');
     expect(error?.textContent).toContain('end date');
-    // The file was not written.
+    // The file was not written: it keeps the dates that were assigned on the
+    // load (the day of today and the day of tomorrow).
     const file = harness.bridge.files.get('/home/user/projects/task_1.txt');
-    expect(file).not.toContain('start=2026');
+    expect(file).not.toContain('start=20261019');
+    expect(file).not.toContain('end=20261012');
   });
 
   it('adds the tasks that block a task and the tasks that are related to it', async () => {
@@ -908,6 +910,42 @@ describe('App and the tree view', () => {
     }
     // The tasks outside of the branch are untouched.
     expect(harness.bridge.files.get('/home/user/projects/task_5.txt')).not.toContain('expanded=');
+    harness.app.dispose();
+  });
+
+  it('assigns the missing dates of the tasks when they are loaded', async () => {
+    const harness = await createHarness(0, {
+      tasks: [
+        { id: 1 },
+        { id: 2, parentId: 1 },
+      ],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+
+    // The dates are assigned on the disk: today for the start, tomorrow for
+    // the end, at midnight, and the update time of the file is untouched.
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const midnight = (date: Date): string => {
+      const copy = new Date(date);
+      copy.setHours(0, 0, 0, 0);
+      return [
+        String(copy.getFullYear()).padStart(4, '0'),
+        String(copy.getMonth() + 1).padStart(2, '0'),
+        String(copy.getDate()).padStart(2, '0'),
+        '000000000',
+      ].join('');
+    };
+    const file = harness.bridge.files.get('/home/user/projects/task_1.txt');
+    expect(file).toContain(`start=${midnight(today)}`);
+    expect(file).toContain(`end=${midnight(tomorrow)}`);
+    expect(file).toContain('updated=20261002100000000');
+
+    // The view shows the assigned dates without another refresh.
+    const rows = [...harness.root.querySelectorAll<HTMLElement>('.task-table tbody tr')];
+    expect(rows).toHaveLength(2);
+
     harness.app.dispose();
   });
 
@@ -1427,7 +1465,7 @@ describe('App and the board', () => {
 
 describe('App and the Gantt chart', () => {
   async function createGanttHarness(): Promise<Harness> {
-    return createHarness(0, {
+    const harness = await createHarness(0, {
       tasks: [
         { id: 1 },
         { id: 2, parentId: 1 },
@@ -1435,6 +1473,12 @@ describe('App and the Gantt chart', () => {
       ],
       config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
     });
+    // The missing dates of the tests are already set: the tasks the tests do
+    // not date explicitly are given a range inside the one of the task 1, so
+    // the automatic assignment of the missing dates does not widen the chart.
+    setDates(harness, 2, '20261019100000000', '20261023180000000');
+    setDates(harness, 3, '20261019100000000', '20261023180000000');
+    return harness;
   }
 
   /** Adds the dates of a task on the fake disk. */
@@ -1447,8 +1491,8 @@ describe('App and the Gantt chart', () => {
     harness.bridge.files.set(
       path,
       content
-        .replace('start=', `start=${start}`)
-        .replace('end=', `end=${end}`),
+        .replace(/^start=.*$/mu, `start=${start}`)
+        .replace(/^end=.*$/mu, `end=${end}`),
     );
   }
 
@@ -1599,7 +1643,12 @@ describe('App and the Gantt chart', () => {
   });
 
   it('explains that no task has a date', async () => {
-    const harness = await createGanttHarness();
+    // The tasks without dates receive the day of today and the day of tomorrow
+    // on the load, so the empty chart only happens on a project without task.
+    const harness = await createHarness(0, {
+      tasks: [],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
     await switchToGantt(harness);
 
     expect(harness.root.querySelector('.gantt-empty')?.textContent).toContain('start or an end date');

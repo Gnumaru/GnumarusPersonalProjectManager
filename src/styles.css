@@ -849,9 +849,48 @@ button[hidden] {
   user-select: none;
 }
 
+/* A card is colored with the colour of the column it sits in, a shade darker
+   than the column itself: the background keeps the hue of the status and stays
+   readable behind the name, the tags and the actions. Dragging the card onto
+   another column repaints it, because the colour follows the column. */
+.kanban-column[data-status='planning'] .kanban-card {
+  background: color-mix(in srgb, var(--info) 16%, var(--info-soft));
+  border-color: color-mix(in srgb, var(--info) 30%, var(--border));
+}
+
+.kanban-column[data-status='todo'] .kanban-card {
+  background: color-mix(in srgb, var(--text-faint) 14%, var(--bg-elevated));
+  border-color: color-mix(in srgb, var(--text-faint) 28%, var(--border));
+}
+
+.kanban-column[data-status='next'] .kanban-card {
+  background: color-mix(in srgb, var(--accent) 16%, var(--accent-soft));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+.kanban-column[data-status='paused'] .kanban-card {
+  background: color-mix(in srgb, var(--paused) 16%, var(--paused-soft));
+  border-color: color-mix(in srgb, var(--paused) 30%, var(--border));
+}
+
+.kanban-column[data-status='doing'] .kanban-card {
+  background: color-mix(in srgb, var(--warning) 16%, var(--warning-soft));
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--border));
+}
+
+.kanban-column[data-status='done'] .kanban-card {
+  background: color-mix(in srgb, var(--success) 16%, var(--success-soft));
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border));
+}
+
+.kanban-column[data-status='canceled'] .kanban-card {
+  background: color-mix(in srgb, var(--danger) 16%, var(--danger-soft));
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+}
+
 .kanban-card:hover {
   border-color: var(--border-strong);
-  background: var(--bg-subtle);
+  filter: brightness(0.97);
 }
 
 .kanban-card.tree-dragging {

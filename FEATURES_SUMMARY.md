@@ -59,6 +59,7 @@ list or as a tree.
 | **Dates written in the compact format `YYYYMMDDHHNNSSIII` (local time, no timezone)** | Done | `src/core/task.ts` |
 | **`start=...` and `end=...`: the start and the end date of a task** | Done | `src/core/task.ts` |
 | **A new task is created with the start date of today and the end date of tomorrow** | Done | `src/ui/taskDialog.ts` |
+| **A task loaded without dates receives today (start) and tomorrow (end)** | Done | `src/core/task.ts`, `src/ui/app.ts` |
 | **Date pickers for the start and the end date in the editor** | Done | `src/ui/taskDialog.ts` |
 | Amount of children per task (read with `grep`) | Done | `src/core/serviceStore.ts`, `src/core/embeddedStore.ts` |
 
@@ -80,6 +81,7 @@ list or as a tree.
 | ------- | ------ | ----- |
 | **Kanban board: one column per status** | Done | `src/ui/kanbanBoard.ts` |
 | **Board columns colored from top to bottom with the colour of their status** | Done | `src/styles.css` |
+| **Cards colored with the colour of their column, a shade darker, changing when dragged** | Done | `src/styles.css` |
 | **The titles of the cards are shown in full (the text wraps, cards of unequal height)** | Done | `src/styles.css` |
 | **Columns in the order PLANNING, TODO, NEXT, PAUSED, DOING, DONE, CANCELED** | Done | `src/core/task.ts` |
 | **Only the tasks that have no child are on the board** | Done | `src/core/projectStore.ts` |

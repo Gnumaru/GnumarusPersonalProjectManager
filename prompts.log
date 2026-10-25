@@ -74,9 +74,11 @@ ao usar o webservice como backend, para fazer buscas utilize ripgrep (comando rg
 ====
 eu respondi errado a pergunta. a view de kanban nao precisa do metadado expanded, apenas as views de tree e gantt. toda view apenas ignora aqueles metadados que não interessam pra ela.
 ====
-====
 os cards no kanban tambem precisa estar coloridos com a mesma cor da coluna onde estiverem e mudar de cor ao arrastar pra outra coluna, mas a cor do card vai ser mais escura do que a cor da coluna
 ao carregar uma nota que nao tenha start date o dia atual deve ser atribuido a ela. e se a nota nao tiver end date o dia seguinte é atribuido a ela
+====
+na view gantt a busca nao esta funcionando. ela deve funcionar do mesmo jeito que na view tree: todas as tasks que derem match com o termo de busca sao exibidas bem como toda sua hierarquia de tasks pai.
+a busca tambem deve funcionar no kanban. apenas as tasks 'folha' (sem filhas) que derem match no termo de busca devem ser exibidas, todas as outras devem "sumir" e voltar apenas quando a busca for limpada
 ====
 ====
 ====

@@ -973,6 +973,34 @@ async function runChecks() {
     String(boardDots),
   );
 
+  // The cards themselves are colored with the colour of their column, a shade
+  // darker than it: the background of a card is different from the column and
+  // from the card of every other column.
+  const cardColors = await evaluate(`(() => {
+    const colors = (status) => {
+      const column = document.querySelector('.kanban-column[data-status="' + status + '"]');
+      if (column === null) { return null; }
+      const card = column.querySelector('.kanban-card');
+      if (card === null) { return null; }
+      return getComputedStyle(card).backgroundColor + '|' + getComputedStyle(column).backgroundColor;
+    };
+    return [colors('done'), colors('todo'), colors('doing')].filter((entry) => entry !== null);
+  })()`);
+  const distinctCards = cardColors.every((entry) => {
+    const [card, column] = entry.split('|');
+    return card !== column;
+  });
+  check(
+    distinctCards === true,
+    'the card is colored with its column and darker than it',
+    cardColors.join(' '),
+  );
+  check(
+    new Set(cardColors.map((entry) => entry.split('|')[0])).size === cardColors.length,
+    'the cards of different columns have different colours',
+    cardColors.join(' '),
+  );
+
   // The task 1 has a child: it is not on the board.
   const parentOnBoard = await evaluate(
     `document.querySelector('.kanban-card[data-task-id="1"]') !== null`,
@@ -989,6 +1017,12 @@ async function runChecks() {
     return true;
   })()`);
   await delay(300);
+
+  // The colour of the card before the drag: the one of its current column.
+  const cardColorBefore = await evaluate(
+    `getComputedStyle(document.querySelector('.kanban-card[data-task-id="2"]')).backgroundColor`,
+  );
+
   const boardPoints = await evaluate(`(() => {
     const source = document.querySelector('.kanban-card[data-task-id="2"] .kanban-card-title').getBoundingClientRect();
     const target = document.querySelector('.kanban-column[data-status="doing"] .kanban-cards').getBoundingClientRect();
@@ -1022,6 +1056,17 @@ async function runChecks() {
     movedStatus.content.includes('status=doing'),
     'the card dropped on a column changes the status of the task',
     movedStatus.content,
+  );
+
+  // The colour follows the new column: the card is repainted with the colour
+  // of its new status.
+  const cardColorAfter = await evaluate(
+    `getComputedStyle(document.querySelector('.kanban-card[data-task-id="2"]')).backgroundColor`,
+  );
+  check(
+    cardColorAfter !== cardColorBefore,
+    'the card changes color when it is dragged onto another column',
+    `${cardColorBefore} -> ${cardColorAfter}`,
   );
 
   // --- gantt chart ----------------------------------------------------------

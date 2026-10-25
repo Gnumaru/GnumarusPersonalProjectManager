@@ -435,6 +435,38 @@
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
 
+## Batch 16 - Card colours and default dates on load
+
+### Kanban board
+
+- [x] A card is painted with the colour of the column it sits in, one shade
+      darker than the column (background and border), in both themes
+- [x] The colour follows the card: dragging it onto another column repaints it
+
+### Default dates on load
+
+- [x] `withDefaultDates(task, now)` in `src/core/task.ts`: an empty `start=`
+      receives the day of today and an empty `end=` the day of tomorrow, at
+      midnight, without touching `updated=`
+- [x] `src/ui/app.ts` seeds the dates of every task it loads (list, tree,
+      board and Gantt) and writes the change into the files, only once per task
+- [x] The Gantt of the current refresh shows the assigned dates right away
+
+### Tests
+
+- [x] `src/core/task.test.ts` - defaults, kept dates, `updated` untouched
+- [x] `src/ui/app.test.ts` - the files receive the dates on the load; the Gantt
+      tests and the fixtures were adapted (the helper `setDates` replaces the
+      whole line now)
+- [x] `scripts/e2e-browser.mjs` - the card is darker than its column, the
+      columns hold different card colours, and the card changes colour when it
+      is dragged onto another column
+
+### Build / deploy
+
+- [x] `npm run verify` (388 tests, 101/101 browser checks)
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
 ## Batch 15 - Task expansion metadata and ripgrep searches
 
 ### Task format

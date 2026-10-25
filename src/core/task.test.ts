@@ -16,6 +16,7 @@ import {
   parseTaskIdFromFileName,
   parseTaskTimestamp,
   serializeTask,
+  withDefaultDates,
   TASK_STATUSES,
   taskFileName,
   timestampFromDateInput,
@@ -481,6 +482,60 @@ describe('serializeTask', () => {
     const collapsed = withExpandedState(expanded, false);
     expect(collapsed.updated).toBe('20260202000000000');
   });
+
+  it('assigns today and tomorrow to the dates a task does not have', () => {
+    const now = new Date(2026, 4, 5, 15, 30, 0, 0);
+    const task = {
+      id: 1,
+      title: 'T',
+      status: 'todo' as const,
+      parentId: null,
+      tags: [],
+      created: '',
+      updated: '20260101000000000',
+      start: '',
+      end: '',
+      description: '',
+      blockedBy: [],
+      related: [],
+      expanded: false,
+    };
+    const seeded = withDefaultDates(task, now);
+    expect(seeded.start).toBe(formatTaskTimestamp(new Date(2026, 4, 5, 0, 0, 0, 0)));
+    expect(seeded.end).toBe(formatTaskTimestamp(new Date(2026, 4, 6, 0, 0, 0, 0)));
+    // The change is not an edit of the user: the update time stays.
+    expect(seeded.updated).toBe('20260101000000000');
+  });
+
+  it('keeps the dates a task already has', () => {
+    const now = new Date();
+    const task = {
+      id: 1,
+      title: 'T',
+      status: 'todo' as const,
+      parentId: null,
+      tags: [],
+      created: '',
+      updated: '',
+      start: '20250101100000000',
+      end: '',
+      blockedBy: [],
+      related: [],
+      expanded: false,
+      description: '',
+    };
+    const seeded = withDefaultDates(task, now);
+    expect(seeded.start).toBe('20250101100000000');
+    expect(seeded.end).toBe(formatTaskTimestamp(midnightOfNextDay(now)));
+  });
+
+  function midnightOfNextDay(now: Date): Date {
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const copy = new Date(tomorrow);
+    copy.setHours(0, 0, 0, 0);
+    return copy;
+  }
 
   it('keeps a title on a single line', () => {
     const task = {

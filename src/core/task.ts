@@ -552,3 +552,24 @@ export function withExpandedState(task: Task, expanded: boolean): Task {
     expanded,
   };
 }
+
+/**
+ * Fills the dates the task does not have.
+ *
+ * A task is loaded without a start date: **today** is assigned to it. Without
+ * an end date: **tomorrow**. The time is midnight, local. A date that already
+ * exists is kept, and changing the dates this way does not touch the `updated`
+ * timestamp of the file.
+ */
+export function withDefaultDates(task: Task, now: Date): Task {
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const midnight = (date: Date): Date => {
+    const copy = new Date(date);
+    copy.setHours(0, 0, 0, 0);
+    return copy;
+  };
+  const start = task.start.length === 0 ? formatTaskTimestamp(midnight(now)) : task.start;
+  const end = task.end.length === 0 ? formatTaskTimestamp(midnight(tomorrow)) : task.end;
+  return { ...task, start, end };
+}

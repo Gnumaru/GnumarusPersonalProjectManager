@@ -450,6 +450,14 @@ which shares the same state) is now stored **in the task file itself** as an
 The searches of the service backend now prefer **ripgrep** (`rg`) when it is
 available on the machine, and fall back to `grep` otherwise.
 
+## Batch 16 - Card colours and default dates on load
+
+* the **cards of the board** are painted with the colour of their column, one
+  shade darker than it, and they change colour when they are dragged onto
+  another column;
+* a **task loaded without dates** receives the day of today (`start=`) and the
+  day of tomorrow (`end=`); the change is written into its file.
+
 ## Batch 15 - Task expansion metadata and ripgrep searches
 
 Two improvements:

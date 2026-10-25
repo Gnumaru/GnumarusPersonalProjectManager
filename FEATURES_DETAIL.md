@@ -51,7 +51,10 @@ Rules:
 * `start` / `end` - the timestamps of the start and of the end of the task. They
   are empty when the task has not started and when it is not finished. They are
   written and read, and shown in the view of a task; they will be used by the
-  features to come.
+  features to come. When the application **loads a task without a start date**
+  it assigns the day of **today**, and without an end date the day of
+  **tomorrow**, both at midnight. The change is written into the file (so it
+  happens once) and it does not touch `updated`.
 * `blocked_by` - the ids of the tasks that **block** this one: they prevent its
   completion. The key is absent when the task is not blocked.
 * `related` - the ids of the tasks that are **related** to this one: a relation
@@ -453,6 +456,13 @@ The **title of a card is never cut**: the text wraps over the lines it needs
 (`overflow-wrap: anywhere`), so the cards of the same column do not have the
 same height. The tags, the actions and the drag keep working on a card of any
 height.
+
+The **card itself is painted with the colour of its column**, one shade darker
+than the column: the background keeps the hue of the status and the border
+carries a stronger mix of it, so the card stands out from the column without
+leaving its colour family. The colour follows the card: dragging it onto
+another column repaints the card in an instant, because the colour comes from
+the column the card sits in.
 
 ### Changing the status
 
