@@ -64,7 +64,7 @@ import {
 import {
   barOf,
   buildLayout,
-  buildSchedule,
+  buildPaddedSchedule,
   dayOfIndex,
   dayOfTimestamp,
   daysBetween,
@@ -1775,7 +1775,7 @@ export class App
     );
 
     const rows = this.ganttRows();
-    const schedule = this.ganttSchedule();
+    const schedule = this.ganttSchedule(rows);
     if (schedule === null) {
       this.ganttElement.append(
         el(this.doc, 'div', { class: 'gantt-view' }, [
@@ -1956,12 +1956,22 @@ export class App
     });
   }
 
-  /** The days of the schedule, from the dates of the tasks. */
-  private ganttSchedule(): GanttSchedule | null {
+  /**
+   * The days of the schedule, from the dates of the displayed tasks.
+   *
+   * Only the rows on the screen count, so focusing or searching changes the
+   * visible weeks. One margin week is kept before the smallest start and one
+   * after the largest end, so the bars never touch the edges of the chart.
+   */
+  private ganttSchedule(rows: readonly TreeRow[]): GanttSchedule | null {
     let from: Date | null = null;
     let to: Date | null = null;
 
-    for (const task of this.ganttMetadata.values()) {
+    for (const row of rows) {
+      const task = this.ganttMetadata.get(row.id);
+      if (task === undefined) {
+        continue;
+      }
       const start = dayOfTimestamp(task.start);
       const end = dayOfTimestamp(task.end);
       for (const date of [start, end]) {
@@ -1980,7 +1990,7 @@ export class App
     if (from === null || to === null) {
       return null;
     }
-    return buildSchedule(from, to);
+    return buildPaddedSchedule(from, to);
   }
 
   /** The tasks of the chart, with their bar. */
@@ -2035,7 +2045,8 @@ export class App
    *
    * The months are not collapsed themselves: they follow the days, so they
    * cannot be drawn as a single column. Clicking a month is a shortcut for
-   * the weeks that hold at least one day of that month.
+   * every week holding at least one day of that month, even when the week
+   * starts in another month.
    */
   private toggleGanttMonth(monthKey: string): void {
     const schedule = this.ganttScheduleState;
@@ -2043,8 +2054,13 @@ export class App
       return;
     }
     const weeks = schedule.weeks.filter((week) => {
-      const date = dayOfIndex(schedule, week.firstDayIndex);
-      return isoDate(startOfMonth(date)) === monthKey;
+      for (let offset = 0; offset < week.days; offset += 1) {
+        const date = dayOfIndex(schedule, week.firstDayIndex + offset);
+        if (isoDate(startOfMonth(date)) === monthKey) {
+          return true;
+        }
+      }
+      return false;
     });
     if (weeks.length === 0) {
       return;

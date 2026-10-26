@@ -80,7 +80,7 @@ The service status pill at the top right shows whether the service is online. Wh
 ```bash
 npm install
 npm run build
-npm run verify        # typecheck, 410 tests, build, smoke E2E, browser E2E (120 checks)
+npm run verify        # typecheck, 417 tests, build, smoke E2E, browser E2E (122 checks)
 npm run deploy        # builds and copies dist to /var/www/html/GnumarusProjectManager
 ```
 
@@ -114,7 +114,7 @@ Every feature has tests:
 - `src/core/fileSystemAccess.test.ts` — the picker, the permission and the handle storage
 - `src/ui/app.test.ts` — the whole application with the fake bridge
 - `src/ui/ganttView.test.ts` — the rows of the Gantt chart
-- `scripts/e2e-browser.mjs` — real headless Chrome, 120 checks (service, embedded, notes, Gantt chart, File System Access API)
+- `scripts/e2e-browser.mjs` — real headless Chrome, 122 checks (service, embedded, notes, Gantt chart, File System Access API)
 - `scripts/e2e-smoke.sh` — headless Chrome renders the built app at root and at a nested path
 
 ## License

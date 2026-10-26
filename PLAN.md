@@ -8,13 +8,18 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
-- All planned batches (1-19) are implemented.
+- All planned batches (1-20) are implemented.
+- Batch 20 fixed the Gantt columns: the schedule always keeps one full margin
+  week before the smallest displayed start and one after the largest displayed
+  end (computed from the displayed rows), the week of an end date in the next
+  month is drawn, every chart row spans the whole chart so the separators cross
+  the margin weeks, and clicking a month covers weeks starting in another month.
 - Batch 19 reworked the Gantt view: the name column is 480px wide, the names
   are left aligned and wrap, the rows share their height with the chart through
   subgrids, the names stay pinned on the left, the indentation is 9px per
   level, every row has focus/edit/add-child actions and the chart keeps the
   focus breadcrumb of the tree view.
-- Verification: 410 unit tests and 120/120 browser checks pass.
+- Verification: 417 unit tests and 122/122 browser checks pass.
 - Documentation consistency verified.
 
 ## Architecture

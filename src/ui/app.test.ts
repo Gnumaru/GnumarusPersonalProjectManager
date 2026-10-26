@@ -1819,9 +1819,11 @@ describe('App and the Gantt chart', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.querySelector('.gantt-row-name')?.textContent).toBe('Task 1');
 
-    // The chart has one column per day of the schedule.
+    // The chart has one column per day of the schedule: the week of the task
+    // (the 18th to the 24th of October) plus one margin week before (the 11th
+    // to the 17th) and one after (the 25th to the 31st).
     const days = [...harness.root.querySelectorAll('.gantt-day')];
-    expect(days).toHaveLength(7);
+    expect(days).toHaveLength(21);
     expect(harness.root.querySelector('.gantt-bar')).not.toBeNull();
 
     // Expanding the task shows its children on the left.
@@ -1839,11 +1841,12 @@ describe('App and the Gantt chart', () => {
     await switchToGantt(harness);
 
     // The task 1 goes from the 19th to the 23rd of October: five days. The
-    // week starts on Sunday, so the bar starts on the second column.
+    // schedule starts one margin week before, on Sunday the 11th, so the bar
+    // starts on the ninth column.
     const bars = [...harness.root.querySelectorAll<HTMLElement>('.gantt-bar')];
     expect(bars).toHaveLength(1);
     expect(bars[0]?.style.width).toBe('138px');
-    expect(bars[0]?.style.left).toBe('28px');
+    expect(bars[0]?.style.left).toBe('224px');
 
     harness.app.dispose();
   });
@@ -1905,6 +1908,99 @@ describe('App and the Gantt chart', () => {
     click(harness.root.querySelector<HTMLButtonElement>('.gantt-month'));
     await flush();
     expect(harness.root.querySelectorAll('.gantt-day')).toHaveLength(daysBefore);
+
+    harness.app.dispose();
+  });
+
+  it('collapses a week starting in another month when its month is clicked', async () => {
+    const harness = await createGanttHarness();
+    // The 30th of September to the 2nd of October: the schedule covers the
+    // weeks of the 20th and the 27th of September and of the 4th of October
+    // (margins included). The week of the 27th starts in September but holds
+    // days of October.
+    setDates(harness, 1, '20260930100000000', '20261002180000000');
+    setDates(harness, 2, '20260930100000000', '20261002180000000');
+    setDates(harness, 3, '20260930100000000', '20261002180000000');
+    await switchToGantt(harness);
+
+    const months = [...harness.root.querySelectorAll<HTMLButtonElement>('.gantt-month')];
+    const october = months.find((month) => month.textContent?.includes('October'));
+    expect(october).not.toBeUndefined();
+
+    const daysBefore = harness.root.querySelectorAll('.gantt-day').length;
+    click(october ?? null);
+    await flush();
+    const daysAfter = harness.root.querySelectorAll('.gantt-day').length;
+    // Both weeks holding October days collapse: the spanning week and the
+    // week fully in October.
+    expect(daysAfter).toBeLessThan(daysBefore);
+
+    click(october ?? null);
+    await flush();
+    expect(harness.root.querySelectorAll('.gantt-day')).toHaveLength(daysBefore);
+
+    harness.app.dispose();
+  });
+
+  it('keeps one margin week before the smallest start and after the largest end', async () => {
+    const harness = await createGanttHarness();
+    setDates(harness, 1, '20261019100000000', '20261023180000000');
+    setDates(harness, 2, '20261019100000000', '20261023180000000');
+    setDates(harness, 3, '20261019100000000', '20261023180000000');
+    await switchToGantt(harness);
+
+    // The tasks run from the 19th to the 23rd of October (week of the 18th):
+    // the chart shows that week plus the full weeks of the 11th and the 25th.
+    const weeks = [...harness.root.querySelectorAll('.gantt-week')];
+    expect(weeks).toHaveLength(3);
+    const days = harness.root.querySelectorAll('.gantt-day');
+    expect(days).toHaveLength(21);
+
+    harness.app.dispose();
+  });
+
+  it('draws the week of the end date when it falls in the next month', async () => {
+    const harness = await createGanttHarness();
+    setDates(harness, 1, '20261028100000000', '20261104180000000');
+    setDates(harness, 2, '20261028100000000', '20261104180000000');
+    setDates(harness, 3, '20261028100000000', '20261104180000000');
+    await switchToGantt(harness);
+
+    const months = [...harness.root.querySelectorAll('.gantt-month')].map(
+      (cell) => cell.textContent,
+    );
+    expect(months).toContain('10October');
+    expect(months).toContain('11November');
+
+    // The week of the end (the 1st to the 7th of November) and one week after
+    // it (the 8th to the 14th) are both drawn.
+    const weeks = [...harness.root.querySelectorAll('.gantt-week')];
+    expect(weeks.length).toBeGreaterThanOrEqual(4);
+
+    harness.app.dispose();
+  });
+
+  it('computes the schedule from the displayed rows only', async () => {
+    const harness = await createHarness(0, {
+      tasks: [{ id: 1 }, { id: 2, parentId: 1 }, { id: 3, parentId: 1 }, { id: 4 }],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+    setDates(harness, 1, '20261019100000000', '20261023180000000');
+    setDates(harness, 2, '20261019100000000', '20261023180000000');
+    setDates(harness, 3, '20261019100000000', '20261023180000000');
+    // Task 4 is far away in December: it is only shown at the general root.
+    setDates(harness, 4, '20261201100000000', '20261202180000000');
+    await switchToGantt(harness);
+
+    // Focusing on task 1 hides task 4: the schedule ignores its December
+    // dates and stays around October.
+    click(ganttRow(harness, 1)?.querySelector<HTMLButtonElement>('[title="Focus the chart on this task"]'));
+    await flush();
+    const months = [...harness.root.querySelectorAll('.gantt-month')].map(
+      (cell) => cell.textContent,
+    );
+    expect(months).not.toContain('12December');
+    expect(harness.root.querySelectorAll('.gantt-day')).toHaveLength(21);
 
     harness.app.dispose();
   });

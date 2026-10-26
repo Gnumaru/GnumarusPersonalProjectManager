@@ -116,6 +116,8 @@ list or as a tree.
 | **A bar from the start date to the end date of the task** | Done | `src/core/gantt.ts` |
 | **The bars can be dragged to change the dates of a task** | Done | `src/ui/ganttDrag.ts` |
 | **The bars carry the colour of the status** | Done | `src/styles.css` |
+| **One margin week before the smallest start and after the largest end** | Done | `src/ui/app.ts`, `src/core/gantt.ts` |
+| **The chart rows span the whole chart, with their separators** | Done | `src/styles.css` |
 
 ## The notes
 

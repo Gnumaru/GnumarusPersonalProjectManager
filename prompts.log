@@ -93,6 +93,7 @@ na visualizacao "gantt":
 - o texto do nome das tarefas deve quebrar linha mesmo que isso faça com que a altura das linhas fique desigual.
 - deve haver botoes para "add child task" e "focus" igual os que existem na visualizacao de arvore, e uma funcionalidade pra resetar o focus igual na visualizacao de arvore
 ====
+na view gantt a visualizacao das colunas esta quebrada. deve aparecer sempre ao menos uma semana antes da semana que contem o menor start date das tarefas exibidas e uma semana depois da semana que contem o maior end date das tarefas exibidas. mas a coluna da semana que contem o end date das tarefas (que por acaso é no mes seguinte) nao esta aparecendo, e a coluna da semana anterior a semana do menor start date (que esta no mesmo mes) esta renderizando sem as linhas horizontais que separam as tarefas entre si
 ====
 ====
 ====

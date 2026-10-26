@@ -4,11 +4,13 @@ import {
   barGeometry,
   barOf,
   buildLayout,
+  buildPaddedSchedule,
   buildSchedule,
   columnOfDay,
   DAY_WIDTH_PX,
   dayOfTimestamp,
   daysBetween,
+  GANTT_MARGIN_DAYS,
   isoDate,
   startOfDay,
   startOfMonth,
@@ -115,6 +117,47 @@ describe('buildSchedule', () => {
     expect(weekends).toHaveLength(4);
     expect(isoDate(weekends[0]?.date ?? new Date())).toBe('2026-10-18');
     expect(isoDate(weekends[1]?.date ?? new Date())).toBe('2026-10-24');
+  });
+});
+
+describe('buildPaddedSchedule', () => {
+  it('keeps one margin week before and after the range', () => {
+    expect(GANTT_MARGIN_DAYS).toBe(7);
+    // The 19th to the 23rd of October 2026 is the week of the 18th to the
+    // 24th: the padded schedule adds the full weeks of the 11th and of the
+    // 25th.
+    const schedule = buildPaddedSchedule(new Date(2026, 9, 19), new Date(2026, 9, 23));
+
+    expect(isoDate(schedule.start)).toBe('2026-10-11');
+    expect(isoDate(schedule.end)).toBe('2026-10-31');
+    expect(schedule.days).toHaveLength(21);
+    expect(schedule.weeks).toHaveLength(3);
+  });
+
+  it('keeps the week of the end date when it falls in the next month', () => {
+    // From the 28th of October to the 4th of November: the padded range goes
+    // from the 21st of October to the 11th of November, widened to whole
+    // weeks, so the week of the end (the 1st to the 7th of November) and one
+    // week after it (the 8th to the 14th) are both drawn.
+    const schedule = buildPaddedSchedule(new Date(2026, 9, 28), new Date(2026, 10, 4));
+
+    const keys = schedule.weeks.map((week) => isoDate(week.firstDay));
+    expect(keys).toContain('2026-10-18');
+    expect(keys).toContain('2026-11-01');
+    expect(keys).toContain('2026-11-08');
+    expect(isoDate(schedule.start)).toBe('2026-10-18');
+    expect(isoDate(schedule.end)).toBe('2026-11-14');
+  });
+
+  it('pads a single day with one week on each side', () => {
+    const day = new Date(2026, 9, 21);
+    const schedule = buildPaddedSchedule(day, day);
+
+    // The day is a Wednesday of the week of the 18th: the schedule shows the
+    // weeks of the 11th, the 18th and the 25th.
+    expect(schedule.weeks).toHaveLength(3);
+    expect(isoDate(schedule.start)).toBe('2026-10-11');
+    expect(isoDate(schedule.end)).toBe('2026-10-31');
   });
 });
 

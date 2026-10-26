@@ -1145,7 +1145,7 @@ async function runChecks() {
     `[...document.querySelectorAll('.gantt-month')].map((node) => node.textContent).join('|')`,
   );
   check(
-    ganttMonths === '9September|10October',
+    ganttMonths === '9September|10October|11November',
     'the months are numbered with the number of the month of the year',
     ganttMonths,
   );
@@ -1154,9 +1154,53 @@ async function runChecks() {
     `[...document.querySelectorAll('.gantt-week')].map((node) => node.textContent).join('|')`,
   );
   check(
-    /^40[A-Z]/.test(ganttWeeks),
+    /^39[A-Z]/.test(ganttWeeks),
     'the weeks are numbered from the first day of the year',
     ganttWeeks,
+  );
+
+  // The schedule keeps one margin week before the smallest start and one
+  // after the largest end: the tasks run from the 2nd of October to the 27th
+  // (the child created by the test), so the chart shows the weeks of the 20th
+  // of September through the 1st of November.
+  const ganttMargin = await evaluate(`(() => ({
+    weeks: document.querySelectorAll('.gantt-week').length,
+    days: document.querySelectorAll('.gantt-day').length,
+    first: document.querySelector('.gantt-week')?.textContent ?? '',
+    last: [...document.querySelectorAll('.gantt-week')].at(-1)?.textContent ?? '',
+  }))()`);
+  check(
+    ganttMargin.weeks === 7 && ganttMargin.days === 49,
+    'the schedule keeps one margin week around the tasks',
+    `${ganttMargin.weeks} weeks, ${ganttMargin.days} days (${ganttMargin.first} .. ${ganttMargin.last})`,
+  );
+
+  // Every chart row spans the whole chart panel: the horizontal separators
+  // cross the margin weeks too (the rows once lived in an implicit second
+  // column and the left of the chart lost its lines).
+  const ganttRowSpan = await evaluate(`(() => {
+    const panel = document.querySelector('.gantt-chart');
+    const row = document.querySelector('.gantt-chart-row');
+    if (panel === null || row === null) {
+      return null;
+    }
+    const panelBox = panel.getBoundingClientRect();
+    const rowBox = row.getBoundingClientRect();
+    return {
+      panelLeft: panelBox.left,
+      rowLeft: rowBox.left,
+      panelWidth: panelBox.width,
+      rowWidth: rowBox.width,
+    };
+  })()`);
+  check(
+    ganttRowSpan !== null &&
+      Math.abs(ganttRowSpan.panelLeft - ganttRowSpan.rowLeft) < 1 &&
+      Math.abs(ganttRowSpan.panelWidth - ganttRowSpan.rowWidth) < 1,
+    'the chart rows span the whole chart, with their separators',
+    ganttRowSpan === null
+      ? 'no chart row'
+      : `${ganttRowSpan.rowLeft}/${ganttRowSpan.panelLeft} ${ganttRowSpan.rowWidth}/${ganttRowSpan.panelWidth}`,
   );
 
   const ganttBars = await evaluate(`document.querySelectorAll('.gantt-bar').length`);

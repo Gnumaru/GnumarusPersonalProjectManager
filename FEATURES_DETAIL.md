@@ -526,6 +526,16 @@ weeks by **month**, with three rows of headers:
 
 The weeks start on **Sunday** and end on Saturday.
 
+### The range of the schedule
+
+The schedule always keeps **one full margin week** before the week holding
+the smallest displayed `start` and one full margin week after the week
+holding the largest displayed `end`. The range is computed from the displayed
+rows, so focusing or searching changes the visible weeks. Every week in that
+range is drawn, including the week of the `end` date when it falls in the
+next month, and every chart row spans the whole chart width so the horizontal
+separators cross the margin weeks too.
+
 ### The column of the names
 
 The column of the task names is **480px** wide (50% wider than the earlier
@@ -1022,17 +1032,17 @@ be entered with a double click.
 | `src/core/note.test.ts` | The note file format: the names, the parsing, the serialization, the round trip, the search scopes and the summary of the body. |
 | `src/core/markdown.test.ts` | The markdown parser: the headings, the paragraphs, the lists, the quotes, the code blocks, the rules and the inline marks. |
 | `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons) and the pagination bar (jsdom). |
-| `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token, the tree view, the board and the Gantt chart (the focus breadcrumb, the reset of the focus and the creation of a child from the chart). |
+| `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token, the tree view, the board and the Gantt chart (the focus breadcrumb, the reset of the focus, the creation of a child from the chart, the margin weeks from the displayed rows and the month-spanning collapse). |
 | `src/ui/kanbanBoard.test.ts` | The board: the columns and their order, the cards, their tags and their actions. |
 | `src/ui/kanbanDrag.test.ts` | The drag and drop of the cards of the board between the columns. |
-| `src/core/gantt.test.ts` | The schedule of the Gantt chart: the days, the weeks, the months, the columns and the bars. |
+| `src/core/gantt.test.ts` | The schedule of the Gantt chart: the days, the weeks, the months, the columns, the bars and the padded schedule with one margin week around the tasks. |
 | `src/ui/ganttDrag.test.ts` | The drag of the bars of the Gantt chart: moving a task, changing one of its dates and the limits. |
 | `src/ui/ganttView.test.ts` | The rows of the Gantt chart: the 9px indentation, the focus/edit/add-child actions and the shared row tracks of the names and the chart. |
 | `src/ui/treeDrag.test.ts` | The drag and drop of the rows of the tree: the drop target, the thresholds, the buttons that never start a drag, the click that ends the drag and the detachment of a task. |
 | `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
 | `src/ui/markdownView.test.ts` | The rendering of the markdown: the blocks, the inline marks, the safe URLs and the fact that the text of a note is never injected as markup. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
-| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. It also drives the **notes** (the listing, the pagination, the jump to a page, the search scopes, the preview and the creation), the **Gantt chart** (the wider wrapping names, the shared row heights, the sticky names, the 9px indentation, the row actions and the focus breadcrumb), the **three choices** of the dialog of the project and the **embedded project**: the switch, the creation of a task, the export of the ZIP archive, its import and the **cold start** (the application opened on the embedded project asks for no folder and creates a task). |
+| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. It also drives the **notes** (the listing, the pagination, the jump to a page, the search scopes, the preview and the creation), the **Gantt chart** (the wider wrapping names, the shared row heights, the sticky names, the 9px indentation, the row actions, the focus breadcrumb, the margin weeks around the tasks and the chart rows spanning the whole chart), the **three choices** of the dialog of the project and the **embedded project**: the switch, the creation of a task, the export of the ZIP archive, its import and the **cold start** (the application opened on the embedded project asks for no folder and creates a task). |
 
 Commands:
 

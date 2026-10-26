@@ -177,5 +177,15 @@ describe('renderGanttView', () => {
 
     // The background stripes cover the whole body of the chart.
     expect(chart?.querySelector('.gantt-stripes')).not.toBeNull();
+
+    // The rows carry no inline grid placement: the subgrid of the panels
+    // decides the tracks, so a stale inline column cannot push the chart rows
+    // into an implicit column. (The stylesheet must keep `.gantt-chart-row`
+    // in the single column of `.gantt-chart`; the browser test checks the
+    // resulting widths.)
+    for (const row of [...sideRows, ...chartRows]) {
+      expect(row.style.gridColumn).toBe('');
+      expect(row.style.gridRow).toBe('');
+    }
   });
 });

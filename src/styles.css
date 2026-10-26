@@ -2030,7 +2030,12 @@ input[type='date'] {
 
 .gantt-chart-row {
   position: relative;
-  grid-column: 2;
+  /* Inside the chart panel there is a single column: the rows must stay in
+     it. A stale `grid-column: 2` here (from when the rows were direct
+     children of the outer grid) pushes every row into an implicit second
+     column, so the left of the chart loses its horizontal separators and the
+     bars are offset. */
+  grid-column: 1;
   z-index: 1;
   padding: 0;
 }

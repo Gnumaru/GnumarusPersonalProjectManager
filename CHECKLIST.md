@@ -435,6 +435,38 @@
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
 
+## Batch 20 - Gantt schedule margin and column rendering
+
+### Gantt chart
+
+- [x] The schedule always shows at least one full week before the week with
+      the smallest displayed `start` and one full week after the week with
+      the largest displayed `end` (`buildPaddedSchedule` in `src/core/gantt.ts`,
+      used by `src/ui/app.ts`)
+- [x] The schedule range is computed from the displayed rows, not from every
+      task in the project
+- [x] The week with the `end` date in the next month is drawn
+- [x] The margin week before the smallest `start` draws the horizontal row
+      separators across the whole chart width: `.gantt-chart-row` stays in
+      the single column of the chart panel (`src/styles.css`)
+- [x] Clicking a month collapses/expands every week holding at least one day
+      of that month, even when the week starts in another month
+
+### Tests
+
+- [x] `src/core/gantt.test.ts` - margin weeks, month-spanning weeks
+- [x] `src/ui/app.test.ts` - schedule from displayed rows with margins,
+      month-spanning collapse, end date in the next month
+- [x] `src/ui/ganttView.test.ts` - chart rows carry no inline grid placement
+- [x] `scripts/e2e-browser.mjs` - margin weeks visible across a month
+      boundary, with row separators spanning the chart, in a real browser
+
+### Build / deploy
+
+- [x] `npm run verify` (417 tests, 122/122 browser checks)
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 19 - Gantt names, row actions and focus
 
 ### Gantt chart

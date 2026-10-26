@@ -288,6 +288,21 @@ export function buildSchedule(from: Date, to: Date): GanttSchedule {
   return { start, end, days, weeks, months };
 }
 
+/** One margin week, in days: the schedule always keeps this context around. */
+export const GANTT_MARGIN_DAYS = 7;
+
+/**
+ * Builds the schedule of a range of dates, with one margin week around it.
+ *
+ * The schedule always shows at least one full week before the week holding
+ * `from` and one full week after the week holding `to`, so the first and the
+ * last task never touch the edges of the chart. The range is still widened to
+ * whole weeks by `buildSchedule`.
+ */
+export function buildPaddedSchedule(from: Date, to: Date): GanttSchedule {
+  return buildSchedule(addDays(from, -GANTT_MARGIN_DAYS), addDays(to, GANTT_MARGIN_DAYS));
+}
+
 /** The kind of a column of the chart. */
 export type GanttColumnKind = 'day' | 'week' | 'month';
 
