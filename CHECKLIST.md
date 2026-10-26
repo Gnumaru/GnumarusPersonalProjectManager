@@ -611,3 +611,4 @@
 ### Build / deploy
 - [x] `npm run verify` (376 tests, 92/92 browser checks)
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files.
