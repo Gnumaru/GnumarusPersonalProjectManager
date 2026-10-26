@@ -762,6 +762,26 @@ button[hidden] {
   padding: 0 7px;
 }
 
+/* The amount of comments of a task, shown as a number inside a small circle,
+   to the left of its name, in every view that lists the tasks. */
+.comment-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-right: 6px;
+  font-size: 11px;
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  flex: none;
+}
+
 /* Every column is painted with the colour of its status, instead of showing a
    single dot: the background is the soft colour of the status and the border,
    the separator of the header and the name carry the full colour. */

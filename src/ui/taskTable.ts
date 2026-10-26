@@ -19,8 +19,9 @@ export function renderTaskRows(
   tasks: readonly Task[],
   handlers: TaskTableHandlers,
   childCounts: ReadonlyMap<number, number> = new Map<number, number>(),
+  commentCounts: ReadonlyMap<number, number> = new Map<number, number>(),
 ): HTMLElement[] {
-  return tasks.map((task) => renderTaskRow(doc, task, handlers, childCounts));
+  return tasks.map((task) => renderTaskRow(doc, task, handlers, childCounts, commentCounts));
 }
 
 function renderTaskRow(
@@ -28,6 +29,7 @@ function renderTaskRow(
   task: Task,
   handlers: TaskTableHandlers,
   childCounts: ReadonlyMap<number, number>,
+  commentCounts: ReadonlyMap<number, number>,
 ): HTMLElement {
   const titleCell = doc.createElement('td');
   titleCell.className = 'cell-title';
@@ -41,6 +43,17 @@ function renderTaskRow(
 
   const titleLine = doc.createElement('div');
   titleLine.className = 'task-title-line';
+
+  const commentCount = commentCounts.get(task.id) ?? 0;
+  if (commentCount > 0) {
+    const badge = el(doc, 'span', {
+      class: 'comment-count',
+      title: `${commentCount} comment${commentCount === 1 ? '' : 's'}`,
+      text: String(commentCount),
+    });
+    titleLine.append(badge);
+  }
+
   titleLine.append(titleButton);
 
   const childCount = childCounts.get(task.id) ?? 0;

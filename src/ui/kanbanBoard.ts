@@ -29,6 +29,7 @@ export function renderKanbanBoard(
   doc: Document,
   cards: readonly TaskCard[],
   handlers: KanbanHandlers,
+  commentCounts: ReadonlyMap<number, number> = new Map<number, number>(),
 ): HTMLElement {
   const board = el(doc, 'div', { class: 'kanban-board' });
 
@@ -45,7 +46,7 @@ export function renderKanbanBoard(
 
     const list = column.querySelector('.kanban-cards');
     for (const card of columnCards) {
-      list?.append(renderKanbanCard(doc, card, handlers));
+      list?.append(renderKanbanCard(doc, card, handlers, commentCounts));
     }
     board.append(column);
   }
@@ -53,7 +54,12 @@ export function renderKanbanBoard(
   return board;
 }
 
-function renderKanbanCard(doc: Document, card: TaskCard, handlers: KanbanHandlers): HTMLElement {
+function renderKanbanCard(
+  doc: Document,
+  card: TaskCard,
+  handlers: KanbanHandlers,
+  commentCounts: ReadonlyMap<number, number> = new Map<number, number>(),
+): HTMLElement {
   const title = el(doc, 'button', {
     class: 'kanban-card-title',
     text: card.title.length > 0 ? card.title : 'Untitled task',
@@ -63,6 +69,19 @@ function renderKanbanCard(doc: Document, card: TaskCard, handlers: KanbanHandler
   title.addEventListener('click', () => {
     handlers.onOpen(card.id);
   });
+
+  const commentCount = commentCounts.get(card.id) ?? 0;
+  const children: HTMLElement[] = [];
+  if (commentCount > 0) {
+    children.push(
+      el(doc, 'span', {
+        class: 'comment-count',
+        title: `${commentCount} comment${commentCount === 1 ? '' : 's'}`,
+        text: String(commentCount),
+      }),
+    );
+  }
+  children.push(title);
 
   const tags = el(doc, 'div', { class: 'kanban-card-tags' });
   for (const tag of card.tags) {
@@ -78,7 +97,7 @@ function renderKanbanCard(doc: Document, card: TaskCard, handlers: KanbanHandler
     }),
   ]);
 
-  const element = el(doc, 'article', { class: 'kanban-card' }, [title, tags, actions]);
+  const element = el(doc, 'article', { class: 'kanban-card' }, [...children, tags, actions]);
   element.dataset['taskId'] = String(card.id);
   return element;
 }

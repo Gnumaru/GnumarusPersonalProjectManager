@@ -35,6 +35,7 @@ export function renderTreeRows(
   rows: readonly TreeRow[],
   tasks: ReadonlyMap<number, Task>,
   handlers: TreeViewHandlers,
+  commentCounts: ReadonlyMap<number, number> = new Map<number, number>(),
 ): HTMLElement[] {
   const elements: HTMLElement[] = [];
   for (const row of rows) {
@@ -43,7 +44,7 @@ export function renderTreeRows(
       // The file of the task could not be read: the row is left out.
       continue;
     }
-    elements.push(renderTreeRow(doc, row, task, handlers));
+    elements.push(renderTreeRow(doc, row, task, handlers, commentCounts));
   }
   return elements;
 }
@@ -53,6 +54,7 @@ function renderTreeRow(
   row: TreeRow,
   task: Task,
   handlers: TreeViewHandlers,
+  commentCounts: ReadonlyMap<number, number>,
 ): HTMLElement {
   const indent = el(doc, 'span', { class: 'tree-indent' });
   indent.style.width = `${row.depth * TREE_INDENT_PX}px`;
@@ -90,6 +92,16 @@ function renderTreeRow(
     handlers.onView(task);
   });
 
+  const commentCount = commentCounts.get(task.id) ?? 0;
+  const commentBadge =
+    commentCount > 0
+      ? el(doc, 'span', {
+          class: 'comment-count',
+          title: `${commentCount} comment${commentCount === 1 ? '' : 's'}`,
+          text: String(commentCount),
+        })
+      : null;
+
   const tags = el(doc, 'span', { class: 'tree-tags' });
   for (const tag of task.tags) {
     tags.append(el(doc, 'span', { class: 'tag', text: tag }));
@@ -110,7 +122,12 @@ function renderTreeRow(
     }),
   ]);
 
-  const element = el(doc, 'div', { class: 'tree-row' }, [indent, twisty, title, tags, actions]);
+  const elements: HTMLElement[] = [indent, twisty];
+  if (commentBadge !== null) {
+    elements.push(commentBadge);
+  }
+  elements.push(title, tags, actions);
+  const element = el(doc, 'div', { class: 'tree-row' }, elements);
   element.dataset['taskId'] = String(task.id);
   element.dataset['depth'] = String(row.depth);
   return element;

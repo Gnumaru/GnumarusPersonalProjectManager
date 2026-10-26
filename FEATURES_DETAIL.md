@@ -799,6 +799,21 @@ order of the task list and the other way round.
 
 ---
 
+## 5 sexies. Comment count badge on the tasks
+
+Every view that lists the tasks (the flat list, the tree, the board and the
+Gantt chart) shows, to the **left of the name of the task**, a small circle
+with the number of comments of the task, exactly like the number of cards of a
+column on the board. A task without comments shows no badge.
+
+The count is read once per refresh, for every task at once: the service reads
+all the `comment_*.txt` files and counts them by their `task=` key (one
+`grep` command, the same shape as the count of the children), and the embedded
+and the file system stores do the same in memory. The badge is purely
+informational: it does not change the sorting or the filtering of the tasks.
+
+---
+
 ## 6. The project of the user
 
 **Files:** `src/core/projectStore.ts`, `src/core/serviceStore.ts`, `src/core/embeddedStore.ts`, `src/core/browserStorage.ts`, `src/core/fileSystemAccess.ts`, `src/core/fileSystemStore.ts`, `src/core/zip.ts`, `src/ui/projectDialog.ts`

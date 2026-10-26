@@ -314,6 +314,21 @@ export class FakeBridge {
         .sort((left, right) => Number.parseInt(left[0], 10) - Number.parseInt(right[0], 10))
         .map(([parentId, count]) => `${String(count).padStart(7, ' ')} ${parentId}\n`)
         .join('');
+    } else if (command.includes("'^task='")) {
+      // Counting the comments of every task.
+      const counts = new Map<string, number>();
+      for (const [, content] of files()) {
+        const match = /^task=(\d+)$/mu.exec(content);
+        if (match === null) {
+          continue;
+        }
+        const taskId = match[1] ?? '';
+        counts.set(taskId, (counts.get(taskId) ?? 0) + 1);
+      }
+      stdout = [...counts.entries()]
+        .sort((left, right) => Number.parseInt(left[0], 10) - Number.parseInt(right[0], 10))
+        .map(([taskId, count]) => `${String(count).padStart(7, ' ')} ${taskId}\n`)
+        .join('');
     } else if (command.includes("-e '^parent=")) {
       // Listing the children of one task.
       const match = /-e '\^parent=(\d+)\$'/u.exec(command);

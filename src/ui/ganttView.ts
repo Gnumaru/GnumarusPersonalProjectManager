@@ -62,6 +62,7 @@ export interface GanttViewOptions {
   readonly tasks: ReadonlyMap<number, GanttTask>;
   readonly schedule: GanttSchedule;
   readonly layout: GanttLayout;
+  readonly commentCounts?: ReadonlyMap<number, number>;
 }
 
 /** Builds the Gantt chart. */
@@ -109,9 +110,10 @@ export function renderGanttView(
   const chart = el(doc, 'div', { class: 'gantt-chart' });
   chart.append(renderStripes(doc, layout));
 
+  const commentCounts = options.commentCounts ?? new Map<number, number>();
   for (const row of options.rows) {
     const task = options.tasks.get(row.id);
-    side.append(renderSideRow(doc, row, task, handlers));
+    side.append(renderSideRow(doc, row, task, handlers, commentCounts));
     chart.append(renderChartRow(doc, layout, task));
   }
 
@@ -151,6 +153,7 @@ function renderSideRow(
   row: TreeRow,
   task: GanttTask | undefined,
   handlers: GanttHandlers,
+  commentCounts: ReadonlyMap<number, number> = new Map<number, number>(),
 ): HTMLElement {
   const indent = el(doc, 'span', { class: 'gantt-indent' });
   indent.style.width = `${row.depth * GANTT_INDENT_PX}px`;
@@ -194,7 +197,20 @@ function renderSideRow(
     }),
   ]);
 
-  const element = el(doc, 'div', { class: 'gantt-row' }, [indent, twisty, name, actions]);
+  const commentCount = commentCounts.get(row.id) ?? 0;
+  const nameElements: HTMLElement[] = [indent, twisty];
+  if (commentCount > 0) {
+    nameElements.push(
+      el(doc, 'span', {
+        class: 'comment-count',
+        title: `${commentCount} comment${commentCount === 1 ? '' : 's'}`,
+        text: String(commentCount),
+      }),
+    );
+  }
+  nameElements.push(name, actions);
+
+  const element = el(doc, 'div', { class: 'gantt-row' }, nameElements);
   element.dataset['taskId'] = String(row.id);
   element.dataset['depth'] = String(row.depth);
   return element;

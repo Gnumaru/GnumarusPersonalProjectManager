@@ -95,14 +95,45 @@ na visualizacao "gantt":
 ====
 na view gantt a visualizacao das colunas esta quebrada. deve aparecer sempre ao menos uma semana antes da semana que contem o menor start date das tarefas exibidas e uma semana depois da semana que contem o maior end date das tarefas exibidas. mas a coluna da semana que contem o end date das tarefas (que por acaso é no mes seguinte) nao esta aparecendo, e a coluna da semana anterior a semana do menor start date (que esta no mesmo mes) esta renderizando sem as linhas horizontais que separam as tarefas entre si
 ====
+nas views 'list', 'tree', 'kanban' e 'gantt', adicione a contagem de comentarios de cada tarefa do lado esquerdo do nome da tarefa de forma similar a como é feito no kanban a contagem de tarefas por coluna (com um numero dentro de uma bolinha. se a tarefa nao tiver comentarios nao adicione a bolinha com numero
+====
+====
+na modal de visualizacao da task, devem ser exibidos todos os comentarios dela, ordenados decrescentemente por data de criacao
 ====
 ====
 ====
 ====
 ====
 ====
-====
-====
+ao invez de usarmos
+
+
+-9007199254740992
++9007199254740992
+
+function getRandomSafeInteger() {
+  const minBI = BigInt(Number.MIN_SAFE_INTEGER); // -9007199254740991n
+  const maxBI = BigInt(Number.MAX_SAFE_INTEGER); //  9007199254740991n
+  const range = maxBI - minBI + 1n;              //  18014398509481983n
+
+  // Aloca 8 bytes (64 bits) de entropia criptográfica
+  const buffer = new BigUint64Array(1);
+  
+  while (true) {
+    crypto.getRandomValues(buffer);
+    const random64 = buffer[0];
+
+    // Elimina o viés de módulo (Modulo Bias) para garantir distribuição uniforme
+    const maxSafeRandom = (2n ** 64n / range) * range;
+    if (random64 < maxSafeRandom) {
+      // Retorna o resultado convertido de volta para Number seguro
+      return Number((random64 % range) + minBI);
+    }
+  }
+}
+
+// Exemplo de uso:
+console.log(getRandomSafeInteger());
 
 ====
 

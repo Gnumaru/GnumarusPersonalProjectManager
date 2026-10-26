@@ -96,6 +96,9 @@ export interface ProjectStore {
   /** The amount of children of every task, indexed by the id of the parent. */
   childCounts(): Promise<ReadonlyMap<number, number>>;
 
+  /** The amount of comments of every task, indexed by the id of the task. */
+  commentCounts(): Promise<ReadonlyMap<number, number>>;
+
   /** The full task held by a file. */
   readTask(path: string): Promise<Task>;
 

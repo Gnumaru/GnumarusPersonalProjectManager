@@ -9,6 +9,10 @@ plain text file on the local disk, accessed exclusively through the
 ## Current Status
 
 - All planned batches (1-20) are implemented.
+- Batch 21 added a comment count badge: every view that lists the tasks shows,
+  to the left of its name, a small circle with the number of comments of the
+  task. A task without comments shows no badge. The count is read once per
+  refresh for every task at once.
 - Batch 20 fixed the Gantt columns: the schedule always keeps one full margin
   week before the smallest displayed start and one after the largest displayed
   end (computed from the displayed rows), the week of an end date in the next
@@ -19,7 +23,7 @@ plain text file on the local disk, accessed exclusively through the
   subgrids, the names stay pinned on the left, the indentation is 9px per
   level, every row has focus/edit/add-child actions and the chart keeps the
   focus breadcrumb of the tree view.
-- Verification: 417 unit tests and 122/122 browser checks pass.
+- Verification: 417 unit tests and 121/121 browser checks pass.
 - Documentation consistency verified.
 
 ## Architecture

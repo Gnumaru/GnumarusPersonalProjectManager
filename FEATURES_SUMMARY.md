@@ -20,6 +20,7 @@ list or as a tree.
 | Recursive search of the tasks (grep) | Done | `src/core/serviceStore.ts`, `src/core/embeddedStore.ts` |
 | **Sortable columns: click a name to sort descending, click again to invert** | Done | `src/core/tableSort.ts`, `src/ui/app.ts` |
 | **Global sort across the pages, numeric / alphabetical / date per column** | Done | `src/core/tableSort.ts`, `src/ui/app.ts` |
+| **Comment count badge to the left of the task name, in every view** | Done | `src/ui/taskTable.ts`, `src/ui/taskTreeView.ts`, `src/ui/kanbanBoard.ts`, `src/ui/ganttView.ts` |
 | Free form tags (add and remove) | Done | `src/core/task.ts` |
 | Task status (planning, next, to do, doing, paused, done, canceled) | Done | `src/core/task.ts` |
 

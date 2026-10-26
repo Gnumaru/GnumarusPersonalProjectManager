@@ -102,6 +102,19 @@ export class FileSystemProjectStore implements ProjectStore {
     return counts;
   }
 
+  async commentCounts(): Promise<ReadonlyMap<number, number>> {
+    const counts = new Map<number, number>();
+    for (const path of await this.listCommentPathsInternal()) {
+      const content = await this.readFile(path);
+      if (content === null) {
+        continue;
+      }
+      const comment = parseComment(content, parseCommentIdFromFileName(nameOf(path)) ?? undefined);
+      counts.set(comment.taskId, (counts.get(comment.taskId) ?? 0) + 1);
+    }
+    return counts;
+  }
+
   async readTask(path: string): Promise<Task> {
     const content = await this.readFile(path);
     if (content === null) {

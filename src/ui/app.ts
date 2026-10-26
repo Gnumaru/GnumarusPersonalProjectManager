@@ -204,6 +204,8 @@ export class App
   private tasks: Task[] = [];
   private info: PageInfo = computePageInfo(1, DEFAULT_PAGE_SIZE, 0);
   private childCounts = new Map<number, number>();
+  /** The amount of comments of every task. */
+  private commentCounts = new Map<number, number>();
   private serviceState: ServiceState = 'checking';
 
   /** The notes of the displayed page. */
@@ -1327,6 +1329,7 @@ export class App
     }
 
     const childCounts = await store.childCounts().catch(() => new Map<number, number>());
+    const commentCounts = await store.commentCounts().catch(() => new Map<number, number>());
     const seededDates = await this.seedTaskDates(
       tasks.map((task) => ({
         id: task.id,
@@ -1342,6 +1345,7 @@ export class App
     this.info = info;
     this.page = info.page;
     this.childCounts = new Map(childCounts);
+    this.commentCounts = new Map(commentCounts);
   }
 
   /**
@@ -1361,6 +1365,7 @@ export class App
     this.applyHierarchy(summaries);
     await this.seedTaskDates(summaries);
     this.treeMatches = await this.searchTaskIds();
+    this.commentCounts = new Map(await store.commentCounts().catch(() => new Map<number, number>()));
 
     await this.updateTreeRows();
   }
@@ -1410,6 +1415,7 @@ export class App
     }
     const matches = await this.searchTaskIds();
     this.treeMatches = matches;
+    this.commentCounts = new Map(await store.commentCounts().catch(() => new Map<number, number>()));
     this.kanbanCards = summaries
       .filter((task) => !parents.has(task.id))
       // The search of the board shows only the leaves that match: the other
@@ -1441,6 +1447,7 @@ export class App
     const seededDates = await this.seedTaskDates(summaries);
     this.applyHierarchy(summaries);
     this.treeMatches = await this.searchTaskIds();
+    this.commentCounts = new Map(await store.commentCounts().catch(() => new Map<number, number>()));
     this.ganttMetadata = new Map<number, TaskSummary>(
       summaries.map((task) => {
         const seeded = seededDates.get(task.id);
@@ -1686,7 +1693,7 @@ export class App
       onOpenParent: (parentId) => {
         void this.openTaskById(parentId);
       },
-    }, this.childCounts)) {
+    }, this.childCounts, this.commentCounts)) {
       this.rowsElement.append(row);
     }
 
@@ -1728,7 +1735,7 @@ export class App
       onAddChild: (task) => {
         this.openCreateDialog(task);
       },
-    })) {
+    }, this.commentCounts)) {
       this.treeRowsElement.append(row);
     }
 
@@ -1751,7 +1758,7 @@ export class App
         onEdit: (taskId) => {
           void this.openEditTaskById(taskId);
         },
-      }),
+      }, this.commentCounts),
     );
 
     this.updateEmptyState(this.kanbanCards.length === 0);
@@ -1802,6 +1809,7 @@ export class App
             tasks,
             schedule,
             layout,
+            commentCounts: this.commentCounts,
           },
           {
             onToggle: (id, recursive) => {

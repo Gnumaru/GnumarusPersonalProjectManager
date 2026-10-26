@@ -506,6 +506,26 @@
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
 - [x] Compared consistency of all documentation files
 
+## Batch 19 - Comment count badge on the tasks
+
+### Every view that lists the tasks
+
+- [x] A small circle with the number of comments of the task is shown to the
+      left of its name, in the flat list, in the tree, on the board and on the
+      Gantt chart
+- [x] A task without comments shows no badge
+
+### Data
+
+- [x] `commentCounts()` on the store, one `grep` command for the service, in
+      memory for the embedded and file system stores
+- [x] The count is read once per refresh and kept in the state of the app
+
+### Tests
+
+- [x] `npm run verify` (417 tests, 121/121 browser checks)
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+
 ## Batch 18 - Sortable columns in the list and in the notes
 
 ### Task list

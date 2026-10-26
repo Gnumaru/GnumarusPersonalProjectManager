@@ -164,6 +164,19 @@ export class EmbeddedProjectStore implements ProjectStore {
     return counts;
   }
 
+  async commentCounts(): Promise<ReadonlyMap<number, number>> {
+    const counts = new Map<number, number>();
+    for (const path of this.pathsOf((name) => isCommentFileName(name.slice(name.lastIndexOf('/') + 1)))) {
+      const content = this.files.get(path);
+      if (content === undefined) {
+        continue;
+      }
+      const comment = parseComment(content, parseCommentIdFromFileName(path.slice(path.lastIndexOf('/') + 1)) ?? undefined);
+      counts.set(comment.taskId, (counts.get(comment.taskId) ?? 0) + 1);
+    }
+    return counts;
+  }
+
   async listComments(taskId: number): Promise<readonly TaskComment[]> {
     const comments: TaskComment[] = [];
     for (const path of this.pathsOf((name) => isCommentFileName(name.slice(name.lastIndexOf('/') + 1)))) {

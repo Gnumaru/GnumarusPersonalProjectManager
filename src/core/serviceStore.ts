@@ -93,6 +93,10 @@ export const FIND_ALL_FILES_COMMAND =
 export const COUNT_CHILDREN_COMMAND =
   "grep -rh --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg '^parent=' . | cut -d= -f2 | sort | uniq -c";
 
+/** Command used to count the comments of every task. */
+export const COUNT_COMMENTS_COMMAND =
+  "grep -rh --include='comment_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg '^task=' . | cut -d= -f2 | sort | uniq -c";
+
 /**
  * Command used to read the metadata of every task.
  *
@@ -341,6 +345,32 @@ export class ServiceProjectStore implements ProjectStore {
       const parentId = Number.parseInt(match[2] ?? '', 10);
       if (Number.isSafeInteger(count) && Number.isSafeInteger(parentId)) {
         counts.set(parentId, count);
+      }
+    }
+    return counts;
+  }
+
+  async commentCounts(): Promise<ReadonlyMap<number, number>> {
+    const counts = new Map<number, number>();
+    const result = await this.api.execShell({
+      command: COUNT_COMMENTS_COMMAND,
+      cwd: this.projectDir,
+      timeout: 60,
+    });
+    if (result.returncode !== 0 && result.returncode !== 1) {
+      throw new Error(
+        `Unable to count the comments of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
+      );
+    }
+    for (const line of result.stdout.split('\\n')) {
+      const match = /^\\s*(\\d+)\\s+(\\d+)\\s*$/u.exec(line);
+      if (match === null) {
+        continue;
+      }
+      const count = Number.parseInt(match[1] ?? '', 10);
+      const taskId = Number.parseInt(match[2] ?? '', 10);
+      if (Number.isSafeInteger(count) && Number.isSafeInteger(taskId)) {
+        counts.set(taskId, count);
       }
     }
     return counts;
