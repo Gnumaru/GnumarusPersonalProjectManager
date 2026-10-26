@@ -96,6 +96,13 @@ list or as a tree.
 | Feature | Status | Where |
 | ------- | ------ | ----- |
 | **Gantt chart: the tasks on the left, the chart on the right** | Done | `src/ui/ganttView.ts` |
+| **The column of the names is 480px wide, 50% wider than before** | Done | `src/styles.css` |
+| **The names are aligned to the left and wrap over several lines** | Done | `src/styles.css` |
+| **The chart follows the height of the wrapped names** | Done | `src/ui/ganttView.ts`, `src/styles.css` |
+| **The names stay pinned on the left when the chart scrolls** | Done | `src/styles.css` |
+| **The indentation is 9px per level, half of the tree view** | Done | `src/ui/ganttView.ts` |
+| **Every row offers focus, edit and add-child actions** | Done | `src/ui/ganttView.ts` |
+| **The focus breadcrumb of the tree, with the General root reset** | Done | `src/ui/app.ts` |
 | **Search on the chart: the matches and their chain of ancestors** | Done | `src/core/taskTree.ts`, `src/ui/app.ts` |
 | **One column per day** | Done | `src/core/gantt.ts` |
 | **The days grouped by week and the weeks by month** | Done | `src/core/gantt.ts` |
@@ -172,6 +179,5 @@ list or as a tree.
 
 ## Not implemented yet (planned for the next batches)
 
-* Grand children (a task whose parent is itself a child): the format already
-  supports it, but the user interface only offers one level of children.
-* Multi project management, task dependencies, due dates, priorities.
+* Multi project management.
+* Priorities.

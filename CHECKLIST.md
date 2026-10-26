@@ -435,6 +435,45 @@
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
 
+## Batch 19 - Gantt names, row actions and focus
+
+### Gantt chart
+
+- [x] The column of the task names is **480px** wide, 50% wider than the
+      previous 320px (`src/styles.css`)
+- [x] The names are aligned to the **left** and **wrap** over several lines
+- [x] The names and the chart are two **subgrids** of shared row tracks: a
+      wrapped name makes its chart row taller, so the bars stay aligned with
+      their names
+- [x] The names stay **pinned on the left** when the chart scrolls horizontally
+      (the grid is as wide as its columns, so the sticky cells can follow the
+      scroll)
+- [x] The indentation is **9px per level**, half of the 18px of the tree view
+      (`GANTT_INDENT_PX` in `src/ui/ganttView.ts`)
+- [x] Every row offers the **focus**, **edit** and **add child** actions, in
+      that order
+- [x] The **focus breadcrumb** of the tree view is shown above the chart, with
+      the **General root** item that resets the focus
+- [x] Adding a child from a chart row loads the task by id before opening the
+      creation dialog
+- [x] A ctrl+click still collapses or expands the whole branch
+
+### Tests
+
+- [x] `src/ui/ganttView.test.ts` - the 9px indentation, the row actions and
+      their handlers, and the shared row tracks of the names and the chart
+- [x] `src/ui/app.test.ts` - the Gantt indentation, the focus and its reset,
+      and the creation of a child from the chart
+- [x] `scripts/e2e-browser.mjs` - the 480px column, the left alignment, the
+      wrapping, the shared row heights, the sticky names, the 9px indentation,
+      the child creation and the focus breadcrumb, in a real browser
+
+### Build / deploy
+
+- [x] `npm run verify` (410 tests, 120/120 browser checks)
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 18 - Sortable columns in the list and in the notes
 
 ### Task list

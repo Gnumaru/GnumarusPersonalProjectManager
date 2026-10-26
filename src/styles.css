@@ -989,7 +989,8 @@ button[hidden] {
   display: none;
 }
 
-.tree-header {
+.tree-header,
+.gantt-focus-header {
   flex: none;
   display: flex;
   align-items: center;
@@ -1000,7 +1001,14 @@ button[hidden] {
   overflow-x: auto;
 }
 
-.tree-header-label {
+.gantt-focus-header {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.tree-header-label,
+.gantt-focus-header-label {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.7px;
@@ -1008,14 +1016,16 @@ button[hidden] {
   white-space: nowrap;
 }
 
-.tree-breadcrumb {
+.tree-breadcrumb,
+.gantt-focus-breadcrumb {
   display: flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
 }
 
-.tree-crumb {
+.tree-crumb,
+.gantt-focus-crumb {
   padding: 2px 8px;
   font-size: 12.5px;
   border: 1px solid transparent;
@@ -1025,12 +1035,14 @@ button[hidden] {
   white-space: nowrap;
 }
 
-.tree-crumb:hover:not(:disabled) {
+.tree-crumb:hover:not(:disabled),
+.gantt-focus-crumb:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-.tree-crumb.is-active {
+.tree-crumb.is-active,
+.gantt-focus-crumb.is-active {
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
@@ -1039,7 +1051,8 @@ button[hidden] {
   text-overflow: ellipsis;
 }
 
-.tree-crumb-sep {
+.tree-crumb-sep,
+.gantt-focus-crumb-sep {
   color: var(--text-faint);
   font-size: 12px;
 }
@@ -1743,6 +1756,14 @@ input[type='date'] {
   display: none;
 }
 
+.gantt-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .gantt-wrap {
   flex: 1;
   min-height: 0;
@@ -1754,8 +1775,12 @@ input[type='date'] {
 
 .gantt-grid {
   display: grid;
-  grid-template-columns: 320px max-content;
+  grid-template-columns: 480px max-content;
   align-content: start;
+  /* The grid itself must be as wide as its columns: a sticky cell is
+     constrained by the content box of its grid container, so a grid that only
+     fills the viewport would let the names scroll away. */
+  width: max-content;
   min-width: 100%;
 }
 
@@ -1763,6 +1788,8 @@ input[type='date'] {
   position: sticky;
   top: 0;
   left: 0;
+  grid-column: 1;
+  grid-row: 1;
   z-index: 4;
   display: flex;
   align-items: center;
@@ -1782,6 +1809,8 @@ input[type='date'] {
 .gantt-heads {
   position: sticky;
   top: 0;
+  grid-column: 2;
+  grid-row: 1;
   z-index: 3;
   background: var(--bg-subtle);
   border-bottom: 1px solid var(--border);
@@ -1884,7 +1913,17 @@ input[type='date'] {
   background: var(--bg-subtle);
 }
 
+/* The two panels share the row tracks of the grid: a wrapped name of the left
+   side makes its row taller and the chart follows it. */
+.gantt-side,
+.gantt-chart {
+  grid-row: 2 / -1;
+  display: grid;
+  grid-template-rows: subgrid;
+}
+
 .gantt-side {
+  grid-column: 1;
   position: sticky;
   left: 0;
   z-index: 2;
@@ -1892,9 +1931,14 @@ input[type='date'] {
   border-right: 1px solid var(--border);
 }
 
+.gantt-chart {
+  grid-column: 2;
+  position: relative;
+}
+
 .gantt-row,
 .gantt-chart-row {
-  height: 30px;
+  min-height: 30px;
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--border);
@@ -1902,7 +1946,7 @@ input[type='date'] {
 
 .gantt-row {
   gap: 6px;
-  padding: 0 8px 0 0;
+  padding: 4px 8px 4px 0;
 }
 
 .gantt-row:hover {
@@ -1956,9 +2000,8 @@ input[type='date'] {
   border: none;
   background: transparent;
   color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .gantt-row-name:hover:not(:disabled) {
@@ -1985,20 +2028,18 @@ input[type='date'] {
   padding: 0;
 }
 
-.gantt-chart {
-  position: relative;
-}
-
 .gantt-chart-row {
   position: relative;
+  grid-column: 2;
   z-index: 1;
   padding: 0;
 }
 
 .gantt-bar {
   position: absolute;
-  top: 6px;
+  top: 50%;
   height: 18px;
+  transform: translateY(-50%);
   border-radius: 5px;
   display: flex;
   align-items: center;

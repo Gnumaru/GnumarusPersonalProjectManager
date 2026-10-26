@@ -8,7 +8,13 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
-- All planned batches (1-11) are implemented.
+- All planned batches (1-19) are implemented.
+- Batch 19 reworked the Gantt view: the name column is 480px wide, the names
+  are left aligned and wrap, the rows share their height with the chart through
+  subgrids, the names stay pinned on the left, the indentation is 9px per
+  level, every row has focus/edit/add-child actions and the chart keeps the
+  focus breadcrumb of the tree view.
+- Verification: 410 unit tests and 120/120 browser checks pass.
 - Documentation consistency verified.
 
 ## Architecture

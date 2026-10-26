@@ -1736,6 +1736,78 @@ describe('App and the Gantt chart', () => {
     await flush();
   }
 
+  function ganttNames(harness: Harness): (string | undefined)[] {
+    return [...harness.root.querySelectorAll('.gantt-row-name')].map((row) => row.textContent);
+  }
+
+  function ganttRow(harness: Harness, taskId: number): HTMLElement | null {
+    return harness.root.querySelector<HTMLElement>(`.gantt-row[data-task-id="${taskId}"]`);
+  }
+
+  it('indents the rows of the chart by half of the indentation of the tree', async () => {
+    const harness = await createGanttHarness();
+    await switchToGantt(harness);
+
+    expect(ganttRow(harness, 1)?.querySelector<HTMLElement>('.gantt-indent')?.style.width).toBe('0px');
+
+    click(harness.root.querySelector<HTMLButtonElement>('.gantt-twisty'));
+    await flush();
+
+    expect(ganttRow(harness, 2)?.querySelector<HTMLElement>('.gantt-indent')?.style.width).toBe('9px');
+
+    harness.app.dispose();
+  });
+
+  it('focuses the chart on a task and resets the focus from the breadcrumb', async () => {
+    const harness = await createHarness(0, {
+      tasks: [{ id: 1 }, { id: 2, parentId: 1 }, { id: 3, parentId: 1 }, { id: 4 }],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+    await switchToGantt(harness);
+
+    // The general root shows the tasks without a parent.
+    expect(ganttNames(harness)).toEqual(['Task 1', 'Task 4']);
+
+    // The first action focuses the chart on the task: the branch opens and the
+    // tasks outside of it are hidden.
+    click(ganttRow(harness, 1)?.querySelector<HTMLButtonElement>('[title="Focus the chart on this task"]'));
+    await flush();
+    expect(ganttNames(harness)).toEqual(['Task 1', 'Task 2', 'Task 3']);
+
+    const crumbs = [...harness.root.querySelectorAll('.gantt-focus-crumb')];
+    expect(crumbs.map((crumb) => crumb.textContent)).toEqual(['General root', 'Task 1']);
+
+    // The first crumb resets the focus, like the header of the tree view.
+    click(crumbs[0] ?? null);
+    await flush();
+    expect(ganttNames(harness)).toEqual(['Task 1', 'Task 2', 'Task 3', 'Task 4']);
+    expect(harness.root.querySelector('.gantt-focus-crumb.is-active')?.textContent).toBe('General root');
+
+    harness.app.dispose();
+  });
+
+  it('creates a child task from the actions of the chart', async () => {
+    const harness = await createGanttHarness();
+    await switchToGantt(harness);
+
+    click(ganttRow(harness, 1)?.querySelector<HTMLButtonElement>('[title="Add a child task"]'));
+    await flush();
+    expect(harness.doc.querySelector('.modal-title')?.textContent).toContain('New child of task #1');
+
+    const title = harness.doc.querySelector<HTMLInputElement>('#task-title');
+    if (title === null) {
+      return;
+    }
+    title.value = 'Child created from the chart';
+    click(buttonByText(harness.doc, 'Create task'));
+    await flush();
+
+    expect(harness.bridge.files.get('/home/user/projects/task_4.txt')).toContain('parent=1');
+    expect(ganttNames(harness)).toContain('Child created from the chart');
+
+    harness.app.dispose();
+  });
+
   it('shows the tasks on the left and the chart on the right', async () => {
     const harness = await createGanttHarness();
     setDates(harness, 1, '20261019100000000', '20261023180000000');

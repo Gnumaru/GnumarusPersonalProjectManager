@@ -39,15 +39,22 @@ export interface GanttTask {
 export interface GanttHandlers {
   /** Collapses or expands the children of a task. */
   readonly onToggle: (id: number, recursive: boolean) => void;
+  /** The chart is focused on the task. */
+  readonly onFocus: (id: number) => void;
   /** The task is opened. */
   readonly onOpen: (id: number) => void;
   /** The editor of the task is opened. */
   readonly onEdit: (id: number) => void;
+  /** A child of the task is created. */
+  readonly onAddChild: (id: number) => void;
   /** A week is collapsed or expanded. */
   readonly onToggleWeek: (key: string) => void;
   /** A month is collapsed or expanded. */
   readonly onToggleMonth: (key: string) => void;
 }
+
+/** Width of one level of indentation of the chart, in pixels. */
+export const GANTT_INDENT_PX = 9;
 
 export interface GanttViewOptions {
   readonly doc: Document;
@@ -94,6 +101,10 @@ export function renderGanttView(
 
   const heads = el(doc, 'div', { class: 'gantt-heads' }, [months, weeks, days]);
 
+  // The rows of the tasks and the lines of the chart live in the same row
+  // tracks of the grid, through the subgrid of the two panels: the wrapped
+  // names of the left side make the row taller and the chart follows it, so
+  // the bars always stay beside the names.
   const side = el(doc, 'div', { class: 'gantt-side' });
   const chart = el(doc, 'div', { class: 'gantt-chart' });
   chart.append(renderStripes(doc, layout));
@@ -104,7 +115,14 @@ export function renderGanttView(
     chart.append(renderChartRow(doc, layout, task));
   }
 
-  const grid = el(doc, 'div', { class: 'gantt-grid' }, [corner, heads, side, chart]);
+  const grid = el(doc, 'div', { class: 'gantt-grid' }, [corner, heads]);
+  if (options.rows.length > 0) {
+    // The header is the first row: the panels share the row tracks of the
+    // tasks that follow it.
+    grid.style.gridTemplateRows = `auto repeat(${options.rows.length}, minmax(30px, auto))`;
+    grid.append(side, chart);
+  }
+
   return el(doc, 'div', { class: 'gantt-wrap' }, [grid]);
 }
 
@@ -135,7 +153,7 @@ function renderSideRow(
   handlers: GanttHandlers,
 ): HTMLElement {
   const indent = el(doc, 'span', { class: 'gantt-indent' });
-  indent.style.width = `${row.depth * 18}px`;
+  indent.style.width = `${row.depth * GANTT_INDENT_PX}px`;
 
   const twisty = el(doc, 'button', {
     class: 'gantt-twisty',
@@ -165,8 +183,14 @@ function renderSideRow(
   });
 
   const actions = el(doc, 'div', { class: 'gantt-row-actions' }, [
+    actionButton(doc, 'target', 'Focus the chart on this task', () => {
+      handlers.onFocus(task?.id ?? row.id);
+    }),
     actionButton(doc, 'pencil', 'Edit the task', () => {
       handlers.onEdit(task?.id ?? row.id);
+    }),
+    actionButton(doc, 'child', 'Add a child task', () => {
+      handlers.onAddChild(task?.id ?? row.id);
     }),
   ]);
 

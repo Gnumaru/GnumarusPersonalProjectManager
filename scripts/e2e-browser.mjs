@@ -1165,6 +1165,127 @@ async function runChecks() {
   const ganttRows = await evaluate(`document.querySelectorAll('.gantt-row').length`);
   check(ganttRows > 0, 'the Gantt chart shows the tasks on the left', `${ganttRows}`);
 
+  // The column of the names is 50% wider, the names are aligned to the left
+  // and their text wraps. The chart follows the height of the wrapped rows.
+  const ganttLayout = await evaluate(`(() => {
+    const grid = document.querySelector('.gantt-grid');
+    const side = grid.querySelector('.gantt-side');
+    const sideRows = [...grid.querySelectorAll('.gantt-row')];
+    const chartRows = [...grid.querySelectorAll('.gantt-chart-row')];
+    const row = sideRows.find((node) => node.dataset['taskId'] === '1');
+    const index = sideRows.indexOf(row);
+    const name = row.querySelector('.gantt-row-name');
+    const style = getComputedStyle(name);
+    const before = {
+      side: row.getBoundingClientRect().height,
+      chart: chartRows[index].getBoundingClientRect().height,
+      width: side.getBoundingClientRect().width,
+      textAlign: style.textAlign,
+      whiteSpace: style.whiteSpace,
+      overflowWrap: style.overflowWrap,
+    };
+    const text = name.textContent;
+    name.textContent =
+      'A long task name that must wrap over several lines because the column is not wide enough. '.repeat(3);
+    const wrapped = {
+      side: row.getBoundingClientRect().height,
+      chart: chartRows[index].getBoundingClientRect().height,
+    };
+    name.textContent = text;
+    return { before, wrapped };
+  })()`);
+  check(
+    Math.abs(ganttLayout.before.width - 480) < 1,
+    'the column of the names of the Gantt chart is 50% wider',
+    `${ganttLayout.before.width}px`,
+  );
+  check(
+    ganttLayout.before.textAlign === 'left',
+    'the names of the Gantt chart are aligned to the left',
+    ganttLayout.before.textAlign,
+  );
+  check(
+    ganttLayout.before.whiteSpace === 'normal' && ganttLayout.before.overflowWrap === 'anywhere',
+    'the names of the Gantt chart wrap over several lines',
+    `${ganttLayout.before.whiteSpace} / ${ganttLayout.before.overflowWrap}`,
+  );
+  check(
+    Math.abs(ganttLayout.before.side - ganttLayout.before.chart) < 1 &&
+      ganttLayout.wrapped.side > ganttLayout.before.side &&
+      Math.abs(ganttLayout.wrapped.side - ganttLayout.wrapped.chart) < 1,
+    'the chart follows the height of the wrapped names',
+    `${ganttLayout.before.side} -> ${ganttLayout.wrapped.side}`,
+  );
+
+  // The names of the tasks stay pinned on the left when the chart scrolls.
+  const ganttScroll = await evaluate(`(() => {
+    const wrap = document.querySelector('.gantt-wrap');
+    const row = document.querySelector('.gantt-row[data-task-id="1"]');
+    const previousWidth = wrap.style.width;
+    const previousFlex = wrap.style.flex;
+    wrap.style.flex = 'none';
+    wrap.style.width = '700px';
+    wrap.scrollLeft = 0;
+    const before = row.getBoundingClientRect().left;
+    wrap.scrollLeft = 240;
+    const after = row.getBoundingClientRect().left;
+    const scrolled = wrap.scrollLeft;
+    wrap.scrollLeft = 0;
+    wrap.style.width = previousWidth;
+    wrap.style.flex = previousFlex;
+    return { before, after, scrolled };
+  })()`);
+  check(
+    ganttScroll.scrolled > 0 && Math.abs(ganttScroll.before - ganttScroll.after) < 1,
+    'the names stay pinned on the left when the chart scrolls',
+    `${ganttScroll.before} -> ${ganttScroll.after} (${ganttScroll.scrolled}px)`,
+  );
+
+  // The indentation is half of the one of the tree view: 9 pixels per level.
+  const ganttIndents = await evaluate(`(() => ({
+    root: document.querySelector('.gantt-row[data-task-id="1"] .gantt-indent')?.style.width ?? '',
+    child: document.querySelector('.gantt-row[data-task-id="13"] .gantt-indent')?.style.width ?? '',
+  }))()`);
+  check(
+    ganttIndents.root === '0px' && ganttIndents.child === '9px',
+    'the indentation of the Gantt chart is half of the tree view',
+    `${ganttIndents.root} / ${ganttIndents.child}`,
+  );
+
+  // The actions of a row focus the chart and create a child, like the tree.
+  await evaluate(`(() => {
+    document.querySelector('.gantt-row[data-task-id="1"] [title="Add a child task"]').click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelector('#task-title') !== null`);
+  const ganttChildBanner = await evaluate(
+    `document.querySelector('.task-parent-banner')?.textContent ?? ''`,
+  );
+  check(
+    ganttChildBanner.includes('New child of task #1'),
+    'the chart offers the creation of a child task',
+    ganttChildBanner,
+  );
+  await evaluate(`document.querySelector('.modal-close').click()`);
+
+  const ganttRowsBeforeFocus = await evaluate(`document.querySelectorAll('.gantt-row').length`);
+  await evaluate(`(() => {
+    document.querySelector('.gantt-row[data-task-id="1"] [title="Focus the chart on this task"]').click();
+    return true;
+  })()`);
+  await waitFor(`document.querySelectorAll('.gantt-row').length === 3`);
+  const ganttBreadcrumb = await evaluate(
+    `[...document.querySelectorAll('.gantt-focus-crumb')].map((node) => node.textContent).join('|')`,
+  );
+  check(
+    ganttBreadcrumb === 'General root|Browser test task 1',
+    'the chart has the focus breadcrumb of the tree view',
+    ganttBreadcrumb,
+  );
+  await evaluate(`document.querySelector('.gantt-focus-crumb').click()`);
+  await waitFor(`document.querySelectorAll('.gantt-row').length === ${ganttRowsBeforeFocus}`);
+  check(true, 'the focus of the chart is reset from the breadcrumb');
+
   // A ctrl+click on the twisty expands or collapses the whole branch of the
   // task, the task and all its descendants.
   const twisty = await evaluate(`(() => {

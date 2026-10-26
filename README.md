@@ -17,7 +17,7 @@ Notes (`note_<id>.txt`) are a new kind of thing: a simple note-taking replacemen
 - Paginated listing with first / previous / next / last buttons
 - Tree view with collapsible/expandable branches and focus
 - Kanban board with drag-and-drop between status columns
-- Gantt chart with draggable bars
+- Gantt chart with draggable bars, wrapping task names, row actions and focus breadcrumb
 - Notes mode with markdown editing, preview, paginated listing, page jump input, configurable page size
 - Comments on tasks
 - Project folder selection through an OS-like file picker
@@ -80,7 +80,7 @@ The service status pill at the top right shows whether the service is online. Wh
 ```bash
 npm install
 npm run build
-npm run verify        # typecheck, 383 tests, build, smoke E2E, browser E2E (92 checks)
+npm run verify        # typecheck, 410 tests, build, smoke E2E, browser E2E (120 checks)
 npm run deploy        # builds and copies dist to /var/www/html/GnumarusProjectManager
 ```
 
@@ -113,7 +113,8 @@ Every feature has tests:
 - `src/core/fileSystemStore.test.ts` — the File System Access store
 - `src/core/fileSystemAccess.test.ts` — the picker, the permission and the handle storage
 - `src/ui/app.test.ts` — the whole application with the fake bridge
-- `scripts/e2e-browser.mjs` — real headless Chrome, 92 checks (service, embedded, notes, File System Access API)
+- `src/ui/ganttView.test.ts` — the rows of the Gantt chart
+- `scripts/e2e-browser.mjs` — real headless Chrome, 120 checks (service, embedded, notes, Gantt chart, File System Access API)
 - `scripts/e2e-smoke.sh` — headless Chrome renders the built app at root and at a nested path
 
 ## License

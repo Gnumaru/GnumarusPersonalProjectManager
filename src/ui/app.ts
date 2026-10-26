@@ -271,7 +271,8 @@ export class App
   private treeRowsElement!: HTMLElement;
   private kanbanElement!: HTMLElement;
   private ganttElement!: HTMLElement;
-  private ganttChartElement!: HTMLElement;
+  /** The left edge of the columns of the chart, for the drag of the bars. */
+  private ganttChartOriginElement: HTMLElement | null = null;
   private ganttDrag: GanttDragController | null = null;
   private treeDrag: TreeDragController | null = null;
   private kanbanDrag: KanbanDragController | null = null;
@@ -1761,12 +1762,26 @@ export class App
   /** Draws the Gantt chart of the tasks. */
   private renderGantt(): void {
     clear(this.ganttElement);
+    this.ganttScheduleState = null;
+    this.ganttLayoutState = null;
+    this.ganttChartOriginElement = null;
+
+    const header = el(this.doc, 'div', { class: 'gantt-focus-header' });
+    this.renderFocusHeader(
+      header,
+      'gantt-focus',
+      this.treeFocusId === null ? undefined : this.ganttMetadata.get(this.treeFocusId)?.title,
+      false,
+    );
 
     const rows = this.ganttRows();
     const schedule = this.ganttSchedule();
     if (schedule === null) {
       this.ganttElement.append(
-        el(this.doc, 'div', { class: 'gantt-empty', text: 'No task has a start or an end date yet.' }),
+        el(this.doc, 'div', { class: 'gantt-view' }, [
+          header,
+          el(this.doc, 'div', { class: 'gantt-empty', text: 'No task has a start or an end date yet.' }),
+        ]),
       );
       this.updateEmptyState(false);
       this.resultCountElement.textContent = this.buildResultCount();
@@ -1778,38 +1793,49 @@ export class App
     const tasks = this.ganttTasks(rows, layout, schedule);
 
     this.ganttElement.append(
-      renderGanttView(
-        {
-          doc: this.doc,
-          rows,
-          tasks,
-          schedule,
-          layout,
-        },
-        {
-          onToggle: (id, recursive) => {
-            void this.toggleTreeNode(id, recursive);
+      el(this.doc, 'div', { class: 'gantt-view' }, [
+        header,
+        renderGanttView(
+          {
+            doc: this.doc,
+            rows,
+            tasks,
+            schedule,
+            layout,
           },
-          onOpen: (id) => {
-            void this.openTaskById(id);
+          {
+            onToggle: (id, recursive) => {
+              void this.toggleTreeNode(id, recursive);
+            },
+            onFocus: (id) => {
+              void this.focusTree(id);
+            },
+            onOpen: (id) => {
+              void this.openTaskById(id);
+            },
+            onEdit: (id) => {
+              void this.openEditTaskById(id);
+            },
+            onAddChild: (id) => {
+              void this.openAddChildTaskById(id);
+            },
+            onToggleWeek: (key) => {
+              this.toggleGanttPeriod(key);
+            },
+            onToggleMonth: (key) => {
+              this.toggleGanttMonth(key);
+            },
           },
-          onEdit: (id) => {
-            void this.openEditTaskById(id);
-          },
-          onToggleWeek: (key) => {
-            this.toggleGanttPeriod(key);
-          },
-          onToggleMonth: (key) => {
-            this.toggleGanttMonth(key);
-          },
-        },
-      ),
+        ),
+      ]),
     );
 
-    // The drag of the bars needs the chart that is on the screen.
+    // The drag of the bars needs the chart that is on the screen. The headers
+    // share the left edge of the columns of the chart.
     this.ganttScheduleState = schedule;
     this.ganttLayoutState = layout;
-    this.ganttChartElement = this.ganttElement.querySelector<HTMLElement>('.gantt-chart') ?? this.ganttElement;
+    this.ganttChartOriginElement =
+      this.ganttElement.querySelector<HTMLElement>('.gantt-heads') ?? this.ganttElement;
 
     this.updateEmptyState(rows.length === 0);
     this.resultCountElement.textContent = this.buildResultCount();
@@ -1820,13 +1846,13 @@ export class App
   private ganttDragContext(): GanttDragContext | null {
     const schedule = this.ganttScheduleState;
     const layout = this.ganttLayoutState;
-    if (schedule === null || layout === null || this.ganttChartElement === null) {
+    if (schedule === null || layout === null || this.ganttChartOriginElement === null) {
       return null;
     }
     return {
       columns: layout.columns,
       schedule,
-      chart: this.ganttChartElement,
+      chart: this.ganttChartOriginElement,
     };
   }
 
@@ -2039,12 +2065,35 @@ export class App
    * on, from the general root down to the focused task.
    */
   private renderTreeHeader(): void {
-    clear(this.treeHeaderElement);
+    this.renderFocusHeader(
+      this.treeHeaderElement,
+      'tree',
+      this.treeFocusId === null ? undefined : this.treeTasks.get(this.treeFocusId)?.title,
+      true,
+    );
+  }
+
+  /**
+   * Draws the focus breadcrumb of a view.
+   *
+   * The first crumb ("General root") resets the focus. The tree uses the same
+   * header as the Gantt chart, so both views can be focused and reset in the
+   * same way; only the tree is a drop target of the drag of the tasks.
+   */
+  private renderFocusHeader(
+    container: HTMLElement,
+    prefix: 'tree' | 'gantt-focus',
+    focusedTitle: string | undefined,
+    rootTarget: boolean,
+  ): void {
+    clear(container);
 
     const generalRoot = el(this.doc, 'button', {
-      class: `tree-crumb ${ROOT_TARGET_CLASS}`,
+      class: `${prefix}-crumb${rootTarget ? ` ${ROOT_TARGET_CLASS}` : ''}`,
       text: 'General root',
-      title: 'Show every task that has no parent (drop a task here to make it a root task)',
+      title: rootTarget
+        ? 'Show every task that has no parent (drop a task here to make it a root task)'
+        : 'Show every task that has no parent (reset the focus)',
     });
     generalRoot.type = 'button';
     if (this.treeFocusId === null) {
@@ -2058,11 +2107,11 @@ export class App
     const structure = this.treeStructure;
     if (this.treeFocusId !== null && structure !== null) {
       for (const ancestorId of ancestorsOf(structure, this.treeFocusId)) {
-        crumbs.push(el(this.doc, 'span', { class: 'tree-crumb-sep', text: '›' }));
+        crumbs.push(el(this.doc, 'span', { class: `${prefix}-crumb-sep`, text: '›' }));
         const crumb = el(this.doc, 'button', {
-          class: 'tree-crumb',
+          class: `${prefix}-crumb`,
           text: `#${ancestorId}`,
-          title: `Focus the tree on the task #${ancestorId}`,
+          title: `Focus on the task #${ancestorId}`,
         });
         crumb.type = 'button';
         crumb.addEventListener('click', () => {
@@ -2070,19 +2119,18 @@ export class App
         });
         crumbs.push(crumb);
       }
-      crumbs.push(el(this.doc, 'span', { class: 'tree-crumb-sep', text: '›' }));
-      const focused = this.treeTasks.get(this.treeFocusId);
+      crumbs.push(el(this.doc, 'span', { class: `${prefix}-crumb-sep`, text: '›' }));
       crumbs.push(
         el(this.doc, 'span', {
-          class: 'tree-crumb is-active',
-          text: focused === undefined ? `#${this.treeFocusId}` : focused.title,
+          class: `${prefix}-crumb is-active`,
+          text: focusedTitle === undefined ? `#${this.treeFocusId}` : focusedTitle,
         }),
       );
     }
 
-    this.treeHeaderElement.append(
-      el(this.doc, 'span', { class: 'tree-header-label', text: 'Focus' }),
-      el(this.doc, 'nav', { class: 'tree-breadcrumb' }, crumbs),
+    container.append(
+      el(this.doc, 'span', { class: `${prefix}-header-label`, text: 'Focus' }),
+      el(this.doc, 'nav', { class: `${prefix}-breadcrumb` }, crumbs),
     );
   }
 
@@ -2504,6 +2552,15 @@ export class App
       return;
     }
     this.openEditDialog(task);
+  }
+
+  /** Opens the creation dialog of a child of a task that is known by its id. */
+  private async openAddChildTaskById(id: number): Promise<void> {
+    const task = await this.loadTaskById(id);
+    if (task === null) {
+      return;
+    }
+    this.openCreateDialog(task);
   }
 
   /** The comments of a task, the most recent first. */

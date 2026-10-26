@@ -86,7 +86,12 @@ compare os seguintes arquivos entre si, verifique se existe alguma inconsistenci
 ====
 analise o projeto e mediga detalhadamente tudo o que esta implementado
 ====
-
+na visualizacao "gantt":
+- a coluna com o nome das tarefas deve ser 50% mais larga.
+- o nome das tarefas deve ficar alinhado a esquerda.
+- o recuo de cada identacao deve ser metade do que é hoje.
+- o texto do nome das tarefas deve quebrar linha mesmo que isso faça com que a altura das linhas fique desigual.
+- deve haver botoes para "add child task" e "focus" igual os que existem na visualizacao de arvore, e uma funcionalidade pra resetar o focus igual na visualizacao de arvore
 ====
 ====
 ====
