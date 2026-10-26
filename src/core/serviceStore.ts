@@ -362,8 +362,8 @@ export class ServiceProjectStore implements ProjectStore {
         `Unable to count the comments of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
       );
     }
-    for (const line of result.stdout.split('\\n')) {
-      const match = /^\\s*(\\d+)\\s+(\\d+)\\s*$/u.exec(line);
+    for (const line of result.stdout.split('\n')) {
+      const match = /^\s*(\d+)\s+(\d+)\s*$/u.exec(line);
       if (match === null) {
         continue;
       }

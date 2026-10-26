@@ -97,12 +97,13 @@ na view gantt a visualizacao das colunas esta quebrada. deve aparecer sempre ao 
 ====
 nas views 'list', 'tree', 'kanban' e 'gantt', adicione a contagem de comentarios de cada tarefa do lado esquerdo do nome da tarefa de forma similar a como é feito no kanban a contagem de tarefas por coluna (com um numero dentro de uma bolinha. se a tarefa nao tiver comentarios nao adicione a bolinha com numero
 ====
+voce diz que fez a tarefa, alterou os arquivos, mas eu nao estou vendo nada na tela. teste pra ver se realmente esta aparecendo
+====
+====
+====
+====
 ====
 na modal de visualizacao da task, devem ser exibidos todos os comentarios dela, ordenados decrescentemente por data de criacao
-====
-====
-====
-====
 ====
 ====
 ao invez de usarmos
