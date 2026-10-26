@@ -82,10 +82,11 @@ a busca tambem deve funcionar no kanban. apenas as tasks 'folha' (sem filhas) qu
 ====
 na view list deve ser possivel ordenar a lista ascendentemente ou descendentemente por qualquer coluna (exceto tags) clicando no nome dela. se a coluna clicada ainda não é a coluna de ordenação, ao clicar ela se torna a coluna de ordenação e ordena descendentemente (ordem numerica pra numeros, alfabetica pra strings e ordem de data para colunas de data). se a coluna já for a coluna de ordenacao, a direcao da ordenacao vai inverter (se era ascendente vira descendente e vice versa). essa regra de ordenacao vale tambem pra view de notas, mas apenas para essas duas
 ====
-====
-====
 compare os seguintes arquivos entre si, verifique se existe alguma inconsistencia entre eles e se houver corrija: CHECKLIST.md, FEATURES_DETAIL.md, FEATURES_SUMMARY.md, PLAN.md, README.md
 ====
+analise o projeto e mediga detalhadamente tudo o que esta implementado
+====
+
 ====
 ====
 ====
@@ -94,9 +95,7 @@ compare os seguintes arquivos entre si, verifique se existe alguma inconsistenci
 ====
 ====
 ====
-Error: You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. 
-* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 15, model: gemini-3.5-flash-lite, description: Generate content requests per minute limit exceeded on Free Tier. See https://ai.google.dev/gemini-api/docs/rate-limits.
-Please retry in 5.584578466s.
+====
 ====
 
 ====
