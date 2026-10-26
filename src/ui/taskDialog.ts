@@ -201,6 +201,11 @@ export class TaskDialog {
       ]),
     );
 
+    if (this.onLoadComments !== undefined) {
+      this.commentsElement = el(this.doc, 'div', { class: 'task-comments' });
+      body.push(this.commentsElement);
+    }
+
     if (this.onAddChild !== undefined) {
       body.push(
         el(this.doc, 'div', { class: 'task-children' }, [
@@ -555,6 +560,8 @@ export class TaskDialog {
       return;
     }
 
+    const isView = this.mode === 'view';
+
     container.append(
       el(this.doc, 'div', { class: 'task-comments-header' }, [
         el(this.doc, 'span', { class: 'field-label', text: 'Comments' }),
@@ -572,17 +579,23 @@ export class TaskDialog {
           text: 'This task has no comment yet.',
         }),
       );
+      if (!isView) {
+        container.append(this.renderNewComment());
+      }
+      return;
     }
 
     for (const comment of this.comments) {
-      container.append(this.renderComment(comment));
+      container.append(this.renderComment(comment, isView));
     }
 
-    container.append(this.renderNewComment());
+    if (!isView) {
+      container.append(this.renderNewComment());
+    }
   }
 
   /** One comment of the list, with its actions. */
-  private renderComment(comment: TaskComment): HTMLElement {
+  private renderComment(comment: TaskComment, readOnly = false): HTMLElement {
     const element = el(this.doc, 'article', { class: 'task-comment' });
     element.dataset['commentId'] = String(comment.id);
 
@@ -595,6 +608,12 @@ export class TaskDialog {
           comment.created.length > 0 ? formatTimestamp(comment.created) : `#${comment.id}`,
       }),
     ]);
+
+    if (readOnly) {
+      const text = el(this.doc, 'p', { class: 'task-comment-text', text: comment.text });
+      element.append(meta, text);
+      return element;
+    }
 
     if (isEditing) {
       const editor = textArea(this.doc, {

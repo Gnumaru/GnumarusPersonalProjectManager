@@ -2766,6 +2766,9 @@ export class App
       onOpenChild: (child) => {
         void this.openViewDialog(child);
       },
+      onLoadComments: async (taskId) => {
+        return this.loadTaskComments(taskId);
+      },
     });
     dialog.open();
   }
