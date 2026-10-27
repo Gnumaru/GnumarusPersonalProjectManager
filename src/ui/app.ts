@@ -2940,11 +2940,13 @@ export class App
 
   private async openViewDialog(task: Task): Promise<void> {
     const children = await this.loadChildren(task.id);
+    const candidates = await this.loadTaskCandidates(task.id);
     const dialog = new TaskDialog({
       doc: this.doc,
       mode: 'view',
       task,
       children,
+      candidates,
       onSave: async () => {
         // The read only view never saves.
       },

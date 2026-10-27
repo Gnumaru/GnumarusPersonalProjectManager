@@ -49,7 +49,7 @@ export class IdListField {
     this.onChange = options.onChange;
     this.excluded = options.excluded ?? [];
     this.candidates = options.candidates;
-    this.debounceMs = options.debounceMs ?? 500;
+    this.debounceMs = options.debounceMs ?? 333;
     this.values = [...options.values];
 
     this.itemsElement = el(this.doc, 'span', { class: 'id-list-items' });

@@ -452,7 +452,7 @@ async function runChecks() {
     related.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
   })()`);
-  await delay(600);
+  await delay(400);
   await evaluate(`(() => {
     const fields = [...document.querySelectorAll('.id-list')];
     const blocked = fields[0].querySelector('.id-list-input');

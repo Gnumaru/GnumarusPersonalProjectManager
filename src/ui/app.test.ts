@@ -468,7 +468,7 @@ describe('App', () => {
       }
       input.value = title;
       input.dispatchEvent(new harness.dom.window.Event('input', { bubbles: true }));
-      await new Promise((resolve) => setTimeout(resolve, 550));
+      await new Promise((resolve) => setTimeout(resolve, 360));
       input.dispatchEvent(
         new harness.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
       );
@@ -507,7 +507,7 @@ describe('App', () => {
     }
     input.value = 'Task 1';
     input.dispatchEvent(new harness.dom.window.Event('input', { bubbles: true }));
-    await new Promise((resolve) => setTimeout(resolve, 550));
+    await new Promise((resolve) => setTimeout(resolve, 360));
     input.dispatchEvent(
       new harness.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
     );

@@ -171,11 +171,13 @@ export class TaskDialog {
       this.definitionRow('End', task.end.length > 0 ? formatTimestamp(task.end) : '—'),
       this.definitionRow(
         'Blocked by',
-        task.blockedBy.length === 0 ? '—' : task.blockedBy.map((id) => `#${id}`).join('  '),
+        task.blockedBy.length === 0
+          ? '—'
+          : task.blockedBy.map((id) => this.taskLabel(id)).join('  '),
       ),
       this.definitionRow(
         'Related',
-        task.related.length === 0 ? '—' : task.related.map((id) => `#${id}`).join('  '),
+        task.related.length === 0 ? '—' : task.related.map((id) => this.taskLabel(id)).join('  '),
       ),
     ];
 
@@ -798,6 +800,16 @@ export class TaskDialog {
     } catch (error) {
       this.setError(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  private taskLabel(id: number): string {
+    const candidate = this.candidates.find((item) => item.id === id);
+    const title = candidate?.title ?? '';
+    const label = title.length > 0 ? `#${id} ${title}` : `#${id}`;
+    if (label.length <= 64) {
+      return label;
+    }
+    return `${label.slice(0, 63)}…`;
   }
 
   private setError(message: string): void {

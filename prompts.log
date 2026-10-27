@@ -105,7 +105,8 @@ deve ser possível definir a ordem das tarefas na view kanban e nas views tree/g
 ====
 Na modal que permite editar uma tarefa, nos campos 'blocked by' e 'related tasks', altere a forma que o usuario interage com o campo. Ao inves de digitar um id de tarefa e apertar enter/return para transformar o texto em uma badge, o usuario deve poder começar a digitar um texto para fazer uma busca dinamica pelas tarefas com aquele titulo, e logo abaixo do campo irá aparecer uma lista com os 10 primeiros resultados. a comparacao de string sera uma comparacao simples usando debounce de meio segundo. ao apertar seta pra cima ou pra baixo o usuário poderá alternar o foco entre os itens da lista e ao apertar enter aquele item vai virar uma badge. O texto exibido na bagde deve ser o id da tarefa seguido do nome da tarefa (truncado para 64 caracteres). o valor persistido como metadado no arquivo da tarefa continua sendo apenas o id da tarefa. ao construir a modal de uma tarefa que já tenha ids de tarefas bloqueadoras ou relacionadas as badges já devem ser construidas com os nomes das tarefas
 ====
-
+reduza o debounce da busca dinamica para um terço de segundo (333ms).
+embora a busca dinamica esteja funcionando e persistindo, a aparencia da lista exibida esta 'bruta' demais, muito 'espartana', e a selecao com as setas e escolha com enter/return esta funcionando mas nao existe nenhum feedback visual, precisa existir. e a modal de visualizar tarefa (sem editar) esta exibindo apenas o id das tarefas bloqueadoras e relacionadas, mas precisa exibir tambem os nomes das tarefas (truncado pra 64 caracteres)
 ====
 ====
 ====
