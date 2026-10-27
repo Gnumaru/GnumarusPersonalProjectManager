@@ -22,9 +22,11 @@ export interface IdListFieldOptions {
   readonly excluded?: readonly number[];
   /** Every task the user can pick, with its title. */
   readonly candidates: readonly { readonly id: number; readonly title: string }[];
+  /** Whether more than one task can be chosen. Defaults to `true`. */
+  readonly multiple?: boolean;
   /** Called every time the list changes. */
   readonly onChange: (values: number[]) => void;
-  /** Debounce in milliseconds (defaults to 500). */
+  /** Debounce in milliseconds (defaults to 333). */
   readonly debounceMs?: number;
 }
 
@@ -37,6 +39,7 @@ export class IdListField {
   private readonly onChange: (values: number[]) => void;
   private readonly excluded: readonly number[];
   private readonly candidates: readonly { readonly id: number; readonly title: string }[];
+  private readonly multiple: boolean;
   private readonly debounceMs: number;
   private values: number[];
   private term = '';
@@ -49,6 +52,7 @@ export class IdListField {
     this.onChange = options.onChange;
     this.excluded = options.excluded ?? [];
     this.candidates = options.candidates;
+    this.multiple = options.multiple ?? true;
     this.debounceMs = options.debounceMs ?? 333;
     this.values = [...options.values];
 
@@ -166,10 +170,17 @@ export class IdListField {
   }
 
   private select(id: number): void {
-    if (this.excluded.includes(id) || this.values.includes(id)) {
+    if (this.excluded.includes(id)) {
       return;
     }
-    this.values.push(id);
+    if (this.multiple) {
+      if (this.values.includes(id)) {
+        return;
+      }
+      this.values.push(id);
+    } else {
+      this.values = [id];
+    }
     this.inputElement.value = '';
     this.term = '';
     this.results = [];

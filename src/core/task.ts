@@ -145,6 +145,8 @@ export interface TaskInput {
   readonly blockedBy: readonly number[];
   /** The ids of the tasks that are related to this one. */
   readonly related: readonly number[];
+  /** The parent of the task, when the editor changes it. */
+  readonly parentId?: number | null;
 }
 
 export const EMPTY_TASK_INPUT: TaskInput = {
@@ -500,11 +502,12 @@ export function buildTask(
   parentId: number | null = null,
 ): Task {
   const timestamp = formatTaskTimestamp(now);
+  const resolvedParent = input.parentId === undefined ? parentId : input.parentId;
   return {
     id,
     title: input.title.trim(),
     status: input.status,
-    parentId,
+    parentId: resolvedParent,
     tags: normalizeTags(input.tags),
     created: timestamp,
     updated: timestamp,
@@ -525,6 +528,7 @@ export function applyTaskInput(task: Task, input: TaskInput, now: Date): Task {
     ...task,
     title: input.title.trim(),
     status: input.status,
+    parentId: input.parentId === undefined ? task.parentId : input.parentId,
     tags: normalizeTags(input.tags),
     start: input.start,
     end: input.end,

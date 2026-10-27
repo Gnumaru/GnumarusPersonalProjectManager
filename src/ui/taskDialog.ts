@@ -77,6 +77,8 @@ export class TaskDialog {
   private descriptionInput: HTMLTextAreaElement | null = null;
   private errorLabel: HTMLDivElement | null = null;
   private confirmingDelete = false;
+  /** The parent of the task being edited. */
+  private parentId: number | null;
   /** The ids of the tasks that block the task. */
   private blockedByIds: number[];
   /** The ids of the tasks that are related to the task. */
@@ -108,6 +110,12 @@ export class TaskDialog {
     this.onCancel = options.onCancel;
     this.blockedByIds = [...(options.task?.blockedBy ?? [])];
     this.relatedIds = [...(options.task?.related ?? [])];
+    this.parentId =
+      options.task !== undefined
+        ? options.task.parentId
+        : options.parent !== undefined
+          ? options.parent.id
+          : null;
 
     const title =
       options.mode === 'create'
@@ -384,6 +392,20 @@ export class TaskDialog {
       title: 'The day the task ends',
     });
 
+    // The parent of the task, edited like the blocking and related tasks.
+    const parentField = new IdListField({
+      doc: this.doc,
+      label: 'Parent',
+      placeholder: 'Search by title…',
+      values: this.parentId === null ? [] : [this.parentId],
+      excluded: task === undefined ? [] : [task.id],
+      candidates: this.candidates,
+      multiple: false,
+      onChange: (values) => {
+        this.parentId = values[0] ?? null;
+      },
+    });
+
     // The tasks that block this one and the tasks that are related to it.
     const blockedByField = new IdListField({
       doc: this.doc,
@@ -463,6 +485,9 @@ export class TaskDialog {
           el(this.doc, 'span', { class: 'field-label', text: 'End date' }),
           this.endInput,
         ]),
+      ]),
+      el(this.doc, 'div', { class: 'field-row field-row-even' }, [
+        parentField.element,
       ]),
       el(this.doc, 'div', { class: 'field-row field-row-even' }, [
         blockedByField.element,
@@ -780,6 +805,7 @@ export class TaskDialog {
       end,
       blockedBy: this.blockedByIds,
       related: this.relatedIds,
+      parentId: this.parentId,
     };
 
     try {

@@ -444,10 +444,10 @@ async function runChecks() {
   // A task that blocks the new one and a task that is related to it.
   await evaluate(`(() => {
     const fields = [...document.querySelectorAll('.id-list')];
-    const blocked = fields[0].querySelector('.id-list-input');
+    const blocked = fields[1].querySelector('.id-list-input');
     blocked.value = 'Browser test task 2';
     blocked.dispatchEvent(new Event('input', { bubbles: true }));
-    const related = fields[1].querySelector('.id-list-input');
+    const related = fields[2].querySelector('.id-list-input');
     related.value = 'Browser test task 3';
     related.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
@@ -455,9 +455,9 @@ async function runChecks() {
   await delay(400);
   await evaluate(`(() => {
     const fields = [...document.querySelectorAll('.id-list')];
-    const blocked = fields[0].querySelector('.id-list-input');
+    const blocked = fields[1].querySelector('.id-list-input');
     blocked.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    const related = fields[1].querySelector('.id-list-input');
+    const related = fields[2].querySelector('.id-list-input');
     related.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     return true;
   })()`);

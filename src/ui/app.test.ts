@@ -459,7 +459,7 @@ describe('App', () => {
     // The editor holds a field for the blocking tasks and one for the related
     // ones.
     const fields = [...harness.doc.querySelectorAll('.id-list')];
-    expect(fields).toHaveLength(2);
+    expect(fields).toHaveLength(3);
 
     const addTask = async (field: Element, title: string): Promise<void> => {
       const input = field.querySelector<HTMLInputElement>('.id-list-input');
@@ -475,8 +475,8 @@ describe('App', () => {
       await flush();
     };
 
-    await addTask(fields[0] as Element, 'Task 3');
-    await addTask(fields[1] as Element, 'Task 2');
+    await addTask(fields[1] as Element, 'Task 3');
+    await addTask(fields[2] as Element, 'Task 2');
 
     const chips = [...harness.doc.querySelectorAll('.id-chip-label')].map(
       (chip) => chip.textContent,

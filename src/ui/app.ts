@@ -3052,23 +3052,24 @@ export class App
     if (store === null) {
       throw new Error('No project selected');
     }
+    const resolvedParent = taskInput.parentId === undefined ? parentId : taskInput.parentId;
     const id = await store.nextTaskId();
-    const task = buildTask(taskInput, id, new Date(), parentId);
+    const task = buildTask(taskInput, id, new Date(), resolvedParent);
     await store.createTaskFile(store.taskPath(id), task);
-    if (parentId !== null) {
+    if (resolvedParent !== null) {
       // The new child has to be visible: the branch of the parent is opened,
       // whether the parent was collapsed or had no child until now. The state
       // is persisted before the refresh, which re-derives the set from the
       // files.
-      this.treeExpanded.add(parentId);
-      await this.persistExpandedState(parentId, true);
+      this.treeExpanded.add(resolvedParent);
+      await this.persistExpandedState(resolvedParent, true);
     }
     showToast({
       doc: this.doc,
       message:
-        parentId === null
+        resolvedParent === null
           ? `Task #${task.id} created.`
-          : `Task #${task.id} created as a child of task #${parentId}.`,
+          : `Task #${task.id} created as a child of task #${resolvedParent}.`,
       kind: 'success',
     });
     await this.refresh();

@@ -110,20 +110,23 @@ embora a busca dinamica esteja funcionando e persistindo, a aparencia da lista e
 ====
 agora a lista da busca dinamica desapareceu por completo. mas a busca em si ainda funciona porque se eu faco uma busca, espero um instante e aperto enter, uma nova badge aparece no campo, o que indica que esta funcionando, apenas nao esta exibindo.
 ====
-====
-====
-====
-====
-====
-====
-====
-====
-====
-As tarefas agora devem ter 'Type' e 'Role'. os tipos possiveis sao 'bug', 'improvement', 'feature' e os roles possiveis sao 'Graphics', 'Audio', 'Programming', 'Design', 'Assembly' e 'Management'. na modal de editar tarefa deve ser possivel visualizar e escolher o tipo e o papel da tarefa. Esses dados ficam armazenados nos metadados 'type' e 'role' do arquivo da tarefa.
-====
 na modal de editar tarefa, crie um campo 'parent' identico aos campos 'blocked by' e 'related tasks', com a diferenca que o campo parent so permite definir 0 ou 1 parents. esse campo vai exibir e permitir editar a tarefa pai da task sendo editada.
 ====
-assim como existe um botao pra reordenar a tarefa 'pra baixo', crie outro pra mandar a tarefa 'pra cima'.
+====
+====
+====
+====
+====
+====
+====
+====
+Faça com que a lista da busca dinamica possa ter até 30 itens. utilize barra de rolagem se precisao.
+Assim como existe um botao pra reordenar a tarefa 'pra baixo', crie outro pra mandar a tarefa 'pra cima'.
+As tarefas agora devem ter 'Type' e 'Role'. os tipos possiveis sao 'bug', 'improvement', 'feature' e os roles possiveis sao 'Graphics', 'Audio', 'Programming', 'Design', 'Assembly' e 'Management'. na modal de editar tarefa deve ser possivel visualizar e escolher o tipo e o papel da tarefa. Esses dados ficam armazenados nos metadados 'type' e 'role' do arquivo da tarefa.
+====
+
+====
+
 ====
 ====
 ====
