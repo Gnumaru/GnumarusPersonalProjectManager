@@ -120,7 +120,7 @@ export class TaskDialog {
     this.onCancel = options.onCancel;
     this.blockedByIds = [...(options.task?.blockedBy ?? [])];
     this.relatedIds = [...(options.task?.related ?? [])];
-    this.typeValue = options.task?.type ?? 'feature';
+    this.typeValue = options.task?.type ?? 'Feature';
     this.roleValue = options.task?.role ?? 'Programming';
     this.parentId =
       options.task !== undefined
@@ -181,7 +181,7 @@ export class TaskDialog {
   private renderView(task: Task): void {
     const rows: HTMLElement[] = [
       this.definitionRow('Status', STATUS_LABELS[task.status]),
-      this.definitionRow('Type', task.type ?? 'feature'),
+      this.definitionRow('Type', task.type ?? 'Feature'),
       this.definitionRow('Role', task.role ?? 'Programming'),
       this.definitionRow(
         'Tags',
@@ -827,8 +827,8 @@ export class TaskDialog {
       ? (rawStatus as TaskStatus)
       : 'todo';
 
-    const rawType = this.typeSelect?.value ?? 'feature';
-    const type: TaskType = isTaskType(rawType) ? rawType : 'feature';
+    const rawType = this.typeSelect?.value ?? 'Feature';
+    const type: TaskType = isTaskType(rawType) ? rawType : 'Feature';
 
     const rawRole = this.roleSelect?.value ?? 'Programming';
     const role: TaskRole = isTaskRole(rawRole) ? rawRole : 'Programming';

@@ -402,7 +402,7 @@ describe('serializeTask', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
-      type: 'feature' as const,
+      type: 'Feature' as const,
       role: 'Programming' as const,
     };
 
@@ -416,7 +416,7 @@ describe('serializeTask', () => {
         'updated=20261020100000000',
         'start=20261020110000000',
         'end=20261021120000000',
-        'type=feature',
+        'type=Feature',
         'role=Programming',
         'kanban_order=0',
         'tree_gantt_order=0',
@@ -443,7 +443,7 @@ describe('serializeTask', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
-      type: 'feature' as const,
+      type: 'Feature' as const,
       role: 'Programming' as const,
     };
     expect(serializeTask({ ...base, parentId: null })).not.toContain('parent=');
@@ -492,7 +492,7 @@ describe('serializeTask', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
-      type: 'feature' as const,
+      type: 'Feature' as const,
       role: 'Programming' as const,
     };
     const expanded = withExpandedState(base, true);
@@ -519,7 +519,7 @@ describe('serializeTask', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
-      type: 'feature' as const,
+      type: 'Feature' as const,
       role: 'Programming' as const,
     };
     const seeded = withDefaultDates(task, now);
@@ -578,7 +578,7 @@ describe('serializeTask', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
-      type: 'feature' as const,
+      type: 'Feature' as const,
       role: 'Programming' as const,
     };
     const content = serializeTask(task);
@@ -605,7 +605,7 @@ describe('round trip', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
-      type: 'feature' as const,
+      type: 'Feature' as const,
       role: 'Programming' as const,
     };
 
@@ -630,7 +630,7 @@ describe('round trip', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
-      type: 'feature' as const,
+      type: 'Feature' as const,
       role: 'Programming' as const,
     };
     expect(parseTask(serializeTask(original))).toEqual(original);

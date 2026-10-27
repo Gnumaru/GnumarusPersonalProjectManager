@@ -89,7 +89,7 @@ export interface TaskCard {
   readonly path: string;
 }
 
-export const TASK_TYPES = ['bug', 'improvement', 'feature'] as const;
+export const TASK_TYPES = ['Bug', 'Improvement', 'Feature'] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
 
 export const TASK_ROLES = [
@@ -99,6 +99,7 @@ export const TASK_ROLES = [
   'Design',
   'Assembly',
   'Management',
+  'Test',
 ] as const;
 export type TaskRole = (typeof TASK_ROLES)[number];
 
@@ -187,7 +188,7 @@ export const EMPTY_TASK_INPUT: TaskInput = {
   end: '',
   blockedBy: [],
   related: [],
-  type: 'feature',
+  type: 'Feature',
   role: 'Programming',
 };
 
@@ -483,7 +484,7 @@ export function parseTask(content: string, idHint?: number): Task {
     blockedBy: parseIdList(metadata.get('blocked_by') ?? ''),
     related: parseIdList(metadata.get('related') ?? ''),
     expanded: (metadata.get('expanded') ?? '').trim().toLowerCase() === 'true',
-    type: isTaskType((metadata.get('type') ?? '').trim()) ? ((metadata.get('type') ?? '').trim() as TaskType) : 'feature',
+    type: isTaskType((metadata.get('type') ?? '').trim()) ? ((metadata.get('type') ?? '').trim() as TaskType) : 'Feature',
     role: isTaskRole((metadata.get('role') ?? '').trim()) ? ((metadata.get('role') ?? '').trim() as TaskRole) : 'Programming',
     kanbanOrder: normalizeOrder(metadata.get('kanban_order')),
     treeGanttOrder: normalizeOrder(metadata.get('tree_gantt_order')),
@@ -519,7 +520,7 @@ export function serializeTask(task: Task): string {
   if (task.expanded) {
     lines.push('expanded=true');
   }
-  lines.push(`type=${task.type ?? 'feature'}`);
+  lines.push(`type=${task.type ?? 'Feature'}`);
   lines.push(`role=${task.role ?? 'Programming'}`);
   lines.push(`kanban_order=${task.kanbanOrder ?? 0}`);
   lines.push(`tree_gantt_order=${task.treeGanttOrder ?? 0}`);
@@ -551,7 +552,7 @@ export function buildTask(
     blockedBy: [...input.blockedBy],
     related: [...input.related],
     expanded: false,
-    type: input.type ?? 'feature',
+    type: input.type ?? 'Feature',
     role: input.role ?? 'Programming',
     kanbanOrder: 0,
     treeGanttOrder: 0,
@@ -573,7 +574,7 @@ export function applyTaskInput(task: Task, input: TaskInput, now: Date): Task {
     related: [...input.related],
     updated: formatTaskTimestamp(now),
     description: input.description,
-    type: input.type ?? task.type ?? 'feature',
+    type: input.type ?? task.type ?? 'Feature',
     role: input.role ?? task.role ?? 'Programming',
     kanbanOrder: task.kanbanOrder ?? 0,
     treeGanttOrder: task.treeGanttOrder ?? 0,
