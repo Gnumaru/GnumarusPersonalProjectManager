@@ -118,14 +118,15 @@ Assim como existe um botao pra reordenar a tarefa 'pra baixo', crie outro pra ma
 ====
 É verdade. existe sim um botao move up nas tasks. mas o icone dele é de uma folha de papel, o usuário não vai saber o que significa. faça com que seja uma seta pra cima assim como o move down é uma seta pra baixo
 ====
-====
-====
-====
-====
-====
 Na view gantt os botoes sao exibidos apenas quando o mouse passar por cima. isso é bom e está correto. mas eles ocupam espaco horizontal e deixam um espaço vazio do lado direito de todas as tarefas. faça com que os botões renderizem por cima do titulo da tarefa, efetivamente tampando a parte direita do titulo. isso não é um problema porque os botoes só aparecem ao passar o mouse, entao o titulo é visivel enquanto o mouse nao estiver por cima.
 ====
 As tarefas agora devem ter 'Type' e 'Role'. os tipos possiveis sao 'bug', 'improvement', 'feature' e os roles possiveis sao 'Graphics', 'Audio', 'Programming', 'Design', 'Assembly' e 'Management'. na modal de editar tarefa deve ser possivel visualizar e escolher o tipo e o papel da tarefa. Esses dados ficam armazenados nos metadados 'type' e 'role' do arquivo da tarefa.
+====
+====
+====
+====
+====
+
 ====
 
 ====

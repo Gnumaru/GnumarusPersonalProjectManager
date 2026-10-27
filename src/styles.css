@@ -2002,6 +2002,7 @@ input[type='date'] {
 }
 
 .gantt-row {
+  position: relative;
   gap: 6px;
   padding: 4px 8px 4px 0;
 }
@@ -2066,12 +2067,19 @@ input[type='date'] {
 }
 
 .gantt-row-actions {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
   flex: none;
   display: flex;
   align-items: center;
   gap: 2px;
   opacity: 0;
   transition: opacity 0.12s ease;
+  z-index: 1;
+  background: var(--bg-elevated);
+  padding-left: 4px;
 }
 
 .gantt-row:hover .gantt-row-actions,
