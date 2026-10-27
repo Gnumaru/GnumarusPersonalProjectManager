@@ -461,24 +461,27 @@ describe('App', () => {
     const fields = [...harness.doc.querySelectorAll('.id-list')];
     expect(fields).toHaveLength(2);
 
-    const addId = (field: Element, id: string): void => {
+    const addTask = async (field: Element, title: string): Promise<void> => {
       const input = field.querySelector<HTMLInputElement>('.id-list-input');
       if (input === null) {
         return;
       }
-      input.value = id;
+      input.value = title;
+      input.dispatchEvent(new harness.dom.window.Event('input', { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 550));
       input.dispatchEvent(
         new harness.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
       );
+      await flush();
     };
 
-    addId(fields[0] as Element, '3');
-    addId(fields[1] as Element, '2');
+    await addTask(fields[0] as Element, 'Task 3');
+    await addTask(fields[1] as Element, 'Task 2');
 
     const chips = [...harness.doc.querySelectorAll('.id-chip-label')].map(
       (chip) => chip.textContent,
     );
-    expect(chips).toEqual(['#3', '#2']);
+    expect(chips).toEqual(['#3 Task 3', '#2 Task 2']);
 
     click(buttonByText(harness.doc, 'Save changes'));
     await flush();
@@ -502,10 +505,13 @@ describe('App', () => {
     if (input === null || input === undefined) {
       return;
     }
-    input.value = '1';
+    input.value = 'Task 1';
+    input.dispatchEvent(new harness.dom.window.Event('input', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 550));
     input.dispatchEvent(
       new harness.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
     );
+    await flush();
 
     expect(harness.doc.querySelectorAll('.id-chip-label')).toHaveLength(0);
   });

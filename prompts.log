@@ -103,19 +103,24 @@ na modal de visualizacao da task, que é exibida quando voce clica no nome da ta
 ====
 deve ser possível definir a ordem das tarefas na view kanban e nas views tree/gantt. a ordem das views tree/gantt é compartilhada entre as duas (a mesma ordem no tree vai ser a ordem no gantt e vice versa) enquanto a ordem no kanban nao tem relacao alguma com a ordem no tree/gantt. no arquivo de cada tarefa deve haver um metadado kanban_order e tree_gantt_order que eh um numero inteiro >= 0. quanto menor o numero mais alto na sua coluna do kanban ficará a tarefa (ou mais alta entre suas irmãs ficara a tarefa no tree/gantt) e quanto maior o numero mais pra baixo na lista ficara a tarefa na coluna do kanban ou entre suas irmas na tree/gantt. deve haver nessas tres views alguma forma de reordenar as tarefas, seja arrastando elas pro espaco entre as irmas ou clicando em um algum botao. ao construir a interface essas ordens das tarefas sao 'normalizados'. por exemplo, se 3 tasks tem o mesmo pai mas tem ids aleatorios (<ausente>, -6, 5, 5, 99) ao montar a interface os ids sao consertados (as 5 tasks do exemplo anterior ficam 0, 1, 2, 3, 4) e se algum valor de ordem da tarefa tiver sido alterado ao montar a interface ele sera salvo de volta no arquivo. ao reordenar o valor tambem sera atualizado: se haviam duas tarefas com ordem 0 e 1, ao trocar elas de lugar a que ficou antes fica com ordem 0 e a que ficou depois fica com ordem 1. no caso do kanban a ordem é organizada entre colunas, entao ao mudar a tarefa de uma coluna pra outra a ordem da task é recalculada dependendo de onde ela foi colocada na outra coluna, e potencialmente a ordem de todas as tasks de ambas as colunas envolvidas é recalculada e persistida tambem.
 ====
+Na modal que permite editar uma tarefa, nos campos 'blocked by' e 'related tasks', altere a forma que o usuario interage com o campo. Ao inves de digitar um id de tarefa e apertar enter/return para transformar o texto em uma badge, o usuario deve poder começar a digitar um texto para fazer uma busca dinamica pelas tarefas com aquele titulo, e logo abaixo do campo irá aparecer uma lista com os 10 primeiros resultados. a comparacao de string sera uma comparacao simples usando debounce de meio segundo. ao apertar seta pra cima ou pra baixo o usuário poderá alternar o foco entre os itens da lista e ao apertar enter aquele item vai virar uma badge. O texto exibido na bagde deve ser o id da tarefa seguido do nome da tarefa (truncado para 64 caracteres). o valor persistido como metadado no arquivo da tarefa continua sendo apenas o id da tarefa. ao construir a modal de uma tarefa que já tenha ids de tarefas bloqueadoras ou relacionadas as badges já devem ser construidas com os nomes das tarefas
+====
+
 ====
 ====
 ====
+As tarefas agora devem ter 'Type' e 'Role'. os tipos possiveis sao 'bug', 'improvement', 'feature' e os roles possiveis sao 'Graphics', 'Audio', 'Programming', 'Design', 'Assembly' e 'Management'. na modal de editar tarefa deve ser possivel visualizar e escolher o tipo e o papel da tarefa. Esses dados ficam armazenados nos metadados 'type' e 'role' do arquivo da tarefa.
 ====
+na modal de editar tarefa, crie um campo 'parent' identico aos campos 'blocked by' e 'related tasks', com a diferenca que o campo parent so permite definir 0 ou 1 parents. esse campo vai exibir e permitir editar a tarefa pai da task sendo editada.
 ====
-====
+assim como existe um botao pra reordenar a tarefa 'pra baixo', crie outro pra mandar a tarefa 'pra cima'.
 ====
 ====
 ====
 ====
 em qualquer view, quando eu edito uma tarefa e adiciono um comentario, a contagem de comentarios nao é atualizada para aquela view. mas se eu mudo pra outra view a contagem atualiza.
 ====
-Na modal que permite editar uma tarefa, nos campos 'blocked by' e 'related tasks', altere a forma que o usuario interage com o campo. Ao inves de digitar um id de tarefa e apertar enter/return para transformar o texto em uma badge, o usuario deve poder começar a digitar um texto para fazer uma busca dinamica pelas tarefas com aquele titulo, e logo abaixo do campo irá aparecer uma lista com os 10 primeiros resultados. a comparacao de string sera uma comparacao simples usando debounce de meio segundo. ao apertar seta pra cima ou pra baixo o usuário poderá alternar o foco entre os itens da lista e ao apertar enter aquele item vai virar uma badge. O texto exibido na bagde deve ser o id da tarefa seguido do nome da tarefa (truncado para 64 caracteres). o valor persistido como metadado no arquivo da tarefa continua sendo apenas o id da tarefa. ao construir a modal de uma tarefa que já tenha ids de tarefas bloqueadoras ou relacionadas as badges já devem ser construidas com os nomes das tarefas
+
 ====
 ====
 ====

@@ -25,6 +25,8 @@ export interface TaskDialogOptions {
   readonly task?: Task | undefined;
   /** The parent task, when the task being created is a child of it. */
   readonly parent?: Task | undefined;
+  /** Candidate tasks for the blocked/related search. */
+  readonly candidates?: readonly { readonly id: number; readonly title: string }[] | undefined;
   /** The children of the task being viewed. */
   readonly children?: readonly Task[] | undefined;
   readonly onSave: (input: TaskInput) => void | Promise<void>;
@@ -51,6 +53,7 @@ export class TaskDialog {
   private readonly mode: TaskDialogMode;
   private readonly task: Task | undefined;
   private readonly parent: Task | undefined;
+  private readonly candidates: readonly { readonly id: number; readonly title: string }[];
   private readonly children: readonly Task[];
   private readonly onSave: (input: TaskInput) => void | Promise<void>;
   private readonly onDelete: (() => void | Promise<void>) | undefined;
@@ -91,6 +94,7 @@ export class TaskDialog {
     this.mode = options.mode;
     this.task = options.task;
     this.parent = options.parent;
+    this.candidates = options.candidates ?? [];
     this.children = options.children ?? [];
     this.onSave = options.onSave;
     this.onDelete = options.onDelete;
@@ -382,9 +386,10 @@ export class TaskDialog {
     const blockedByField = new IdListField({
       doc: this.doc,
       label: 'Blocked by',
-      placeholder: 'id of the task, then Enter',
+      placeholder: 'Search by title…',
       values: this.blockedByIds,
       excluded: task === undefined ? [] : [task.id],
+      candidates: this.candidates,
       onChange: (values) => {
         this.blockedByIds = values;
       },
@@ -393,9 +398,10 @@ export class TaskDialog {
     const relatedField = new IdListField({
       doc: this.doc,
       label: 'Related tasks',
-      placeholder: 'id of the task, then Enter',
+      placeholder: 'Search by title…',
       values: this.relatedIds,
       excluded: task === undefined ? [] : [task.id],
+      candidates: this.candidates,
       onChange: (values) => {
         this.relatedIds = values;
       },

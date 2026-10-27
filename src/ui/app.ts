@@ -2807,6 +2807,18 @@ export class App
   }
 
   /** Reads a task from the project, `null` when it cannot be read. */
+  /** Loads the summaries of every task, to feed the blocked/related search. */
+  private async loadTaskCandidates(excludeId?: number): Promise<readonly { id: number; title: string }[]> {
+    const store = this.store;
+    if (store === null) {
+      return [];
+    }
+    const summaries = await store.listTasks();
+    return summaries
+      .filter((task) => task.id !== excludeId)
+      .map((task) => ({ id: task.id, title: task.title }));
+  }
+
   private async loadTaskById(id: number): Promise<Task | null> {
     const store = this.store;
     if (store === null) {
@@ -2908,15 +2920,17 @@ export class App
     showToast({ doc: this.doc, message: `Tasks folder set to ${path}`, kind: 'success' });
   }
 
-  private openCreateDialog(parent?: Task): void {
+  private async openCreateDialog(parent?: Task): Promise<void> {
     if (!this.hasProject()) {
       this.reportMissingProject();
       return;
     }
+    const candidates = await this.loadTaskCandidates(parent?.id);
     const dialog = new TaskDialog({
       doc: this.doc,
       mode: 'create',
       parent,
+      candidates,
       onSave: async (taskInput: TaskInput) => {
         await this.createTask(taskInput, parent?.id ?? null);
       },
@@ -2953,11 +2967,13 @@ export class App
     dialog.open();
   }
 
-  private openEditDialog(task: Task): void {
+  private async openEditDialog(task: Task): Promise<void> {
+    const candidates = await this.loadTaskCandidates(task.id);
     const dialog = new TaskDialog({
       doc: this.doc,
       mode: 'edit',
       task,
+      candidates,
       onSave: async (taskInput: TaskInput) => {
         await this.updateTask(task, taskInput);
       },

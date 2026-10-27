@@ -445,13 +445,23 @@ async function runChecks() {
   await evaluate(`(() => {
     const fields = [...document.querySelectorAll('.id-list')];
     const blocked = fields[0].querySelector('.id-list-input');
-    blocked.value = '2';
+    blocked.value = 'Browser test task 2';
+    blocked.dispatchEvent(new Event('input', { bubbles: true }));
+    const related = fields[1].querySelector('.id-list-input');
+    related.value = 'Browser test task 3';
+    related.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await delay(600);
+  await evaluate(`(() => {
+    const fields = [...document.querySelectorAll('.id-list')];
+    const blocked = fields[0].querySelector('.id-list-input');
     blocked.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     const related = fields[1].querySelector('.id-list-input');
-    related.value = '3';
     related.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     return true;
   })()`);
+  await delay(200);
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Create task');
     button.click();
