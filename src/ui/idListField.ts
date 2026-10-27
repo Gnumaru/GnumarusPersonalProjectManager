@@ -164,7 +164,7 @@ export class IdListField {
         const title = candidate.title.toLowerCase();
         return title.includes(term) || String(candidate.id).includes(term);
       })
-      .slice(0, 10);
+      .slice(0, 30);
     this.highlight = this.results.length > 0 ? 0 : -1;
     this.renderResults();
   }

@@ -112,6 +112,7 @@ agora a lista da busca dinamica desapareceu por completo. mas a busca em si aind
 ====
 na modal de editar tarefa, crie um campo 'parent' identico aos campos 'blocked by' e 'related tasks', com a diferenca que o campo parent so permite definir 0 ou 1 parents. esse campo vai exibir e permitir editar a tarefa pai da task sendo editada.
 ====
+Faça com que a lista da busca dinamica possa ter até 30 itens. utilize barra de rolagem se preciso.
 ====
 ====
 ====
@@ -119,12 +120,12 @@ na modal de editar tarefa, crie um campo 'parent' identico aos campos 'blocked b
 ====
 ====
 ====
-====
-Faça com que a lista da busca dinamica possa ter até 30 itens. utilize barra de rolagem se precisao.
-Assim como existe um botao pra reordenar a tarefa 'pra baixo', crie outro pra mandar a tarefa 'pra cima'.
-As tarefas agora devem ter 'Type' e 'Role'. os tipos possiveis sao 'bug', 'improvement', 'feature' e os roles possiveis sao 'Graphics', 'Audio', 'Programming', 'Design', 'Assembly' e 'Management'. na modal de editar tarefa deve ser possivel visualizar e escolher o tipo e o papel da tarefa. Esses dados ficam armazenados nos metadados 'type' e 'role' do arquivo da tarefa.
 ====
 
+Assim como existe um botao pra reordenar a tarefa 'pra baixo', crie outro pra mandar a tarefa 'pra cima'.
+Na view gantt os botoes sao exibidos apenas quando o mouse passar por cima. isso é bom e está correto. mas eles ocupam espaco horizontal e deixam um espaço vazio do lado direito de todas as tarefas. faça com que os botões renderizem por cima do titulo da tarefa, efetivamente tampando a parte direita do titulo. isso não é um problema porque os botoes só aparecem ao passar o mouse, entao o titulo é visivel enquanto o mouse nao estiver por cima.
+====
+As tarefas agora devem ter 'Type' e 'Role'. os tipos possiveis sao 'bug', 'improvement', 'feature' e os roles possiveis sao 'Graphics', 'Audio', 'Programming', 'Design', 'Assembly' e 'Management'. na modal de editar tarefa deve ser possivel visualizar e escolher o tipo e o papel da tarefa. Esses dados ficam armazenados nos metadados 'type' e 'role' do arquivo da tarefa.
 ====
 
 ====

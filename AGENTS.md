@@ -16,6 +16,7 @@
 - never copy or use any source code from anywhere within my file system unless I say otherwise
 - if nothing exists yet, start implementing from scratch
 - always ask me explicitly for aproval before adding any dependency to the project, be it through a package manager or by directly downloading the dependency code in the project directory
+- DO NOT run the end to end tests yourself. they are too slow. just run the other tests and I will run the e2e tests myself.
 
 - We are creating a frontend-only web application for project management
 - o app permite escolher um diretorio e a partir do diretorio escolhido as tarefas serão criadas como arquivos .txt individuais dentro do diretório.
