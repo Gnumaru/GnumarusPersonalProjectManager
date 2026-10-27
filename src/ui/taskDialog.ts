@@ -20,6 +20,7 @@ import {
 import { button, clear, el, formatTimestamp, input, select, textArea } from './dom.js';
 import type { TaskComment } from '../core/comment.js';
 import { IdListField } from './idListField.js';
+import { TagField } from './tagField.js';
 import { createIcon } from './icons.js';
 import { Modal } from './modal.js';
 
@@ -79,7 +80,7 @@ export class TaskDialog {
   private statusSelect: HTMLSelectElement | null = null;
   private typeSelect: HTMLSelectElement | null = null;
   private roleSelect: HTMLSelectElement | null = null;
-  private tagsInput: HTMLInputElement | null = null;
+  private tagField: TagField | null = null;
   private startInput: HTMLInputElement | null = null;
   private endInput: HTMLInputElement | null = null;
   private descriptionInput: HTMLTextAreaElement | null = null;
@@ -91,6 +92,7 @@ export class TaskDialog {
   private blockedByIds: number[];
   /** The ids of the tasks that are related to the task. */
   private relatedIds: number[];
+  private tagValues: string[];
   private typeValue: TaskType;
   private roleValue: TaskRole;
   /** The comments of the task, the most recent first. */
@@ -120,6 +122,7 @@ export class TaskDialog {
     this.onCancel = options.onCancel;
     this.blockedByIds = [...(options.task?.blockedBy ?? [])];
     this.relatedIds = [...(options.task?.related ?? [])];
+    this.tagValues = [...(options.task?.tags ?? [])];
     this.typeValue = options.task?.type ?? 'Feature';
     this.roleValue = options.task?.role ?? 'Programming';
     this.parentId =
@@ -388,11 +391,13 @@ export class TaskDialog {
       options: TASK_ROLES.map((role) => ({ value: role, label: role })),
     });
 
-    this.tagsInput = input(this.doc, {
-      class: 'field-input',
-      id: 'task-tags',
-      value: (task?.tags ?? []).join(' '),
+    this.tagField = new TagField({
+      doc: this.doc,
       placeholder: 'tags separated by spaces',
+      values: task?.tags ?? [],
+      onChange: (values) => {
+        this.tagValues = values;
+      },
     });
 
     // When the editor creates a task, the dates default to a range of one day:
@@ -499,11 +504,9 @@ export class TaskDialog {
           el(this.doc, 'span', { class: 'field-label', text: 'Status' }),
           this.statusSelect,
         ]),
-        el(this.doc, 'label', { class: 'field', attrs: { for: 'task-tags' } }, [
-          el(this.doc, 'span', { class: 'field-label', text: 'Tags' }),
-          this.tagsInput,
-        ]),
+        el(this.doc, 'div'),
       ]),
+      this.tagField?.element ?? el(this.doc, 'div'),
       el(this.doc, 'div', { class: 'field-row' }, [
         el(this.doc, 'label', { class: 'field', attrs: { for: 'task-type' } }, [
           el(this.doc, 'span', { class: 'field-label', text: 'Type' }),
@@ -844,7 +847,7 @@ export class TaskDialog {
       title,
       description: this.descriptionInput?.value ?? '',
       status,
-      tags: normalizeTags(this.tagsInput?.value ?? ''),
+      tags: normalizeTags(this.tagField?.value() ?? this.tagValues),
       start,
       end,
       blockedBy: this.blockedByIds,

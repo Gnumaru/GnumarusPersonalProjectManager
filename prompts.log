@@ -126,6 +126,7 @@ Na view gantt faça com que o nome das tarefas seja alinhado a esquerda. atualme
 ====
 mude os tipos das tarefas para comecar com letra maiuscula (Bug, Improvement, Feature). Adicione o papel "Test"
 ====
+faça com que o campo de tags da modal de editar tarefa funcione de forma similar aos campos blocked by e related tasks: o usuario digita e ao apertar enter o texto vira badge. tags nao podem ter espaço em branco entao se o usuario digitar, por exemplo, duas palavras separadas por espaço, ao apertar enter elas virarão duas badges ordenadas alfabeticamente.
 ====
 ====
 

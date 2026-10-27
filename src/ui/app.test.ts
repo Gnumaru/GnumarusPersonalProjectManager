@@ -459,7 +459,7 @@ describe('App', () => {
     // The editor holds a field for the blocking tasks and one for the related
     // ones.
     const fields = [...harness.doc.querySelectorAll('.id-list')];
-    expect(fields).toHaveLength(3);
+    expect(fields).toHaveLength(4);
 
     const addTask = async (field: Element, title: string): Promise<void> => {
       const input = field.querySelector<HTMLInputElement>('.id-list-input');
@@ -475,13 +475,13 @@ describe('App', () => {
       await flush();
     };
 
-    await addTask(fields[1] as Element, 'Task 3');
-    await addTask(fields[2] as Element, 'Task 2');
+    await addTask(fields[2] as Element, 'Task 3');
+    await addTask(fields[3] as Element, 'Task 2');
 
     const chips = [...harness.doc.querySelectorAll('.id-chip-label')].map(
       (chip) => chip.textContent,
     );
-    expect(chips).toEqual(['#3 Task 3', '#2 Task 2']);
+    expect(chips).toEqual(['tag1', '#3 Task 3', '#2 Task 2']);
 
     click(buttonByText(harness.doc, 'Save changes'));
     await flush();
@@ -513,7 +513,11 @@ describe('App', () => {
     );
     await flush();
 
-    expect(harness.doc.querySelectorAll('.id-chip-label')).toHaveLength(0);
+    expect(
+      [...harness.doc.querySelectorAll('.id-chip-label')].filter((chip) =>
+        chip.textContent?.startsWith('#1'),
+      ),
+    ).toHaveLength(0);
   });
 
   it('writes, edits and deletes the comments of a task', async () => {
