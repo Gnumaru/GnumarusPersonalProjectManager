@@ -116,6 +116,19 @@ export interface Task {
    * the Gantt views read it.
    */
   readonly expanded: boolean;
+  /**
+   * Order of the task among its siblings in the Kanban view.
+   *
+   * It is a view preference, not a part of the task content in the strict
+   * sense, but it is persisted in the file. The smaller the number, the
+   * higher the card sits in its column.
+   */
+  readonly kanbanOrder?: number;
+  /**
+   * Order of the task among its siblings in the tree view and in the Gantt
+   * chart. The two views share the same order.
+   */
+  readonly treeGanttOrder?: number;
   readonly description: string;
 }
 
@@ -317,6 +330,15 @@ function parseInteger(value: string | undefined): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
+/** Reads an order key, clamped to a non-negative integer. */
+function normalizeOrder(value: string | undefined): number {
+  const parsed = parseInteger(value);
+  if (parsed === null || parsed < 0) {
+    return 0;
+  }
+  return parsed;
+}
+
 /**
  * Removes characters that would break the `key=value` metadata format.
  *
@@ -428,6 +450,8 @@ export function parseTask(content: string, idHint?: number): Task {
     blockedBy: parseIdList(metadata.get('blocked_by') ?? ''),
     related: parseIdList(metadata.get('related') ?? ''),
     expanded: (metadata.get('expanded') ?? '').trim().toLowerCase() === 'true',
+    kanbanOrder: normalizeOrder(metadata.get('kanban_order')),
+    treeGanttOrder: normalizeOrder(metadata.get('tree_gantt_order')),
     description,
   };
 }
@@ -460,6 +484,8 @@ export function serializeTask(task: Task): string {
   if (task.expanded) {
     lines.push('expanded=true');
   }
+  lines.push(`kanban_order=${task.kanbanOrder ?? 0}`);
+  lines.push(`tree_gantt_order=${task.treeGanttOrder ?? 0}`);
   lines.push(METADATA_SEPARATOR);
 
   const description = task.description.replace(/\r\n/gu, '\n').replace(/^\n+/u, '').replace(/\s+$/u, '');
@@ -487,6 +513,8 @@ export function buildTask(
     blockedBy: [...input.blockedBy],
     related: [...input.related],
     expanded: false,
+    kanbanOrder: 0,
+    treeGanttOrder: 0,
     description: input.description,
   };
 }
@@ -504,6 +532,8 @@ export function applyTaskInput(task: Task, input: TaskInput, now: Date): Task {
     related: [...input.related],
     updated: formatTaskTimestamp(now),
     description: input.description,
+    kanbanOrder: task.kanbanOrder ?? 0,
+    treeGanttOrder: task.treeGanttOrder ?? 0,
   };
 }
 

@@ -79,20 +79,24 @@ function createHandlers(): {
   readonly onFocus: ReturnType<typeof vi.fn>;
   readonly onAddChild: ReturnType<typeof vi.fn>;
   readonly onEdit: ReturnType<typeof vi.fn>;
+  readonly onReorder: ReturnType<typeof vi.fn>;
 } {
   const onFocus = vi.fn();
   const onAddChild = vi.fn();
   const onEdit = vi.fn();
+  const onReorder = vi.fn();
   return {
     onFocus,
     onAddChild,
     onEdit,
+    onReorder,
     handlers: {
       onToggle: vi.fn(),
       onFocus,
       onOpen: vi.fn(),
       onEdit,
       onAddChild,
+      onReorder,
       onToggleWeek: vi.fn(),
       onToggleMonth: vi.fn(),
     },
@@ -137,14 +141,16 @@ describe('renderGanttView', () => {
     const row = view.querySelector<HTMLElement>('.gantt-row[data-task-id="2"]');
     const actions = [...(row?.querySelectorAll<HTMLButtonElement>('.gantt-row-action') ?? [])];
     expect(actions.map((action) => action.title)).toEqual([
+      'Move the task up',
+      'Move the task down',
       'Focus the chart on this task',
       'Edit the task',
       'Add a child task',
     ]);
 
-    actions[0]?.click();
-    actions[1]?.click();
     actions[2]?.click();
+    actions[3]?.click();
+    actions[4]?.click();
     expect(onFocus).toHaveBeenCalledWith(2);
     expect(onEdit).toHaveBeenCalledWith(2);
     expect(onAddChild).toHaveBeenCalledWith(2);

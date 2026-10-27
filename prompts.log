@@ -101,42 +101,28 @@ voce diz que fez a tarefa, alterou os arquivos, mas eu nao estou vendo nada na t
 ====
 na modal de visualizacao da task, que é exibida quando voce clica no nome da tarefa em qualquer view, devem ser exibidos todos os comentarios dela, ordenados decrescentemente por data de criacao
 ====
+deve ser possível definir a ordem das tarefas na view kanban e nas views tree/gantt. a ordem das views tree/gantt é compartilhada entre as duas (a mesma ordem no tree vai ser a ordem no gantt e vice versa) enquanto a ordem no kanban nao tem relacao alguma com a ordem no tree/gantt. no arquivo de cada tarefa deve haver um metadado kanban_order e tree_gantt_order que eh um numero inteiro >= 0. quanto menor o numero mais alto na sua coluna do kanban ficará a tarefa (ou mais alta entre suas irmãs ficara a tarefa no tree/gantt) e quanto maior o numero mais pra baixo na lista ficara a tarefa na coluna do kanban ou entre suas irmas na tree/gantt. deve haver nessas tres views alguma forma de reordenar as tarefas, seja arrastando elas pro espaco entre as irmas ou clicando em um algum botao. ao construir a interface essas ordens das tarefas sao 'normalizados'. por exemplo, se 3 tasks tem o mesmo pai mas tem ids aleatorios (<ausente>, -6, 5, 5, 99) ao montar a interface os ids sao consertados (as 5 tasks do exemplo anterior ficam 0, 1, 2, 3, 4) e se algum valor de ordem da tarefa tiver sido alterado ao montar a interface ele sera salvo de volta no arquivo. ao reordenar o valor tambem sera atualizado: se haviam duas tarefas com ordem 0 e 1, ao trocar elas de lugar a que ficou antes fica com ordem 0 e a que ficou depois fica com ordem 1. no caso do kanban a ordem é organizada entre colunas, entao ao mudar a tarefa de uma coluna pra outra a ordem da task é recalculada dependendo de onde ela foi colocada na outra coluna, e potencialmente a ordem de todas as tasks de ambas as colunas envolvidas é recalculada e persistida tambem.
 ====
 ====
 ====
-
 ====
 ====
-ao invez de usarmos
-
-
--9007199254740992
-+9007199254740992
-
-function getRandomSafeInteger() {
-  const minBI = BigInt(Number.MIN_SAFE_INTEGER); // -9007199254740991n
-  const maxBI = BigInt(Number.MAX_SAFE_INTEGER); //  9007199254740991n
-  const range = maxBI - minBI + 1n;              //  18014398509481983n
-
-  // Aloca 8 bytes (64 bits) de entropia criptográfica
-  const buffer = new BigUint64Array(1);
-  
-  while (true) {
-    crypto.getRandomValues(buffer);
-    const random64 = buffer[0];
-
-    // Elimina o viés de módulo (Modulo Bias) para garantir distribuição uniforme
-    const maxSafeRandom = (2n ** 64n / range) * range;
-    if (random64 < maxSafeRandom) {
-      // Retorna o resultado convertido de volta para Number seguro
-      return Number((random64 % range) + minBI);
-    }
-  }
-}
-
-// Exemplo de uso:
-console.log(getRandomSafeInteger());
-
+====
+====
+====
+====
+====
+====
+em qualquer view, quando eu edito uma tarefa e adiciono um comentario, a contagem de comentarios nao é atualizada para aquela view. mas se eu mudo pra outra view a contagem atualiza.
+====
+Na modal que permite editar uma tarefa, nos campos 'blocked by' e 'related tasks', altere a forma que o usuario interage com o campo. Ao inves de digitar um id de tarefa e apertar enter/return para transformar o texto em uma badge, o usuario deve poder começar a digitar um texto para fazer uma busca dinamica pelas tarefas com aquele titulo, e logo abaixo do campo irá aparecer uma lista com os 10 primeiros resultados. a comparacao de string sera uma comparacao simples usando debounce de meio segundo. ao apertar seta pra cima ou pra baixo o usuário poderá alternar o foco entre os itens da lista e ao apertar enter aquele item vai virar uma badge. O texto exibido na bagde deve ser o id da tarefa seguido do nome da tarefa (truncado para 64 caracteres). o valor persistido como metadado no arquivo da tarefa continua sendo apenas o id da tarefa. ao construir a modal de uma tarefa que já tenha ids de tarefas bloqueadoras ou relacionadas as badges já devem ser construidas com os nomes das tarefas
+====
+====
+====
+====
+====
+====
+====
 ====
 
 ====

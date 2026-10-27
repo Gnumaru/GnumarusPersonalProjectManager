@@ -47,6 +47,10 @@ export interface TaskSummary {
    * Only the tree and the Gantt views read it; the other views ignore it.
    */
   readonly expanded: boolean;
+  /** Order of the task in the Kanban view. */
+  readonly kanbanOrder: number;
+  /** Order of the task in the tree view and in the Gantt chart. */
+  readonly treeGanttOrder: number;
   /** The path of the file, relative to the project folder. */
   readonly path: string;
 }

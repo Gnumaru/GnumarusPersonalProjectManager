@@ -801,7 +801,7 @@ async function runChecks() {
   // Focusing a task makes it the root of the tree.
   await evaluate(`(() => {
     const row = document.querySelector('.tree-row[data-task-id="1"]');
-    row.querySelectorAll('.tree-action')[0].click();
+    row.querySelectorAll('.tree-action')[2].click();
     return true;
   })()`);
   await waitFor(`document.querySelectorAll('.tree-row').length === 3`);

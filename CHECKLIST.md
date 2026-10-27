@@ -435,6 +435,42 @@
 - [x] `npm run verify`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
 
+## Batch 21 - Task ordering in the Kanban, tree and Gantt views
+
+### Data layer
+
+- [x] `kanban_order` and `tree_gantt_order` metadata keys in `src/core/task.ts`
+      (parsed, serialized, defaulted to 0)
+- [x] `TaskSummary.kanbanOrder` and `TaskSummary.treeGanttOrder` in
+      `src/core/projectStore.ts`
+- [x] The four stores read and pass the two orders
+- [x] `buildTaskTree` sorts roots and children by `tree_gantt_order`, then id
+
+### User interface
+
+- [x] The Kanban, tree and Gantt views show the tasks in the saved order
+- [x] Up and down buttons on every tree row, Gantt row and Kanban card
+- [x] The tree and the Gantt share one order (`tree_gantt_order`)
+- [x] The Kanban keeps its own order (`kanban_order`)
+- [x] Dragging a Kanban card to another column recomputes the order of both
+      columns
+- [x] Normalization on load: per parent (tree/Gantt) and per status (Kanban),
+      the orders become `0, 1, 2, ...` and the changed values are written back
+
+### Tests
+
+- [x] `src/core/task.test.ts` - serialization and round trip of the two orders
+- [x] `src/ui/ganttView.test.ts` - the up/down actions
+- [x] `src/ui/kanbanBoard.test.ts` - the up/down actions
+- [x] `scripts/e2e-browser.mjs` - the two new actions do not break the
+      checks (122/122)
+
+### Build / deploy
+
+- [x] `npm run verify` (417 tests, 122/122 browser checks)
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 20 - Gantt schedule margin and column rendering
 
 ### Gantt chart

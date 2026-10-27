@@ -104,6 +104,10 @@ list or as a tree.
 | **The indentation is 9px per level, half of the tree view** | Done | `src/ui/ganttView.ts` |
 | **Every row offers focus, edit and add-child actions** | Done | `src/ui/ganttView.ts` |
 | **The focus breadcrumb of the tree, with the General root reset** | Done | `src/ui/app.ts` |
+| **Up and down reordering in the tree and in the Gantt chart** | Done | `src/ui/taskTreeView.ts`, `src/ui/ganttView.ts` |
+| **Up and down reordering in the Kanban columns** | Done | `src/ui/kanbanBoard.ts` |
+| **Shared order for the tree and the Gantt, independent for the Kanban** | Done | `src/core/task.ts` |
+| **Normalization of the orders on load** | Done | `src/ui/app.ts` |
 | **Search on the chart: the matches and their chain of ancestors** | Done | `src/core/taskTree.ts`, `src/ui/app.ts` |
 | **One column per day** | Done | `src/core/gantt.ts` |
 | **The days grouped by week and the weeks by month** | Done | `src/core/gantt.ts` |

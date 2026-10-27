@@ -19,6 +19,8 @@ export interface KanbanHandlers {
   readonly onOpen: (taskId: number) => void;
   /** The editor of a card is opened. */
   readonly onEdit: (taskId: number) => void;
+  /** Moves the card up or down in its column. */
+  readonly onReorder: (taskId: number, delta: -1 | 1) => void;
 }
 
 /** The class of the columns of the board. */
@@ -89,6 +91,12 @@ function renderKanbanCard(
   }
 
   const actions = el(doc, 'div', { class: 'kanban-card-actions' }, [
+    actionButton(doc, 'up', 'Move the card up', () => {
+      handlers.onReorder(card.id, -1);
+    }),
+    actionButton(doc, 'down', 'Move the card down', () => {
+      handlers.onReorder(card.id, 1);
+    }),
     actionButton(doc, 'eye', 'Open the task', () => {
       handlers.onOpen(card.id);
     }),

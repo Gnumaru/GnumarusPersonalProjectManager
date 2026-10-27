@@ -217,6 +217,8 @@ describe('the blocking and the related tasks', () => {
       blockedBy: [] as number[],
       related: [] as number[],
       expanded: false,
+      kanbanOrder: 0,
+      treeGanttOrder: 0,
       description: '',
     };
 
@@ -398,6 +400,8 @@ describe('serializeTask', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanOrder: 0,
+      treeGanttOrder: 0,
     };
 
     expect(serializeTask(task)).toBe(
@@ -410,6 +414,8 @@ describe('serializeTask', () => {
         'updated=20261020100000000',
         'start=20261020110000000',
         'end=20261021120000000',
+        'kanban_order=0',
+        'tree_gantt_order=0',
         METADATA_SEPARATOR,
         'Some description',
         '',
@@ -431,6 +437,8 @@ describe('serializeTask', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanOrder: 0,
+      treeGanttOrder: 0,
     };
     expect(serializeTask({ ...base, parentId: null })).not.toContain('parent=');
     expect(serializeTask({ ...base, parentId: 4 })).toContain('parent=4');
@@ -476,6 +484,8 @@ describe('serializeTask', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanOrder: 0,
+      treeGanttOrder: 0,
     };
     const expanded = withExpandedState(base, true);
     expect(expanded).toEqual({ ...base, expanded: true });
@@ -499,6 +509,8 @@ describe('serializeTask', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanOrder: 0,
+      treeGanttOrder: 0,
     };
     const seeded = withDefaultDates(task, now);
     expect(seeded.start).toBe(formatTaskTimestamp(new Date(2026, 4, 5, 0, 0, 0, 0)));
@@ -522,6 +534,8 @@ describe('serializeTask', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanOrder: 0,
+      treeGanttOrder: 0,
       description: '',
     };
     const seeded = withDefaultDates(task, now);
@@ -552,6 +566,8 @@ describe('serializeTask', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanOrder: 0,
+      treeGanttOrder: 0,
     };
     const content = serializeTask(task);
     expect(content).toContain('title=first second');
@@ -575,6 +591,8 @@ describe('round trip', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanOrder: 0,
+      treeGanttOrder: 0,
     };
 
     const parsed = parseTask(serializeTask(original));
@@ -596,6 +614,8 @@ describe('round trip', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanOrder: 0,
+      treeGanttOrder: 0,
     };
     expect(parseTask(serializeTask(original))).toEqual(original);
   });

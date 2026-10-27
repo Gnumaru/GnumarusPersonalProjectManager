@@ -24,6 +24,8 @@ export interface TreeViewHandlers {
   readonly onView: (task: Task) => void;
   readonly onEdit: (task: Task) => void;
   readonly onAddChild: (task: Task) => void;
+  /** Moves the task up or down among its siblings. */
+  readonly onReorder: (task: Task, delta: -1 | 1) => void;
 }
 
 /** Width of one level of indentation, in pixels. */
@@ -108,6 +110,12 @@ function renderTreeRow(
   }
 
   const actions = el(doc, 'span', { class: 'tree-actions' }, [
+    actionButton(doc, 'up', 'Move the task up', () => {
+      handlers.onReorder(task, -1);
+    }),
+    actionButton(doc, 'down', 'Move the task down', () => {
+      handlers.onReorder(task, 1);
+    }),
     actionButton(doc, 'target', 'Focus the tree on this task', () => {
       handlers.onFocus(task.id);
     }),

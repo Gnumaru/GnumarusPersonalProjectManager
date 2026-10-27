@@ -8,11 +8,11 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
-- All planned batches (1-20) are implemented.
-- Batch 21 added a comment count badge: every view that lists the tasks shows,
-  to the left of its name, a small circle with the number of comments of the
-  task. A task without comments shows no badge. The count is read once per
-  refresh for every task at once.
+- All planned batches (1-21) are implemented.
+- Batch 21 adds task ordering: `kanban_order` and `tree_gantt_order` metadata,
+  up/down reordering in the Kanban, tree and Gantt views, a shared order for
+  tree/Gantt, an independent order for Kanban, column-aware reordering when a
+  Kanban card changes status, and normalization on load.
 - Batch 20 fixed the Gantt columns: the schedule always keeps one full margin
   week before the smallest displayed start and one after the largest displayed
   end (computed from the displayed rows), the week of an end date in the next

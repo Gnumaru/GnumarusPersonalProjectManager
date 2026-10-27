@@ -1256,7 +1256,7 @@ describe('App and the tree view', () => {
     expect(treeRows(harness)).toHaveLength(2);
 
     // A child is added through the actions of the row.
-    click(treeAction(harness, 1, 3));
+    click(treeAction(harness, 1, 5));
     await flush();
     const titleInput = harness.doc.querySelector<HTMLInputElement>('#task-title');
     expect(titleInput).not.toBeNull();
@@ -1304,7 +1304,7 @@ describe('App and the tree view', () => {
     ).toBe(true);
 
     // Its first child is added: the branch opens by itself and shows it.
-    click(treeAction(harness, 6, 3));
+    click(treeAction(harness, 6, 5));
     await flush();
     const childInput = harness.doc.querySelector<HTMLInputElement>('#task-title');
     expect(childInput).not.toBeNull();
@@ -1331,7 +1331,7 @@ describe('App and the tree view', () => {
     await switchToTree(harness);
 
     // The first action of a row focuses the tree on the task.
-    click(treeAction(harness, 1, 0));
+    click(treeAction(harness, 1, 2));
     await flush();
 
     // The focused task is the root of the displayed tree: the other tasks
@@ -1355,7 +1355,7 @@ describe('App and the tree view', () => {
     // Expand the first task, then focus its first child.
     click(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'));
     await flush();
-    click(treeAction(harness, 2, 0));
+    click(treeAction(harness, 2, 2));
     await flush();
 
     const rows = treeRows(harness);
@@ -1473,7 +1473,7 @@ describe('App and the tree view', () => {
     const harness = await createTreeHarness();
     await switchToTree(harness);
 
-    click(treeAction(harness, 1, 0));
+    click(treeAction(harness, 1, 2));
     await flush();
     expect(treeRows(harness)).toHaveLength(3);
     expect(treeRow(harness, 5)).toBeNull();
@@ -1497,7 +1497,7 @@ describe('App and the tree view', () => {
     await flush();
 
     // The pencil opens the editor.
-    click(treeAction(harness, 1, 2));
+    click(treeAction(harness, 1, 4));
     await flush();
     const title = harness.doc.querySelector<HTMLInputElement>('#task-title');
     expect(title?.value).toBe('Task 1');

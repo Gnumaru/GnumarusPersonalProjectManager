@@ -12,6 +12,7 @@ Notes (`note_<id>.txt`) are a new kind of thing: a simple note-taking replacemen
 
 - Root tasks with create, edit, view, delete, search and paginated listing (10 per page)
 - Child tasks with drag-and-drop parent assignment in the tree view
+- Reordering of the tasks with up and down buttons in the Kanban, tree and Gantt views
 - Seven statuses: planning, next, todo, doing, paused, done, canceled
 - Search by title, tag or description (recursive grep in service mode)
 - Paginated listing with first / previous / next / last buttons

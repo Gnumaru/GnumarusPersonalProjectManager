@@ -102,6 +102,8 @@ export class EmbeddedProjectStore implements ProjectStore {
         end: task.end,
         updated: task.updated,
         expanded: task.expanded,
+        kanbanOrder: task.kanbanOrder ?? 0,
+        treeGanttOrder: task.treeGanttOrder ?? 0,
         path,
       });
     }

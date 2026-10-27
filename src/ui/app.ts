@@ -1361,6 +1361,7 @@ export class App
       this.treeStructure = null;
       return;
     }
+    await this.normalizeTreeGanttOrders();
     const summaries = await store.listTasks();
     this.applyHierarchy(summaries);
     await this.seedTaskDates(summaries);
@@ -1405,6 +1406,7 @@ export class App
       this.kanbanCards = [];
       return;
     }
+    await this.normalizeKanbanOrders();
     const summaries = await store.listTasks();
     await this.seedTaskDates(summaries);
     const parents = new Set<number>();
@@ -1421,6 +1423,7 @@ export class App
       // The search of the board shows only the leaves that match: the other
       // cards come back when the search box is emptied.
       .filter((task) => matches === null || matches.has(task.id))
+      .sort((a, b) => a.kanbanOrder - b.kanbanOrder || a.id - b.id)
       .map((task) => ({
         id: task.id,
         title: task.title,
@@ -1443,6 +1446,7 @@ export class App
       this.ganttMetadata = new Map<number, TaskSummary>();
       return;
     }
+    await this.normalizeTreeGanttOrders();
     const summaries = await store.listTasks();
     const seededDates = await this.seedTaskDates(summaries);
     this.applyHierarchy(summaries);
@@ -1461,9 +1465,11 @@ export class App
     const parents = new Map<number, number | null>();
     const paths = new Map<number, string>();
     const expanded = new Set<number>();
+    const orders = new Map<number, number>();
     for (const task of summaries) {
       parents.set(task.id, task.parentId);
       paths.set(task.id, task.path);
+      orders.set(task.id, task.treeGanttOrder);
       // The files carry the expanded state: every refresh re-derives the set
       // from them, so the disk is always the source of truth.
       if (task.expanded) {
@@ -1472,7 +1478,7 @@ export class App
     }
     this.treeExpanded = expanded;
     this.treeHierarchy = { parents, paths };
-    this.treeStructure = buildTaskTree(parents);
+    this.treeStructure = buildTaskTree(parents, orders);
   }
 
   /** Recomputes the rows of the tree and loads the tasks that are shown. */
@@ -1735,6 +1741,9 @@ export class App
       onAddChild: (task) => {
         this.openCreateDialog(task);
       },
+      onReorder: (task, delta) => {
+        void this.moveTaskTree(task.id, delta);
+      },
     }, this.commentCounts)) {
       this.treeRowsElement.append(row);
     }
@@ -1757,6 +1766,9 @@ export class App
         },
         onEdit: (taskId) => {
           void this.openEditTaskById(taskId);
+        },
+        onReorder: (taskId, delta) => {
+          void this.moveTaskKanban(taskId, delta);
         },
       }, this.commentCounts),
     );
@@ -1826,6 +1838,9 @@ export class App
             },
             onAddChild: (id) => {
               void this.openAddChildTaskById(id);
+            },
+            onReorder: (id, delta) => {
+              void this.moveTaskTree(id, delta);
             },
             onToggleWeek: (key) => {
               this.toggleGanttPeriod(key);
@@ -1971,6 +1986,159 @@ export class App
    * visible weeks. One margin week is kept before the smallest start and one
    * after the largest end, so the bars never touch the edges of the chart.
    */
+  /** Normalizes the tree/Gantt orders of every task, persisting changes. */
+  private async normalizeTreeGanttOrders(): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      return;
+    }
+    const summaries = await store.listTasks();
+    const groups = new Map<number | null, TaskSummary[]>();
+    for (const task of summaries) {
+      const key = task.parentId;
+      const list = groups.get(key);
+      if (list === undefined) {
+        groups.set(key, [task]);
+      } else {
+        list.push(task);
+      }
+    }
+    const writes: Promise<void>[] = [];
+    for (const list of groups.values()) {
+      const sorted = [...list].sort(
+        (left, right) => left.treeGanttOrder - right.treeGanttOrder || left.id - right.id,
+      );
+      sorted.forEach((task, index) => {
+        if (task.treeGanttOrder === index) {
+          return;
+        }
+        writes.push(
+          (async () => {
+            const full = await store.readTask(task.path);
+            await store.writeTask(task.path, { ...full, treeGanttOrder: index });
+          })(),
+        );
+      });
+    }
+    await Promise.all(writes);
+  }
+
+  /** Normalizes the Kanban orders of every task, persisting changes. */
+  private async normalizeKanbanOrders(): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      return;
+    }
+    const summaries = await store.listTasks();
+    const groups = new Map<TaskStatus, TaskSummary[]>();
+    for (const task of summaries) {
+      const list = groups.get(task.status);
+      if (list === undefined) {
+        groups.set(task.status, [task]);
+      } else {
+        list.push(task);
+      }
+    }
+    const writes: Promise<void>[] = [];
+    for (const list of groups.values()) {
+      const sorted = [...list].sort(
+        (left, right) => left.kanbanOrder - right.kanbanOrder || left.id - right.id,
+      );
+      sorted.forEach((task, index) => {
+        if (task.kanbanOrder === index) {
+          return;
+        }
+        writes.push(
+          (async () => {
+            const full = await store.readTask(task.path);
+            await store.writeTask(task.path, { ...full, kanbanOrder: index });
+          })(),
+        );
+      });
+    }
+    await Promise.all(writes);
+  }
+
+  /** Moves a task up or down among its siblings in the tree and the Gantt. */
+  private async moveTaskTree(id: number, delta: -1 | 1): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      return;
+    }
+    const summaries = await store.listTasks();
+    const target = summaries.find((task) => task.id === id);
+    if (target === undefined) {
+      return;
+    }
+    const siblings = summaries
+      .filter((task) => task.parentId === target.parentId)
+      .sort((left, right) => left.treeGanttOrder - right.treeGanttOrder || left.id - right.id);
+    const index = siblings.findIndex((task) => task.id === id);
+    const next = index + delta;
+    if (index < 0 || next < 0 || next >= siblings.length) {
+      return;
+    }
+    const reordered = [...siblings];
+    const current = reordered[index];
+    const neighbour = reordered[next];
+    if (current === undefined || neighbour === undefined) {
+      return;
+    }
+    reordered[index] = neighbour;
+    reordered[next] = current;
+    const writes = reordered.map((task, position) => {
+      if (task.treeGanttOrder === position) {
+        return null;
+      }
+      return (async () => {
+        const full = await store.readTask(task.path);
+        await store.writeTask(task.path, { ...full, treeGanttOrder: position });
+      })();
+    });
+    await Promise.all(writes.filter((write): write is Promise<void> => write !== null));
+    await this.refresh();
+  }
+
+  /** Moves a card up or down in its column of the Kanban board. */
+  private async moveTaskKanban(id: number, delta: -1 | 1): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      return;
+    }
+    const summaries = await store.listTasks();
+    const target = summaries.find((task) => task.id === id);
+    if (target === undefined) {
+      return;
+    }
+    const siblings = summaries
+      .filter((task) => task.status === target.status)
+      .sort((left, right) => left.kanbanOrder - right.kanbanOrder || left.id - right.id);
+    const index = siblings.findIndex((task) => task.id === id);
+    const next = index + delta;
+    if (index < 0 || next < 0 || next >= siblings.length) {
+      return;
+    }
+    const reordered = [...siblings];
+    const current = reordered[index];
+    const neighbour = reordered[next];
+    if (current === undefined || neighbour === undefined) {
+      return;
+    }
+    reordered[index] = neighbour;
+    reordered[next] = current;
+    const writes = reordered.map((task, position) => {
+      if (task.kanbanOrder === position) {
+        return null;
+      }
+      return (async () => {
+        const full = await store.readTask(task.path);
+        await store.writeTask(task.path, { ...full, kanbanOrder: position });
+      })();
+    });
+    await Promise.all(writes.filter((write): write is Promise<void> => write !== null));
+    await this.refresh();
+  }
+
   private ganttSchedule(rows: readonly TreeRow[]): GanttSchedule | null {
     let from: Date | null = null;
     let to: Date | null = null;
@@ -2010,6 +2178,7 @@ export class App
     const tasks = new Map<number, GanttTask>();
     const structure = buildTaskTree(
       new Map([...this.ganttMetadata].map(([id, task]) => [id, task.parentId] as const)),
+      new Map([...this.ganttMetadata].map(([id, task]) => [id, task.treeGanttOrder] as const)),
     );
 
     for (const row of rows) {
@@ -2556,17 +2725,28 @@ export class App
    * its file is rewritten.
    */
   private async changeTaskStatus(taskId: number, status: TaskStatus): Promise<void> {
+    const store = this.store;
     const card = this.kanbanCards.find((candidate) => candidate.id === taskId);
-    if (card === undefined || card.status === status) {
+    if (card === undefined || card.status === status || store === null) {
       // The task is not on the board any more, or it is already there.
       return;
     }
+    const summaries = await store.listTasks();
+    const target = summaries.find((task) => task.id === taskId);
+    if (target === undefined) {
+      return;
+    }
+    const newColumn = summaries.filter((task) => task.status === status);
+    const newOrder = newColumn.length;
     showToast({
       doc: this.doc,
       message: `The task #${taskId} is now ${STATUS_LABELS[status]}.`,
       kind: 'success',
     });
-    await this.updateTaskFields(taskId, (task) => withStatus(task, status, new Date()));
+    const full = await store.readTask(target.path);
+    await store.writeTask(target.path, withStatus({ ...full, kanbanOrder: newOrder }, status, new Date()));
+    await this.normalizeKanbanOrders();
+    await this.refresh();
   }
 
   /** Opens the editor of a task that is only known by its id. */

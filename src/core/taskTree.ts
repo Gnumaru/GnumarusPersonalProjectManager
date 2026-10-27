@@ -53,7 +53,10 @@ export interface TreeOptions {
  *
  * @param parents id of every task -> id of its parent (`null` for a root task)
  */
-export function buildTaskTree(parents: ReadonlyMap<number, number | null>): TaskTree {
+export function buildTaskTree(
+  parents: ReadonlyMap<number, number | null>,
+  orders?: ReadonlyMap<number, number>,
+): TaskTree {
   const resolved = new Map<number, number | null>();
   for (const id of parents.keys()) {
     resolved.set(id, null);
@@ -82,9 +85,17 @@ export function buildTaskTree(parents: ReadonlyMap<number, number | null>): Task
       list.push(id);
     }
   }
-  roots.sort((left, right) => left - right);
+  const compare = (left: number, right: number): number => {
+    const leftOrder = orders?.get(left) ?? 0;
+    const rightOrder = orders?.get(right) ?? 0;
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+    return left - right;
+  };
+  roots.sort(compare);
   for (const list of children.values()) {
-    list.sort((left, right) => left - right);
+    list.sort(compare);
   }
 
   return { roots, children, parents: resolved };

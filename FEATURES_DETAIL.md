@@ -526,6 +526,19 @@ weeks by **month**, with three rows of headers:
 
 The weeks start on **Sunday** and end on Saturday.
 
+### Ordering of the tasks
+
+Every task carries two orders: `kanban_order` for the Kanban view and
+`tree_gantt_order` for the tree view and the Gantt chart (the two share the
+same order). The smaller the number, the higher the task sits. Both are
+integers of at least zero.
+
+The views offer up and down buttons to reorder a task among its siblings.
+When a Kanban card is dropped on another column, its order is recomputed in
+the new column and both columns are renumbered. On load the orders are
+normalized to `0, 1, 2, ...` per parent (tree/Gantt) and per status (Kanban),
+and any value that changes is written back to the file.
+
 ### The range of the schedule
 
 The schedule always keeps **one full margin week** before the week holding
@@ -1033,7 +1046,7 @@ be entered with a double click.
 
 | Suite | What it covers |
 | ----- | -------------- |
-| `src/core/task.test.ts` | Format, parsing, serialization, round trip, tags, moving a task under another parent. |
+| `src/core/task.test.ts` | Format, parsing, serialization, round trip, tags, moving a task under another parent, the two orders. |
 | `src/core/pagination.test.ts` | Page count, clamping, slicing, page information. |
 | `src/core/taskTree.test.ts` | The tree of the tasks: roots, children, orphan tasks, cycles, focus, expansion, search and subtree of a task. |
 | `src/core/config.test.ts` | Configuration parsing and serialization, the kind of storage and its default. |

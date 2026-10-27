@@ -18,6 +18,7 @@ describe('renderKanbanBoard', () => {
       onDrop: () => undefined,
       onOpen: () => undefined,
       onEdit: () => undefined,
+      onReorder: () => undefined,
     });
 
     const columns = [...board.querySelectorAll('.kanban-column')];
@@ -51,6 +52,7 @@ describe('renderKanbanBoard', () => {
         onDrop: () => undefined,
         onOpen: () => undefined,
         onEdit: () => undefined,
+      onReorder: () => undefined,
       },
     );
 
@@ -71,6 +73,7 @@ describe('renderKanbanBoard', () => {
       onDrop: () => undefined,
       onOpen: () => undefined,
       onEdit: () => undefined,
+      onReorder: () => undefined,
     });
 
     const tags = board.querySelectorAll('.kanban-card .tag');
@@ -82,7 +85,7 @@ describe('renderKanbanBoard', () => {
     const doc = createDocument();
     const onOpen = vi.fn();
     const onEdit = vi.fn();
-    const board = renderKanbanBoard(doc, [card(1, 'todo')], { onDrop: () => undefined, onOpen, onEdit });
+    const board = renderKanbanBoard(doc, [card(1, 'todo')], { onDrop: () => undefined, onOpen, onEdit, onReorder: () => undefined });
 
     const element = board.querySelector('.kanban-card[data-task-id="1"]');
     const title = element?.querySelector<HTMLButtonElement>('.kanban-card-title');
@@ -90,8 +93,8 @@ describe('renderKanbanBoard', () => {
     expect(onOpen).toHaveBeenCalledWith(1);
 
     const actions = element?.querySelectorAll<HTMLButtonElement>('.kanban-card-action');
-    expect(actions).toHaveLength(2);
-    actions?.[1]?.click();
+    expect(actions).toHaveLength(4);
+    actions?.[3]?.click();
     expect(onEdit).toHaveBeenCalledWith(1);
   });
 
@@ -101,6 +104,7 @@ describe('renderKanbanBoard', () => {
       onDrop: () => undefined,
       onOpen: () => undefined,
       onEdit: () => undefined,
+      onReorder: () => undefined,
     });
 
     expect(board.querySelector('.kanban-card-title')?.textContent).toBe('Untitled task');

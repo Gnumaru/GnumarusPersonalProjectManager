@@ -47,6 +47,8 @@ export interface GanttHandlers {
   readonly onEdit: (id: number) => void;
   /** A child of the task is created. */
   readonly onAddChild: (id: number) => void;
+  /** Moves the task up or down among its siblings. */
+  readonly onReorder: (id: number, delta: -1 | 1) => void;
   /** A week is collapsed or expanded. */
   readonly onToggleWeek: (key: string) => void;
   /** A month is collapsed or expanded. */
@@ -186,6 +188,12 @@ function renderSideRow(
   });
 
   const actions = el(doc, 'div', { class: 'gantt-row-actions' }, [
+    actionButton(doc, 'up', 'Move the task up', () => {
+      handlers.onReorder(task?.id ?? row.id, -1);
+    }),
+    actionButton(doc, 'down', 'Move the task down', () => {
+      handlers.onReorder(task?.id ?? row.id, 1);
+    }),
     actionButton(doc, 'target', 'Focus the chart on this task', () => {
       handlers.onFocus(task?.id ?? row.id);
     }),
