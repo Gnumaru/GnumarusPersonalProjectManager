@@ -212,7 +212,7 @@ export class IdListField {
       this.resultsElement.style.display = 'none';
       return;
     }
-    this.resultsElement.style.display = '';
+    this.resultsElement.style.display = 'block';
     for (let index = 0; index < this.results.length; index += 1) {
       const candidate = this.results[index];
       if (candidate === undefined) {

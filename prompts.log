@@ -108,6 +108,15 @@ Na modal que permite editar uma tarefa, nos campos 'blocked by' e 'related tasks
 reduza o debounce da busca dinamica para um terço de segundo (333ms).
 embora a busca dinamica esteja funcionando e persistindo, a aparencia da lista exibida esta 'bruta' demais, muito 'espartana', e a selecao com as setas e escolha com enter/return esta funcionando mas nao existe nenhum feedback visual, precisa existir. e a modal de visualizar tarefa (sem editar) esta exibindo apenas o id das tarefas bloqueadoras e relacionadas, mas precisa exibir tambem os nomes das tarefas (truncado pra 64 caracteres)
 ====
+agora a lista da busca dinamica desapareceu por completo. mas a busca em si ainda funciona porque se eu faco uma busca, espero um instante e aperto enter, uma nova badge aparece no campo, o que indica que esta funcionando, apenas nao esta exibindo.
+====
+====
+====
+====
+====
+====
+====
+====
 ====
 ====
 As tarefas agora devem ter 'Type' e 'Role'. os tipos possiveis sao 'bug', 'improvement', 'feature' e os roles possiveis sao 'Graphics', 'Audio', 'Programming', 'Design', 'Assembly' e 'Management'. na modal de editar tarefa deve ser possivel visualizar e escolher o tipo e o papel da tarefa. Esses dados ficam armazenados nos metadados 'type' e 'role' do arquivo da tarefa.
