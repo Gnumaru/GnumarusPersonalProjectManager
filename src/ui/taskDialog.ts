@@ -2,14 +2,20 @@
 
 import {
   STATUS_LABELS,
+  TASK_ROLES,
   TASK_STATUSES,
+  TASK_TYPES,
   dateInputValue,
   dateInputValueOfDate,
   normalizeTags,
   timestampFromDateInput,
   type Task,
   type TaskInput,
+  type TaskRole,
   type TaskStatus,
+  type TaskType,
+  isTaskRole,
+  isTaskType,
 } from '../core/task.js';
 import { button, clear, el, formatTimestamp, input, select, textArea } from './dom.js';
 import type { TaskComment } from '../core/comment.js';
@@ -71,6 +77,8 @@ export class TaskDialog {
 
   private titleInput: HTMLInputElement | null = null;
   private statusSelect: HTMLSelectElement | null = null;
+  private typeSelect: HTMLSelectElement | null = null;
+  private roleSelect: HTMLSelectElement | null = null;
   private tagsInput: HTMLInputElement | null = null;
   private startInput: HTMLInputElement | null = null;
   private endInput: HTMLInputElement | null = null;
@@ -83,6 +91,8 @@ export class TaskDialog {
   private blockedByIds: number[];
   /** The ids of the tasks that are related to the task. */
   private relatedIds: number[];
+  private typeValue: TaskType;
+  private roleValue: TaskRole;
   /** The comments of the task, the most recent first. */
   private comments: readonly TaskComment[] = [];
   /** The comment that is being edited, `null` when none is. */
@@ -110,6 +120,8 @@ export class TaskDialog {
     this.onCancel = options.onCancel;
     this.blockedByIds = [...(options.task?.blockedBy ?? [])];
     this.relatedIds = [...(options.task?.related ?? [])];
+    this.typeValue = options.task?.type ?? 'feature';
+    this.roleValue = options.task?.role ?? 'Programming';
     this.parentId =
       options.task !== undefined
         ? options.task.parentId
@@ -169,6 +181,8 @@ export class TaskDialog {
   private renderView(task: Task): void {
     const rows: HTMLElement[] = [
       this.definitionRow('Status', STATUS_LABELS[task.status]),
+      this.definitionRow('Type', task.type ?? 'feature'),
+      this.definitionRow('Role', task.role ?? 'Programming'),
       this.definitionRow(
         'Tags',
         task.tags.length === 0 ? '—' : task.tags.map((tag) => `#${tag}`).join('  '),
@@ -360,6 +374,20 @@ export class TaskDialog {
       options: TASK_STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] })),
     });
 
+    this.typeSelect = select(this.doc, {
+      class: 'field-input',
+      id: 'task-type',
+      value: this.typeValue,
+      options: TASK_TYPES.map((type) => ({ value: type, label: type })),
+    });
+
+    this.roleSelect = select(this.doc, {
+      class: 'field-input',
+      id: 'task-role',
+      value: this.roleValue,
+      options: TASK_ROLES.map((role) => ({ value: role, label: role })),
+    });
+
     this.tagsInput = input(this.doc, {
       class: 'field-input',
       id: 'task-tags',
@@ -474,6 +502,16 @@ export class TaskDialog {
         el(this.doc, 'label', { class: 'field', attrs: { for: 'task-tags' } }, [
           el(this.doc, 'span', { class: 'field-label', text: 'Tags' }),
           this.tagsInput,
+        ]),
+      ]),
+      el(this.doc, 'div', { class: 'field-row' }, [
+        el(this.doc, 'label', { class: 'field', attrs: { for: 'task-type' } }, [
+          el(this.doc, 'span', { class: 'field-label', text: 'Type' }),
+          this.typeSelect,
+        ]),
+        el(this.doc, 'label', { class: 'field', attrs: { for: 'task-role' } }, [
+          el(this.doc, 'span', { class: 'field-label', text: 'Role' }),
+          this.roleSelect,
         ]),
       ]),
       el(this.doc, 'div', { class: 'field-row field-row-even' }, [
@@ -789,6 +827,12 @@ export class TaskDialog {
       ? (rawStatus as TaskStatus)
       : 'todo';
 
+    const rawType = this.typeSelect?.value ?? 'feature';
+    const type: TaskType = isTaskType(rawType) ? rawType : 'feature';
+
+    const rawRole = this.roleSelect?.value ?? 'Programming';
+    const role: TaskRole = isTaskRole(rawRole) ? rawRole : 'Programming';
+
     const start = timestampFromDateInput(this.startInput?.value ?? '');
     const end = timestampFromDateInput(this.endInput?.value ?? '');
     if (start.length > 0 && end.length > 0 && end < start) {
@@ -806,6 +850,8 @@ export class TaskDialog {
       blockedBy: this.blockedByIds,
       related: this.relatedIds,
       parentId: this.parentId,
+      type,
+      role,
     };
 
     try {

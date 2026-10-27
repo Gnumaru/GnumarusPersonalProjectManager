@@ -402,6 +402,8 @@ describe('serializeTask', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
+      type: 'feature' as const,
+      role: 'Programming' as const,
     };
 
     expect(serializeTask(task)).toBe(
@@ -414,6 +416,8 @@ describe('serializeTask', () => {
         'updated=20261020100000000',
         'start=20261020110000000',
         'end=20261021120000000',
+        'type=feature',
+        'role=Programming',
         'kanban_order=0',
         'tree_gantt_order=0',
         METADATA_SEPARATOR,
@@ -439,6 +443,8 @@ describe('serializeTask', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
+      type: 'feature' as const,
+      role: 'Programming' as const,
     };
     expect(serializeTask({ ...base, parentId: null })).not.toContain('parent=');
     expect(serializeTask({ ...base, parentId: 4 })).toContain('parent=4');
@@ -486,6 +492,8 @@ describe('serializeTask', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
+      type: 'feature' as const,
+      role: 'Programming' as const,
     };
     const expanded = withExpandedState(base, true);
     expect(expanded).toEqual({ ...base, expanded: true });
@@ -511,6 +519,8 @@ describe('serializeTask', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
+      type: 'feature' as const,
+      role: 'Programming' as const,
     };
     const seeded = withDefaultDates(task, now);
     expect(seeded.start).toBe(formatTaskTimestamp(new Date(2026, 4, 5, 0, 0, 0, 0)));
@@ -568,6 +578,8 @@ describe('serializeTask', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
+      type: 'feature' as const,
+      role: 'Programming' as const,
     };
     const content = serializeTask(task);
     expect(content).toContain('title=first second');
@@ -593,6 +605,8 @@ describe('round trip', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
+      type: 'feature' as const,
+      role: 'Programming' as const,
     };
 
     const parsed = parseTask(serializeTask(original));
@@ -616,6 +630,8 @@ describe('round trip', () => {
       expanded: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
+      type: 'feature' as const,
+      role: 'Programming' as const,
     };
     expect(parseTask(serializeTask(original))).toEqual(original);
   });

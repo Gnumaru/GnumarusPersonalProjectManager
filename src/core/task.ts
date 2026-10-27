@@ -89,6 +89,27 @@ export interface TaskCard {
   readonly path: string;
 }
 
+export const TASK_TYPES = ['bug', 'improvement', 'feature'] as const;
+export type TaskType = (typeof TASK_TYPES)[number];
+
+export const TASK_ROLES = [
+  'Graphics',
+  'Audio',
+  'Programming',
+  'Design',
+  'Assembly',
+  'Management',
+] as const;
+export type TaskRole = (typeof TASK_ROLES)[number];
+
+export function isTaskType(value: string): value is TaskType {
+  return (TASK_TYPES as readonly string[]).includes(value);
+}
+
+export function isTaskRole(value: string): value is TaskRole {
+  return (TASK_ROLES as readonly string[]).includes(value);
+}
+
 export interface Task {
   /** Unique incremental integer, also encoded in the file name. */
   readonly id: number;
@@ -116,6 +137,10 @@ export interface Task {
    * the Gantt views read it.
    */
   readonly expanded: boolean;
+  /** The kind of work the task represents. */
+  readonly type?: TaskType;
+  /** The role responsible for the task. */
+  readonly role?: TaskRole;
   /**
    * Order of the task among its siblings in the Kanban view.
    *
@@ -147,6 +172,10 @@ export interface TaskInput {
   readonly related: readonly number[];
   /** The parent of the task, when the editor changes it. */
   readonly parentId?: number | null;
+  /** The kind of work the task represents. */
+  readonly type?: TaskType;
+  /** The role responsible for the task. */
+  readonly role?: TaskRole;
 }
 
 export const EMPTY_TASK_INPUT: TaskInput = {
@@ -158,6 +187,8 @@ export const EMPTY_TASK_INPUT: TaskInput = {
   end: '',
   blockedBy: [],
   related: [],
+  type: 'feature',
+  role: 'Programming',
 };
 
 export function isTaskStatus(value: string): value is TaskStatus {
@@ -452,6 +483,8 @@ export function parseTask(content: string, idHint?: number): Task {
     blockedBy: parseIdList(metadata.get('blocked_by') ?? ''),
     related: parseIdList(metadata.get('related') ?? ''),
     expanded: (metadata.get('expanded') ?? '').trim().toLowerCase() === 'true',
+    type: isTaskType((metadata.get('type') ?? '').trim()) ? ((metadata.get('type') ?? '').trim() as TaskType) : 'feature',
+    role: isTaskRole((metadata.get('role') ?? '').trim()) ? ((metadata.get('role') ?? '').trim() as TaskRole) : 'Programming',
     kanbanOrder: normalizeOrder(metadata.get('kanban_order')),
     treeGanttOrder: normalizeOrder(metadata.get('tree_gantt_order')),
     description,
@@ -486,6 +519,8 @@ export function serializeTask(task: Task): string {
   if (task.expanded) {
     lines.push('expanded=true');
   }
+  lines.push(`type=${task.type ?? 'feature'}`);
+  lines.push(`role=${task.role ?? 'Programming'}`);
   lines.push(`kanban_order=${task.kanbanOrder ?? 0}`);
   lines.push(`tree_gantt_order=${task.treeGanttOrder ?? 0}`);
   lines.push(METADATA_SEPARATOR);
@@ -516,6 +551,8 @@ export function buildTask(
     blockedBy: [...input.blockedBy],
     related: [...input.related],
     expanded: false,
+    type: input.type ?? 'feature',
+    role: input.role ?? 'Programming',
     kanbanOrder: 0,
     treeGanttOrder: 0,
     description: input.description,
@@ -536,6 +573,8 @@ export function applyTaskInput(task: Task, input: TaskInput, now: Date): Task {
     related: [...input.related],
     updated: formatTaskTimestamp(now),
     description: input.description,
+    type: input.type ?? task.type ?? 'feature',
+    role: input.role ?? task.role ?? 'Programming',
     kanbanOrder: task.kanbanOrder ?? 0,
     treeGanttOrder: task.treeGanttOrder ?? 0,
   };

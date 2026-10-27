@@ -122,6 +122,7 @@ Na view gantt os botoes sao exibidos apenas quando o mouse passar por cima. isso
 ====
 As tarefas agora devem ter 'Type' e 'Role'. os tipos possiveis sao 'bug', 'improvement', 'feature' e os roles possiveis sao 'Graphics', 'Audio', 'Programming', 'Design', 'Assembly' e 'Management'. na modal de editar tarefa deve ser possivel visualizar e escolher o tipo e o papel da tarefa. Esses dados ficam armazenados nos metadados 'type' e 'role' do arquivo da tarefa.
 ====
+Na view gantt faça com que o nome das tarefas seja alinhado a esquerda. atualmente ele só alinha a esquerda se o texto fizer word wrap e tiver duas linhas. mas se o texto tiver uma unica linha ele fica centralizado.
 ====
 ====
 ====
