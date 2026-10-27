@@ -2051,10 +2051,12 @@ input[type='date'] {
 .gantt-row-name {
   flex: 1;
   min-width: 0;
+  display: block;
   padding: 2px 4px;
   font-size: 13px;
   font-weight: 550;
   text-align: left;
+  justify-content: flex-start;
   border: none;
   background: transparent;
   color: var(--text);

@@ -124,6 +124,7 @@ As tarefas agora devem ter 'Type' e 'Role'. os tipos possiveis sao 'bug', 'impro
 ====
 Na view gantt faça com que o nome das tarefas seja alinhado a esquerda. atualmente ele só alinha a esquerda se o texto fizer word wrap e tiver duas linhas. mas se o texto tiver uma unica linha ele fica centralizado.
 ====
+mude os tipos das tarefas para comecar com letra maiuscula (Bug, Improvement, Feature). Adicione o papel "Test"
 ====
 ====
 ====
