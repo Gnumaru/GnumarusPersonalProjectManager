@@ -128,6 +128,7 @@ mude os tipos das tarefas para comecar com letra maiuscula (Bug, Improvement, Fe
 ====
 faça com que o campo de tags da modal de editar tarefa funcione de forma similar aos campos blocked by e related tasks: o usuario digita e ao apertar enter o texto vira badge. tags nao podem ter espaço em branco entao se o usuario digitar, por exemplo, duas palavras separadas por espaço, ao apertar enter elas virarão duas badges ordenadas alfabeticamente.
 ====
+em qualquer view, quando eu edito uma tarefa e adiciono um comentario, a contagem de comentarios nao é atualizada para aquela view. mas se eu mudo pra outra view a contagem atualiza. quero que a contagem dos comentarios atualize imediatamente na view atual ao fechar a modal.
 ====
 
 ====
@@ -136,7 +137,7 @@ faça com que o campo de tags da modal de editar tarefa funcione de forma simila
 ====
 ====
 ====
-em qualquer view, quando eu edito uma tarefa e adiciono um comentario, a contagem de comentarios nao é atualizada para aquela view. mas se eu mudo pra outra view a contagem atualiza.
+
 ====
 
 ====

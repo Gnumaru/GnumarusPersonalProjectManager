@@ -1888,7 +1888,14 @@ export class App
     await this.updateTaskFields(taskId, (task) => withDates(task, start, end, new Date()));
   }
 
-  /** The path of the file of a task, relative to the project folder. */
+  private async refreshCommentCounts(): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      return;
+    }
+    this.commentCounts = new Map(await store.commentCounts().catch(() => new Map<number, number>()));
+    this.renderCurrentView();
+  }
   private pathOfTask(taskId: number): string {
     return (
       this.treeHierarchy?.paths.get(taskId) ?? this.store?.taskPath(taskId) ?? `task_${taskId}.txt`
@@ -2993,6 +3000,9 @@ export class App
       },
       onDeleteComment: async (taskId, commentId) => {
         await this.deleteTaskComment(taskId, commentId);
+      },
+      onClose: () => {
+        void this.refreshCommentCounts();
       },
     });
     dialog.open();

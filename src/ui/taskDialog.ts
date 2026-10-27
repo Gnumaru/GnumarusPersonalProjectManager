@@ -53,6 +53,8 @@ export interface TaskDialogOptions {
   /** Deletes a comment. */
   readonly onDeleteComment?: ((taskId: number, commentId: number) => Promise<void>) | undefined;
   readonly onCancel?: (() => void) | undefined;
+  /** Called when the dialog is closed. */
+  readonly onClose?: (() => void | Promise<void>) | undefined;
 }
 
 export class TaskDialog {
@@ -74,6 +76,7 @@ export class TaskDialog {
     | undefined;
   private readonly onDeleteComment: ((taskId: number, commentId: number) => Promise<void>) | undefined;
   private readonly onCancel: (() => void) | undefined;
+  private readonly onCloseCallback: (() => void | Promise<void>) | undefined;
   private readonly modal: Modal;
 
   private titleInput: HTMLInputElement | null = null;
@@ -120,6 +123,7 @@ export class TaskDialog {
     this.onUpdateComment = options.onUpdateComment;
     this.onDeleteComment = options.onDeleteComment;
     this.onCancel = options.onCancel;
+    this.onCloseCallback = options.onClose;
     this.blockedByIds = [...(options.task?.blockedBy ?? [])];
     this.relatedIds = [...(options.task?.related ?? [])];
     this.tagValues = [...(options.task?.tags ?? [])];
@@ -143,6 +147,7 @@ export class TaskDialog {
     this.modal = new Modal({ doc: this.doc, title, className: 'task-dialog' });
     this.modal.onClose(() => {
       this.onCancel?.();
+      void this.onCloseCallback?.();
     });
     this.render();
   }
