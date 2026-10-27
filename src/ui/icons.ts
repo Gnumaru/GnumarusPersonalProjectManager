@@ -18,6 +18,7 @@ const ICON_PATHS: Readonly<Record<string, string>> = {
   forward: '<path d="M8.6 4.6 16 12l-7.4 7.4L7.2 18l6-6-6-6 1.4-1.4Z"/>',
   first: '<path d="M11.5 18 5 12l6.5-6v12Zm6.5 0L11 12l7-6v12Z"/>',
   last: '<path d="M12.5 18 19 12l-6.5-6v12Zm-6.5 0L13 12 6 6v12Z"/>',
+  up: '<path d="M11 20V7.8L6.4 12.4 5 11l7-7 7 7-1.4 1.4L13 7.8V20h-2Z"/>',
   down: '<path d="M13 4v12.2l4.6-4.6L19 13l-7 7-7-7 1.4-1.4L11 16.2V4h2Z"/>',
   refresh:
     '<path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7Z"/>',
