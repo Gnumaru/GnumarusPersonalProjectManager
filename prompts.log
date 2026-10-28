@@ -134,6 +134,7 @@ na modal de editar tarefa, tanto na caixa de texto que permite adicionar um come
 ====
 na view kanban, em cada card crie um checkbox para esconder a tarefa. isso será um novo metadado booleano da task chamado kanban_hidden. cada coluna terá um checkbox para exibir cards ocultos, que fica desabilitado por padrão. ao habilitar os cards ocultos são exibidos, ao desabilitar eles voltam a ficar ocultos. deve haver tambem um checkbox global para exibir todos os cards ocultos. se estiver marcado todos os cards ocultos de todas as colunas devem ser exibidos independente do checkbox da coluna. se estiver desmarcado só são exibidos segundo o valor do checkbox da coluna.
 ====
+na modal de edicao de tarefa, na caixa de texto de descricao, faça com que ctrl+enter e ctrl+return salvem e a tarefa e fechem a modal
 ====
 ====
 ====
