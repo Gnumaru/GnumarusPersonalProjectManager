@@ -8,7 +8,9 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
-- All planned batches (1-29) are implemented.
+- All planned batches (1-30) are implemented.
+- Batch 30 moves the search shortcut to Ctrl+Shift+F so plain Ctrl+F stays
+  with the browser find-in-page.
 - Batch 29 halves the Gantt indent to 4.5px per level and uses the same
   indent in the tree view.
 - Batch 28 dims tree and Gantt rows with status `planning`, `done` or
@@ -23,7 +25,7 @@ plain text file on the local disk, accessed exclusively through the
   same view.
 - Batch 23 persists the Kanban show-hidden toggles in a `config.txt` file in
   the project folder, written as `key=value` metadata with no description section.
-- Verification: 456 unit tests pass.
+- Verification: 459 unit tests pass.
 - Batch 22 adds hidden tasks on the Kanban board: `kanban_hidden` metadata, a
   hide checkbox on every card, a show-hidden checkbox per column and a global one.
 - Batch 21 adds task ordering: `kanban_order` and `tree_gantt_order` metadata,

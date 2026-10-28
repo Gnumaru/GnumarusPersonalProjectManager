@@ -1079,7 +1079,7 @@ be entered with a double click.
   and the keyboard, and it adapts to narrower or shorter windows (the tag
   column and the updated column disappear first, the toolbar wraps).
 * Both colour schemes are supported (`prefers-color-scheme`).
-* Shortcuts: `Ctrl+F` focuses the search box, `Enter` searches, `Escape`
+* Shortcuts: `Ctrl+Shift+F` focuses the search box, `Enter` searches, `Escape`
   clears the search, `Escape` closes a dialog.
 
 ---

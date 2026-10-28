@@ -369,6 +369,41 @@ describe('App', () => {
     harness.app.dispose();
   });
 
+  it('focuses the search with ctrl+shift+f, leaving plain ctrl+f to the browser', async () => {
+    const harness = await createHarness(25);
+    await selectFolder(harness);
+
+    const search = harness.root.querySelector<HTMLInputElement>('#search-input');
+    expect(search).not.toBeNull();
+    if (search === null) {
+      return;
+    }
+
+    // Plain Ctrl+F is the find-in-page of the browser: the app ignores it.
+    search.blur();
+    harness.doc.dispatchEvent(
+      new harness.dom.window.KeyboardEvent('keydown', {
+        key: 'f',
+        ctrlKey: true,
+        bubbles: true,
+      }),
+    );
+    expect(harness.doc.activeElement).not.toBe(search);
+
+    // Ctrl+Shift+F focuses the search box of the app.
+    harness.doc.dispatchEvent(
+      new harness.dom.window.KeyboardEvent('keydown', {
+        key: 'F',
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+      }),
+    );
+    expect(harness.doc.activeElement).toBe(search);
+
+    harness.app.dispose();
+  });
+
   it('searches the tasks recursively', async () => {
     const harness = await createHarness(25);
     await selectFolder(harness);

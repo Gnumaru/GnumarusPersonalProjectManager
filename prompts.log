@@ -150,7 +150,9 @@ nas views tree e gantt faca com que tarefas com status planning, done e canceled
 ====
 na view gantt faca o recuo das tarefas filhas em relacao ao pai ficar metade do que é hoje. e use o mesmo recuo na view tree
 ====
+crie um novo tipo de role de tarefa chamado 'Research'
 ====
+atualmente o atalho para a busca é ctrl+f. eu quero que mude para ctrl+shift+f para que o usuario ainda possa usar a busca normal do navegador.
 ====
 ====
 ====

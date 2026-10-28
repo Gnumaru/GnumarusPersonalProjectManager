@@ -173,7 +173,7 @@ list or as a tree.
 | **The scroll of the picker is kept when an item is clicked** | Done | `src/ui/fileDialog.ts` |
 | Responsive, desktop first layout (1366x768 and above) | Done | `src/styles.css` |
 | Light and dark colour schemes | Done | `src/styles.css` |
-| Keyboard shortcuts (`Ctrl+F` focuses the search, `Enter` searches, `Esc` clears) | Done | `src/ui/app.ts` |
+| Keyboard shortcuts (`Ctrl+Shift+F` focuses the search, `Enter` searches, `Esc` clears) | Done | `src/ui/app.ts` |
 | Toasts for the feedback of every action | Done | `src/ui/toast.ts` |
 | Works at the domain root and at any nested path | Done | `vite.config.ts` (`base: './'`) |
 

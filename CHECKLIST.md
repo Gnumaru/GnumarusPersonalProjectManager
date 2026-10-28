@@ -1,5 +1,22 @@
 # Checklist
 
+## Batch 30 - Search shortcut is Ctrl+Shift+F
+
+### Change
+
+- [x] The global shortcut focuses the search on Ctrl+Shift+F (Cmd+Shift+F),
+      leaving plain Ctrl+F to the browser find-in-page (`src/ui/app.ts`)
+
+### Tests
+
+- [x] `src/ui/app.test.ts` - Ctrl+Shift+F focuses, plain Ctrl+F is ignored
+
+### Build / deploy
+
+- [x] `npm run typecheck`, `npm test` (459 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 29 - Shared 4.5px indent in tree and Gantt
 
 ### Change

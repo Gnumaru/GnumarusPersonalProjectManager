@@ -3575,7 +3575,13 @@ export class App
   private readonly handleGlobalKeyDown = (event: KeyboardEvent): void => {
     const target = event.target;
     const isTyping = isTextEntry(target);
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+    // Ctrl+Shift+F (Cmd+Shift+F on macOS): plain Ctrl+F is left for the
+    // find-in-page of the browser.
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.shiftKey &&
+      event.key.toLowerCase() === 'f'
+    ) {
       event.preventDefault();
       this.searchInput.focus();
       this.searchInput.select();
