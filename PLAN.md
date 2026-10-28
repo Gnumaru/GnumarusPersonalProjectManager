@@ -8,7 +8,9 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
-- All planned batches (1-28) are implemented.
+- All planned batches (1-29) are implemented.
+- Batch 29 halves the Gantt indent to 4.5px per level and uses the same
+  indent in the tree view.
 - Batch 28 dims tree and Gantt rows with status `planning`, `done` or
   `canceled`, like hidden tasks.
 - Batch 27 fixes stale tree rows after editing: saving a task invalidates its

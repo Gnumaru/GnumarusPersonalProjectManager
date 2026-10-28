@@ -8,6 +8,7 @@
 
 import type { Task } from '../core/task.js';
 import { isDimmedStatus } from '../core/task.js';
+import { GANTT_INDENT_PX } from './ganttView.js';
 import type { TreeRow } from '../core/taskTree.js';
 import { el } from './dom.js';
 import { createIcon } from './icons.js';
@@ -31,8 +32,8 @@ export interface TreeViewHandlers {
   readonly onToggleHidden: (task: Task, hidden: boolean) => void;
 }
 
-/** Width of one level of indentation, in pixels. */
-export const TREE_INDENT_PX = 20;
+/** Width of one level of indentation, in pixels: the same as the Gantt chart. */
+export const TREE_INDENT_PX = GANTT_INDENT_PX;
 
 /** Builds one row per task of the tree. */
 export function renderTreeRows(

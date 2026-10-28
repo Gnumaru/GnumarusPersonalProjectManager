@@ -1295,14 +1295,14 @@ async function runChecks() {
     `${ganttScroll.before} -> ${ganttScroll.after} (${ganttScroll.scrolled}px)`,
   );
 
-  // The indentation is half of the one of the tree view: 9 pixels per level.
+  // The indentation matches the one of the tree view: 4.5 pixels per level.
   const ganttIndents = await evaluate(`(() => ({
     root: document.querySelector('.gantt-row[data-task-id="1"] .gantt-indent')?.style.width ?? '',
     child: document.querySelector('.gantt-row[data-task-id="13"] .gantt-indent')?.style.width ?? '',
   }))()`);
   check(
-    ganttIndents.root === '0px' && ganttIndents.child === '9px',
-    'the indentation of the Gantt chart is half of the tree view',
+    ganttIndents.root === '0px' && ganttIndents.child === '4.5px',
+    'the indentation of the Gantt chart matches the tree view',
     `${ganttIndents.root} / ${ganttIndents.child}`,
   );
 

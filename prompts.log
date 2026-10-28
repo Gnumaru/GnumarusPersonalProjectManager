@@ -148,6 +148,7 @@ na view tree, quando eu edito o titulo de uma tarefa e salvo, ao fechar a modal 
 ====
 nas views tree e gantt faca com que tarefas com status planning, done e canceled fiquem transparentes igual atualmente acontece pra tarefas escondidas
 ====
+na view gantt faca o recuo das tarefas filhas em relacao ao pai ficar metade do que é hoje. e use o mesmo recuo na view tree
 ====
 ====
 ====

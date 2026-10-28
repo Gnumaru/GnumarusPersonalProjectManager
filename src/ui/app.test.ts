@@ -2216,7 +2216,7 @@ describe('App and the Gantt chart', () => {
     harness.app.dispose();
   });
 
-  it('indents the rows of the chart by half of the indentation of the tree', async () => {
+  it('indents the rows of the chart like the rows of the tree', async () => {
     const harness = await createGanttHarness();
     await switchToGantt(harness);
 
@@ -2225,7 +2225,7 @@ describe('App and the Gantt chart', () => {
     click(harness.root.querySelector<HTMLButtonElement>('.gantt-twisty'));
     await flush();
 
-    expect(ganttRow(harness, 2)?.querySelector<HTMLElement>('.gantt-indent')?.style.width).toBe('9px');
+    expect(ganttRow(harness, 2)?.querySelector<HTMLElement>('.gantt-indent')?.style.width).toBe('4.5px');
 
     harness.app.dispose();
   });

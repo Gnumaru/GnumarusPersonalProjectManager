@@ -60,7 +60,7 @@ export interface GanttHandlers {
 }
 
 /** Width of one level of indentation of the chart, in pixels. */
-export const GANTT_INDENT_PX = 9;
+export const GANTT_INDENT_PX = 4.5;
 
 export interface GanttViewOptions {
   readonly doc: Document;

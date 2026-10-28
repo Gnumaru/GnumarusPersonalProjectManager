@@ -14,6 +14,7 @@ import {
   type GanttHandlers,
   type GanttTask,
 } from './ganttView.js';
+import { TREE_INDENT_PX } from './taskTreeView.js';
 
 function createDocument(): Document {
   return new JSDOM('<!doctype html><html><body></body></html>').window.document;
@@ -131,8 +132,10 @@ describe('renderGanttView', () => {
     );
 
     const indents = [...view.querySelectorAll<HTMLElement>('.gantt-indent')];
-    expect(GANTT_INDENT_PX).toBe(9);
-    expect(indents.map((indent) => indent.style.width)).toEqual(['0px', '9px', '18px']);
+    expect(GANTT_INDENT_PX).toBe(4.5);
+    // The tree view shares the indent of the chart.
+    expect(TREE_INDENT_PX).toBe(GANTT_INDENT_PX);
+    expect(indents.map((indent) => indent.style.width)).toEqual(['0px', '4.5px', '9px']);
   });
 
   it('offers the focus and the add-child actions, like the tree view', () => {

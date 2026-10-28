@@ -1,5 +1,23 @@
 # Checklist
 
+## Batch 29 - Shared 4.5px indent in tree and Gantt
+
+### Change
+
+- [x] Gantt indent halved from 9px to 4.5px per level
+- [x] Tree view uses the same 4.5px indent (`TREE_INDENT_PX = GANTT_INDENT_PX`)
+
+### Tests
+
+- [x] `src/ui/ganttView.test.ts` - new indent values, shared indent
+- [x] `src/ui/app.test.ts` - new indent values
+
+### Build / deploy
+
+- [x] `npm run typecheck`, `npm test` (456 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 28 - Dimmed planning/done/canceled rows in tree and Gantt
 
 ### Change
