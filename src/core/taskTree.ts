@@ -154,6 +154,37 @@ export function childrenOf(tree: TaskTree, id: number): readonly number[] {
 }
 
 /**
+ * Drops the hidden rows of a flattened tree, with their whole subtree.
+ *
+ * The rows come in depth-first order: a hidden row hides every row that
+ * follows it until the depth goes back to its own level or above.
+ */
+export function visibleTreeRows(
+  rows: readonly TreeRow[],
+  hidden: ReadonlySet<number>,
+): TreeRow[] {
+  if (hidden.size === 0) {
+    return [...rows];
+  }
+  const visible: TreeRow[] = [];
+  let hiddenDepth = -1;
+  for (const row of rows) {
+    if (hiddenDepth >= 0) {
+      if (row.depth > hiddenDepth) {
+        continue;
+      }
+      hiddenDepth = -1;
+    }
+    if (hidden.has(row.id)) {
+      hiddenDepth = row.depth;
+      continue;
+    }
+    visible.push(row);
+  }
+  return visible;
+}
+
+/**
  * A task and all its descendants, from the task down to the deepest ones.
  *
  * The traversal keeps the ids it has already visited, so a cycle can never

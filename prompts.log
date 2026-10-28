@@ -140,10 +140,11 @@ salve configuracoes globais da aplicacao em um arquivo config.txt no mesmo diret
 ====
 guarde na config global a view que o usuario estava, para quando ele abrir o app retornar na mesma view
 ====
-
+persista na config global a tarefa que o usuario deu foco em cada view, para quando ele recarregar a pagina o foco retornar exatamente como antes
 ====
-
+as views tree e gantt também devem ter funcionalidade pra esconder tasks igual as da view kanban, com a unica diferenca que so existe o checkbox global pra esconder e mostrar tarefas ja que nao existem colunas por status.
 ====
+na view tree, quando eu edito o titulo de uma tarefa e salvo, ao fechar a modal o titulo que aparece na tree ainda é o antigo. e ao editar a tarefa o titulo continua o antigo. mas a edicao persiste porque se eu editar, salvar e recarregar, vejo o titulo novo.
 ====
 ====
 ====

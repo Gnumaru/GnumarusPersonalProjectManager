@@ -34,6 +34,8 @@ export interface GanttTask {
   readonly endDay: number | null;
   /** `true` when the task has children. */
   readonly hasChildren: boolean;
+  /** `true` when the row is hidden in the tree and the chart. */
+  readonly hidden: boolean;
 }
 
 export interface GanttHandlers {
@@ -49,6 +51,8 @@ export interface GanttHandlers {
   readonly onAddChild: (id: number) => void;
   /** Moves the task up or down among its siblings. */
   readonly onReorder: (id: number, delta: -1 | 1) => void;
+  /** Hides a task or shows it again. */
+  readonly onToggleHidden: (id: number, hidden: boolean) => void;
   /** A week is collapsed or expanded. */
   readonly onToggleWeek: (key: string) => void;
   /** A month is collapsed or expanded. */
@@ -187,6 +191,23 @@ function renderSideRow(
     handlers.onOpen(task?.id ?? row.id);
   });
 
+  const hideCheckbox = doc.createElement('input');
+  hideCheckbox.type = 'checkbox';
+  hideCheckbox.className = 'gantt-hide-checkbox';
+  hideCheckbox.checked = task?.hidden === true;
+  hideCheckbox.title = task?.hidden === true ? 'Show this task' : 'Hide this task';
+  hideCheckbox.setAttribute(
+    'aria-label',
+    task?.hidden === true ? `Show task #${row.id}` : `Hide task #${row.id}`,
+  );
+  hideCheckbox.addEventListener('change', () => {
+    handlers.onToggleHidden(task?.id ?? row.id, hideCheckbox.checked);
+  });
+  const hideToggle = el(doc, 'label', { class: 'gantt-hide-label', title: 'Hide this task' }, [
+    hideCheckbox,
+    el(doc, 'span', { text: 'Hide' }),
+  ]);
+
   const actions = el(doc, 'div', { class: 'gantt-row-actions' }, [
     actionButton(doc, 'up', 'Move the task up', () => {
       handlers.onReorder(task?.id ?? row.id, -1);
@@ -216,9 +237,14 @@ function renderSideRow(
       }),
     );
   }
-  nameElements.push(name, actions);
+  nameElements.push(name, hideToggle, actions);
 
-  const element = el(doc, 'div', { class: 'gantt-row' }, nameElements);
+  const element = el(
+    doc,
+    'div',
+    { class: `gantt-row${task?.hidden === true ? ' is-hidden' : ''}` },
+    nameElements,
+  );
   element.dataset['taskId'] = String(row.id);
   element.dataset['depth'] = String(row.depth);
   return element;

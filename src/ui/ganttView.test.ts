@@ -45,6 +45,7 @@ function createTasks(layout: GanttLayout): ReadonlyMap<number, GanttTask> {
         startDay: 0,
         endDay: 4,
         hasChildren: true,
+        hidden: false,
       },
     ],
     [
@@ -57,6 +58,7 @@ function createTasks(layout: GanttLayout): ReadonlyMap<number, GanttTask> {
         startDay: 1,
         endDay: 2,
         hasChildren: true,
+        hidden: false,
       },
     ],
     [
@@ -69,6 +71,7 @@ function createTasks(layout: GanttLayout): ReadonlyMap<number, GanttTask> {
         startDay: 2,
         endDay: 3,
         hasChildren: false,
+        hidden: false,
       },
     ],
   ]);
@@ -80,16 +83,19 @@ function createHandlers(): {
   readonly onAddChild: ReturnType<typeof vi.fn>;
   readonly onEdit: ReturnType<typeof vi.fn>;
   readonly onReorder: ReturnType<typeof vi.fn>;
+  readonly onToggleHidden: ReturnType<typeof vi.fn>;
 } {
   const onFocus = vi.fn();
   const onAddChild = vi.fn();
   const onEdit = vi.fn();
   const onReorder = vi.fn();
+  const onToggleHidden = vi.fn();
   return {
     onFocus,
     onAddChild,
     onEdit,
     onReorder,
+    onToggleHidden,
     handlers: {
       onToggle: vi.fn(),
       onFocus,
@@ -97,6 +103,7 @@ function createHandlers(): {
       onEdit,
       onAddChild,
       onReorder,
+      onToggleHidden,
       onToggleWeek: vi.fn(),
       onToggleMonth: vi.fn(),
     },
@@ -154,6 +161,34 @@ describe('renderGanttView', () => {
     expect(onFocus).toHaveBeenCalledWith(2);
     expect(onEdit).toHaveBeenCalledWith(2);
     expect(onAddChild).toHaveBeenCalledWith(2);
+  });
+
+  it('hides a row through its checkbox', () => {
+    const doc = createDocument();
+    const schedule = createSchedule();
+    const layout = createLayout(schedule);
+    const { handlers, onToggleHidden } = createHandlers();
+    const tasks = new Map(createTasks(layout));
+    const hidden = tasks.get(2);
+    if (hidden !== undefined) {
+      tasks.set(2, { ...hidden, hidden: true });
+    }
+    const view = renderGanttView({ doc, rows, tasks, schedule, layout }, handlers);
+
+    const row = view.querySelector<HTMLElement>('.gantt-row[data-task-id="2"]');
+    expect(row?.classList.contains('is-hidden')).toBe(true);
+    const checkbox = row?.querySelector<HTMLInputElement>('.gantt-hide-checkbox');
+    expect(checkbox?.checked).toBe(true);
+    if (checkbox === null || checkbox === undefined) {
+      return;
+    }
+    checkbox.checked = false;
+    const viewWindow = checkbox.ownerDocument.defaultView;
+    if (viewWindow === null) {
+      return;
+    }
+    checkbox.dispatchEvent(new viewWindow.Event('change', { bubbles: true }));
+    expect(onToggleHidden).toHaveBeenCalledWith(2, false);
   });
 
   it('keeps every name row and its chart row on the same line of the grid', () => {

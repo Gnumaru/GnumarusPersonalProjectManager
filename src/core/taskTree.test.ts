@@ -6,6 +6,7 @@ import {
   flattenTaskTree,
   parentOf,
   subtreeOf,
+  visibleTreeRows,
 } from './taskTree.js';
 
 function hierarchy(entries: readonly (readonly [number, number | null])[]): Map<number, number | null> {
@@ -232,5 +233,37 @@ describe('flattenTaskTree', () => {
     });
 
     expect(rows.length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('visibleTreeRows', () => {
+  function rows(): ReturnType<typeof flattenTaskTree> {
+    const tree = buildTaskTree(
+      hierarchy([
+        [1, null],
+        [2, 1],
+        [3, 2],
+        [4, 1],
+        [5, null],
+      ]),
+    );
+    return flattenTaskTree(tree, { focusId: null, expanded: new Set([1, 2]) });
+  }
+
+  it('keeps every row when nothing is hidden', () => {
+    expect(rows().map((row) => row.id)).toEqual([1, 2, 3, 4, 5]);
+    expect(visibleTreeRows(rows(), new Set()).map((row) => row.id)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('drops a hidden row with its whole subtree', () => {
+    expect(visibleTreeRows(rows(), new Set([2])).map((row) => row.id)).toEqual([1, 4, 5]);
+  });
+
+  it('drops a hidden root with its whole subtree', () => {
+    expect(visibleTreeRows(rows(), new Set([1])).map((row) => row.id)).toEqual([5]);
+  });
+
+  it('keeps the siblings of a hidden leaf', () => {
+    expect(visibleTreeRows(rows(), new Set([4])).map((row) => row.id)).toEqual([1, 2, 3, 5]);
   });
 });

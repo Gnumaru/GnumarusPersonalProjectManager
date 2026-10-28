@@ -26,6 +26,8 @@ export interface TreeViewHandlers {
   readonly onAddChild: (task: Task) => void;
   /** Moves the task up or down among its siblings. */
   readonly onReorder: (task: Task, delta: -1 | 1) => void;
+  /** Hides a task or shows it again. */
+  readonly onToggleHidden: (task: Task, hidden: boolean) => void;
 }
 
 /** Width of one level of indentation, in pixels. */
@@ -109,6 +111,23 @@ function renderTreeRow(
     tags.append(el(doc, 'span', { class: 'tag', text: tag }));
   }
 
+  const hideCheckbox = doc.createElement('input');
+  hideCheckbox.type = 'checkbox';
+  hideCheckbox.className = 'tree-hide-checkbox';
+  hideCheckbox.checked = task.treeGanttHidden === true;
+  hideCheckbox.title = task.treeGanttHidden === true ? 'Show this task' : 'Hide this task';
+  hideCheckbox.setAttribute(
+    'aria-label',
+    task.treeGanttHidden === true ? `Show task #${task.id}` : `Hide task #${task.id}`,
+  );
+  hideCheckbox.addEventListener('change', () => {
+    handlers.onToggleHidden(task, hideCheckbox.checked);
+  });
+  const hideToggle = el(doc, 'label', { class: 'tree-hide-label', title: 'Hide this task' }, [
+    hideCheckbox,
+    el(doc, 'span', { text: 'Hide' }),
+  ]);
+
   const actions = el(doc, 'span', { class: 'tree-actions' }, [
     actionButton(doc, 'up', 'Move the task up', () => {
       handlers.onReorder(task, -1);
@@ -134,8 +153,13 @@ function renderTreeRow(
   if (commentBadge !== null) {
     elements.push(commentBadge);
   }
-  elements.push(title, tags, actions);
-  const element = el(doc, 'div', { class: 'tree-row' }, elements);
+  elements.push(title, tags, hideToggle, actions);
+  const element = el(
+    doc,
+    'div',
+    { class: `tree-row${task.treeGanttHidden === true ? ' is-hidden' : ''}` },
+    elements,
+  );
   element.dataset['taskId'] = String(task.id);
   element.dataset['depth'] = String(row.depth);
   return element;

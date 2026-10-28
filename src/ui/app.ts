@@ -65,6 +65,7 @@ import {
   flattenTaskTree,
   parentOf,
   subtreeOf,
+  visibleTreeRows,
   type TaskTree,
   type TreeRow,
 } from '../core/taskTree.js';
@@ -90,6 +91,7 @@ import {
   withDefaultDates,
   withExpandedState,
   withKanbanHidden,
+  withTreeGanttHidden,
   withParent,
   withStatus,
   type Task,
@@ -255,6 +257,8 @@ export class App
   private kanbanShowAllHidden = false;
   /** Per column toggle for the hidden cards, `false` when absent. */
   private kanbanShowHiddenByStatus = new Map<TaskStatus, boolean>();
+  /** When `true`, the hidden tasks of the tree and the Gantt are shown. */
+  private treeGanttShowHidden = false;
   /** The metadata of the tasks, read for the Gantt chart. */
   private ganttMetadata = new Map<number, TaskSummary>();
   /** The weeks and the months that are collapsed in the Gantt chart. */
@@ -1375,6 +1379,8 @@ export class App
       return;
     }
     await this.normalizeTreeGanttOrders();
+    const visibility = await this.loadGlobalConfig();
+    this.treeGanttShowHidden = visibility.treeGanttShowHidden;
     const summaries = await store.listTasks();
     this.applyHierarchy(summaries);
     await this.seedTaskDates(summaries);
@@ -1497,20 +1503,22 @@ export class App
     return this.loadGlobalConfig();
   }
 
-  /** Writes the global settings back to `config.txt`. */
-  private async persistGlobalConfig(): Promise<void> {
+  /** Writes the global settings back to `config.txt`, changing only the given fields. */
+  private async persistGlobalConfig(patch: Partial<GlobalConfig>): Promise<void> {
     const store = this.store;
     if (store === null) {
       return;
     }
     try {
+      const current = await this.loadGlobalConfig();
       await store.writeAppConfig(
         serializeGlobalConfig({
-          view: this.viewMode,
-          focusTree: this.treeFocusId,
-          focusGantt: this.treeFocusId,
-          showAllHidden: this.kanbanShowAllHidden,
-          showHiddenByStatus: this.kanbanShowHiddenByStatus,
+          view: patch.view ?? current.view,
+          focusTree: patch.focusTree ?? current.focusTree,
+          focusGantt: patch.focusGantt ?? current.focusGantt,
+          showAllHidden: patch.showAllHidden ?? current.showAllHidden,
+          showHiddenByStatus: patch.showHiddenByStatus ?? current.showHiddenByStatus,
+          treeGanttShowHidden: patch.treeGanttShowHidden ?? current.treeGanttShowHidden,
         }),
       );
     } catch {
@@ -1520,7 +1528,10 @@ export class App
 
   /** Writes the Kanban show-hidden toggles back to `config.txt`. */
   private async persistKanbanVisibility(): Promise<void> {
-    await this.persistGlobalConfig();
+    await this.persistGlobalConfig({
+      showAllHidden: this.kanbanShowAllHidden,
+      showHiddenByStatus: this.kanbanShowHiddenByStatus,
+    });
   }
   /**
    * Reads the metadata of the tasks for the Gantt chart.
@@ -1535,6 +1546,8 @@ export class App
       return;
     }
     await this.normalizeTreeGanttOrders();
+    const visibility = await this.loadGlobalConfig();
+    this.treeGanttShowHidden = visibility.treeGanttShowHidden;
     const summaries = await store.listTasks();
     const seededDates = await this.seedTaskDates(summaries);
     this.applyHierarchy(summaries);
@@ -1816,8 +1829,11 @@ export class App
   private renderTree(): void {
     this.renderTreeHeader();
 
+    const rows = this.treeGanttShowHidden
+      ? this.treeRows
+      : visibleTreeRows(this.treeRows, this.hiddenTreeIds());
     clear(this.treeRowsElement);
-    for (const row of renderTreeRows(this.doc, this.treeRows, this.treeTasks, {
+    for (const row of renderTreeRows(this.doc, rows, this.treeTasks, {
       onToggle: (id, recursive) => {
         void this.toggleTreeNode(id, recursive);
       },
@@ -1836,13 +1852,67 @@ export class App
       onReorder: (task, delta) => {
         void this.moveTaskTree(task.id, delta);
       },
+      onToggleHidden: (task, hidden) => {
+        void this.setTreeGanttHidden(task.id, hidden);
+      },
     }, this.commentCounts)) {
       this.treeRowsElement.append(row);
     }
 
-    this.updateEmptyState(this.treeRows.length === 0);
+    this.updateEmptyState(rows.length === 0);
     this.resultCountElement.textContent = this.buildResultCount();
     this.updateToolbarState();
+  }
+
+  /** The ids of the tasks hidden in the tree view and the Gantt chart. */
+  private hiddenTreeIds(): Set<number> {
+    const hidden = new Set<number>();
+    for (const [id, task] of this.treeTasks) {
+      if (task.treeGanttHidden === true) {
+        hidden.add(id);
+      }
+    }
+    return hidden;
+  }
+
+  /** The ids of the Gantt rows hidden in the chart. */
+  private hiddenGanttIds(): Set<number> {
+    const hidden = new Set<number>();
+    for (const [id, task] of this.ganttMetadata) {
+      if (task.treeGanttHidden) {
+        hidden.add(id);
+      }
+    }
+    return hidden;
+  }
+
+  /**
+   * Writes the `tree_gantt_hidden=` key of the file of a task.
+   *
+   * Like the expanded state, it is a view preference: the write is silent and
+   * follows the change of the screen.
+   */
+  private async setTreeGanttHidden(taskId: number, hidden: boolean): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      return;
+    }
+    const treeTask = this.treeTasks.get(taskId);
+    if (treeTask !== undefined) {
+      this.treeTasks.set(taskId, { ...treeTask, treeGanttHidden: hidden });
+    }
+    const ganttTask = this.ganttMetadata.get(taskId);
+    if (ganttTask !== undefined) {
+      this.ganttMetadata.set(taskId, { ...ganttTask, treeGanttHidden: hidden });
+    }
+    this.renderCurrentView();
+    try {
+      const path = this.pathOfTask(taskId);
+      const task = await store.readTask(path);
+      await store.writeTask(path, withTreeGanttHidden(task, hidden));
+    } catch {
+      // The view has already been drawn: an unreachable file cannot break it.
+    }
   }
 
     /** Draws the board of the tasks: one column per status. */
@@ -1935,8 +2005,11 @@ export class App
       this.treeFocusId === null ? undefined : this.ganttMetadata.get(this.treeFocusId)?.title,
       false,
     );
+    header.append(this.renderTreeGanttShowHidden('gantt-focus'));
 
-    const rows = this.ganttRows();
+    const rows = this.treeGanttShowHidden
+      ? this.ganttRows()
+      : visibleTreeRows(this.ganttRows(), this.hiddenGanttIds());
     const schedule = this.ganttSchedule(rows);
     if (schedule === null) {
       this.ganttElement.append(
@@ -1984,6 +2057,9 @@ export class App
             },
             onReorder: (id, delta) => {
               void this.moveTaskTree(id, delta);
+            },
+            onToggleHidden: (id, hidden) => {
+              void this.setTreeGanttHidden(id, hidden);
             },
             onToggleWeek: (key) => {
               this.toggleGanttPeriod(key);
@@ -2352,6 +2428,7 @@ export class App
         startDay,
         endDay,
         hasChildren: (structure.children.get(metadata.id) ?? []).length > 0,
+        hidden: metadata.treeGanttHidden,
       });
     }
     return tasks;
@@ -2414,6 +2491,26 @@ export class App
       this.treeFocusId === null ? undefined : this.treeTasks.get(this.treeFocusId)?.title,
       true,
     );
+    this.treeHeaderElement.append(this.renderTreeGanttShowHidden('tree'));
+  }
+
+  /** The global "show hidden tasks" checkbox shared by the tree and the Gantt. */
+  private renderTreeGanttShowHidden(prefix: 'tree' | 'gantt-focus'): HTMLElement {
+    const checkbox = this.doc.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = `${prefix}-show-hidden`;
+    checkbox.checked = this.treeGanttShowHidden;
+    checkbox.title = 'Show hidden tasks';
+    checkbox.setAttribute('aria-label', 'Show hidden tasks');
+    checkbox.addEventListener('change', () => {
+      this.treeGanttShowHidden = checkbox.checked;
+      this.renderCurrentView();
+      void this.persistGlobalConfig({ treeGanttShowHidden: checkbox.checked });
+    });
+    return el(this.doc, 'label', { class: `${prefix}-show-hidden-label`, title: 'Show hidden tasks' }, [
+      checkbox,
+      el(this.doc, 'span', { text: 'Hidden' }),
+    ]);
   }
 
   /**
@@ -2687,7 +2784,7 @@ export class App
     await this.refresh();
     // Persisted after the refresh: entering the board reloads the toggles
     // from the file first, so the write keeps them.
-    void this.persistGlobalConfig();
+    void this.persistGlobalConfig({ view: mode });
   }
 
   private updateViewToggle(): void {
@@ -2739,7 +2836,7 @@ export class App
       await this.persistExpandedState(id, true);
     }
     await this.updateTree();
-    void this.persistGlobalConfig();
+    void this.persistGlobalConfig({ focusTree: id, focusGantt: id });
   }
 
   /**

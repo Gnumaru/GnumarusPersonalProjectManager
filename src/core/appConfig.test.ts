@@ -63,6 +63,7 @@ describe('serializeGlobalConfig', () => {
       view: null,
       focusTree: null,
       focusGantt: null,
+      treeGanttShowHidden: false,
       showAllHidden: true,
       showHiddenByStatus: new Map([
         ['todo', true],
@@ -81,6 +82,7 @@ describe('serializeGlobalConfig', () => {
         view: 'gantt',
         focusTree: null,
         focusGantt: null,
+        treeGanttShowHidden: false,
         showAllHidden: false,
         showHiddenByStatus: new Map(),
       }),
@@ -92,6 +94,7 @@ describe('serializeGlobalConfig', () => {
       view: 'tree',
       focusTree: 2,
       focusGantt: 2,
+      treeGanttShowHidden: false,
       showAllHidden: false,
       showHiddenByStatus: new Map(),
     });
@@ -101,6 +104,7 @@ describe('serializeGlobalConfig', () => {
       view: null,
       focusTree: null,
       focusGantt: null,
+      treeGanttShowHidden: false,
       showAllHidden: false,
       showHiddenByStatus: new Map(),
     });
@@ -112,6 +116,7 @@ describe('serializeGlobalConfig', () => {
       view: 'kanban' as const,
       focusTree: 3,
       focusGantt: 3,
+      treeGanttShowHidden: true,
       showAllHidden: true,
       showHiddenByStatus: new Map([['doing', true]] as const),
     };

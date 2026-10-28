@@ -1,5 +1,31 @@
 # Checklist
 
+## Batch 26 - Hidden tasks in the tree and Gantt views
+
+### Data layer
+
+- [x] `tree_gantt_hidden` boolean metadata key in `src/core/task.ts`
+- [x] `TaskSummary.treeGanttHidden`, stores and fake bridge
+- [x] `tree_gantt_show_hidden` key in `src/core/appConfig.ts`
+
+### User interface
+
+- [x] Hide checkbox on every tree row and Gantt row
+- [x] Global show-hidden checkbox in the tree and Gantt headers
+- [x] Hidden subtrees are skipped, shown dimmed while the toggle is on
+
+### Tests
+
+- [x] `src/core/task.test.ts`, `src/core/taskTree.test.ts` - flag and row filter
+- [x] `src/ui/app.test.ts`, `src/ui/ganttView.test.ts` - hiding persists,
+      toggle filters, reload restores
+
+### Build / deploy
+
+- [x] `npm run typecheck`, `npm test` (452 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 25 - Focused task persisted in config.txt
 
 ### Data layer

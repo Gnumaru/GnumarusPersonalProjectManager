@@ -95,6 +95,7 @@ list or as a tree.
 | **Kanban show-hidden toggles persisted in `config.txt`** | Done | `src/core/appConfig.ts`, `src/ui/app.ts` |
 | **Last view persisted in `config.txt`** | Done | `src/core/appConfig.ts`, `src/ui/app.ts` |
 | **Focused task of each view persisted in `config.txt`** | Done | `src/core/appConfig.ts`, `src/ui/app.ts` |
+| **Hide tasks in the tree and Gantt (`tree_gantt_hidden`), one global show toggle** | Done | `src/ui/taskTreeView.ts`, `src/ui/ganttView.ts`, `src/ui/app.ts` |
 
 ## Gantt chart
 

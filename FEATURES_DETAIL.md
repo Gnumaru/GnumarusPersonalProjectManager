@@ -67,6 +67,8 @@ Rules:
 * `kanban_hidden` - `true` only when the card of the task is hidden on the
   Kanban board. Absent means visible. Same view-preference rule as `expanded`:
   writing it does not change `updated`, and only the board reads it.
+* `tree_gantt_hidden` - `true` only when the task is hidden in the tree view
+  and the Gantt chart. Absent means visible, same rule as above.
 
 ### The blocking and the related tasks in the editor
 
@@ -515,6 +517,14 @@ back.
 The same file keeps the task each view is focused on (`focus_tree=<id>`,
 `focus_gantt=<id>`), so reloading returns the focus exactly as before.
 Focusing a task writes the file back.
+
+### Hidden tasks in the tree and Gantt
+
+Like the board, the tree and the Gantt can hide tasks, with the only
+difference that there is a single global show toggle instead of one per
+column. Every row carries a hide checkbox backed by a `tree_gantt_hidden`
+flag; the `tree_gantt_show_hidden` key of `config.txt` shows them again,
+dimmed.
 
 ### Where the data comes from
 

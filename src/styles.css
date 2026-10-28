@@ -764,7 +764,11 @@ button[hidden] {
 
 .kanban-show-hidden-label,
 .kanban-show-all-label,
-.kanban-hide-label {
+.kanban-hide-label,
+.tree-show-hidden-label,
+.tree-hide-label,
+.gantt-focus-show-hidden-label,
+.gantt-hide-label {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -776,13 +780,21 @@ button[hidden] {
 
 .kanban-show-hidden-label:hover,
 .kanban-show-all-label:hover,
-.kanban-hide-label:hover {
+.kanban-hide-label:hover,
+.tree-show-hidden-label:hover,
+.tree-hide-label:hover,
+.gantt-focus-show-hidden-label:hover,
+.gantt-hide-label:hover {
   color: var(--text);
 }
 
 .kanban-show-hidden,
 .kanban-show-all-hidden,
-.kanban-hide-checkbox {
+.kanban-hide-checkbox,
+.tree-show-hidden,
+.tree-hide-checkbox,
+.gantt-focus-show-hidden,
+.gantt-hide-checkbox {
   accent-color: var(--accent);
   width: 13px;
   height: 13px;
@@ -802,6 +814,12 @@ button[hidden] {
 .kanban-card.is-hidden {
   opacity: 0.55;
   border-style: dashed;
+}
+
+/* A hidden row shown through the toggle looks dimmed. */
+.tree-row.is-hidden .tree-title,
+.gantt-row.is-hidden .gantt-row-name {
+  opacity: 0.55;
 }
 
 /* The amount of comments of a task, shown as a number inside a small circle,

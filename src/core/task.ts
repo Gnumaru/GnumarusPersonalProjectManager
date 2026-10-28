@@ -151,6 +151,13 @@ export interface Task {
    */
   readonly kanbanHidden?: boolean;
   /**
+   * Whether the task is hidden in the tree view and the Gantt chart.
+   *
+   * It is a view preference, like `expanded`: only the tree and the Gantt
+   * read it.
+   */
+  readonly treeGanttHidden?: boolean;
+  /**
    * Order of the task among its siblings in the Kanban view.
    *
    * It is a view preference, not a part of the task content in the strict
@@ -493,6 +500,7 @@ export function parseTask(content: string, idHint?: number): Task {
     related: parseIdList(metadata.get('related') ?? ''),
     expanded: (metadata.get('expanded') ?? '').trim().toLowerCase() === 'true',
     kanbanHidden: (metadata.get('kanban_hidden') ?? '').trim().toLowerCase() === 'true',
+    treeGanttHidden: (metadata.get('tree_gantt_hidden') ?? '').trim().toLowerCase() === 'true',
     type: isTaskType((metadata.get('type') ?? '').trim()) ? ((metadata.get('type') ?? '').trim() as TaskType) : 'Feature',
     role: isTaskRole((metadata.get('role') ?? '').trim()) ? ((metadata.get('role') ?? '').trim() as TaskRole) : 'Programming',
     kanbanOrder: normalizeOrder(metadata.get('kanban_order')),
@@ -533,6 +541,10 @@ export function serializeTask(task: Task): string {
   if (task.kanbanHidden === true) {
     lines.push('kanban_hidden=true');
   }
+  // Same rule for the hidden rows of the tree and the Gantt chart.
+  if (task.treeGanttHidden === true) {
+    lines.push('tree_gantt_hidden=true');
+  }
   lines.push(`type=${task.type ?? 'Feature'}`);
   lines.push(`role=${task.role ?? 'Programming'}`);
   lines.push(`kanban_order=${task.kanbanOrder ?? 0}`);
@@ -566,6 +578,7 @@ export function buildTask(
     related: [...input.related],
     expanded: false,
     kanbanHidden: false,
+    treeGanttHidden: false,
     type: input.type ?? 'Feature',
     role: input.role ?? 'Programming',
     kanbanOrder: 0,
@@ -651,6 +664,19 @@ export function withKanbanHidden(task: Task, hidden: boolean): Task {
   return {
     ...task,
     kanbanHidden: hidden,
+  };
+}
+
+/**
+ * Returns a copy of the task with another tree/Gantt hidden state.
+ *
+ * Like the expanded state, it is a **view preference**: changing it does not
+ * touch the `updated` timestamp of the file.
+ */
+export function withTreeGanttHidden(task: Task, hidden: boolean): Task {
+  return {
+    ...task,
+    treeGanttHidden: hidden,
   };
 }
 

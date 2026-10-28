@@ -40,6 +40,8 @@ export interface GlobalConfig {
   readonly showAllHidden: boolean;
   /** Per Kanban column toggle, `false` when the column is absent. */
   readonly showHiddenByStatus: ReadonlyMap<TaskStatus, boolean>;
+  /** Shows the hidden rows of the tree view and the Gantt chart. */
+  readonly treeGanttShowHidden: boolean;
 }
 
 /** The default settings: list view, no focus, nothing hidden is shown. */
@@ -49,6 +51,7 @@ export const EMPTY_GLOBAL_CONFIG: GlobalConfig = {
   focusGantt: null,
   showAllHidden: false,
   showHiddenByStatus: new Map<TaskStatus, boolean>(),
+  treeGanttShowHidden: false,
 };
 
 function columnKey(status: TaskStatus): string {
@@ -77,6 +80,8 @@ export function parseGlobalConfig(content: string): GlobalConfig {
   const rawView = (metadata.get('view') ?? '').trim();
   const view = isView(rawView) ? rawView : null;
   const showAllHidden = (metadata.get('kanban_show_all_hidden') ?? '').trim().toLowerCase() === 'true';
+  const treeGanttShowHidden =
+    (metadata.get('tree_gantt_show_hidden') ?? '').trim().toLowerCase() === 'true';
   const focusTree = parseTaskId(metadata.get('focus_tree'));
   const focusGantt = parseTaskId(metadata.get('focus_gantt'));
   const showHiddenByStatus = new Map<TaskStatus, boolean>();
@@ -92,7 +97,7 @@ export function parseGlobalConfig(content: string): GlobalConfig {
       showHiddenByStatus.set(status, true);
     }
   }
-  return { view, focusTree, focusGantt, showAllHidden, showHiddenByStatus };
+  return { view, focusTree, focusGantt, showAllHidden, treeGanttShowHidden, showHiddenByStatus };
 }
 
 /** Serializes the settings into the content of a `config.txt` file. */
@@ -109,6 +114,9 @@ export function serializeGlobalConfig(config: GlobalConfig): string {
   }
   if (config.showAllHidden) {
     lines.push('kanban_show_all_hidden=true');
+  }
+  if (config.treeGanttShowHidden) {
+    lines.push('tree_gantt_show_hidden=true');
   }
   const statuses = [...config.showHiddenByStatus.keys()].sort();
   for (const status of statuses) {

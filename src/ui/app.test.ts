@@ -1461,6 +1461,62 @@ describe('App and the tree view', () => {
     harness.app.dispose();
   });
 
+  it('hides a task and shows it again through the global toggle', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    // Expand the first task to see its children.
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row .tree-twisty'));
+    await flush();
+    expect(treeRows(harness).map((row) => row.dataset['taskId'])).toEqual(['1', '2', '3', '5']);
+
+    // Every row offers a hide checkbox, unchecked by default.
+    const hideCheckbox = harness.root.querySelector<HTMLInputElement>(
+      '.tree-row[data-task-id="2"] .tree-hide-checkbox',
+    );
+    expect(hideCheckbox?.checked).toBe(false);
+    if (hideCheckbox === null || hideCheckbox === undefined) {
+      return;
+    }
+    hideCheckbox.checked = true;
+    hideCheckbox.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+
+    // The flag is persisted and the whole subtree disappears.
+    expect(harness.bridge.files.get('/home/user/projects/task_2.txt')).toContain(
+      'tree_gantt_hidden=true',
+    );
+    expect(treeRows(harness).map((row) => row.dataset['taskId'])).toEqual(['1', '3', '5']);
+
+    // The global toggle is unchecked by default; checking it shows the
+    // hidden rows dimmed.
+    const showToggle = harness.root.querySelector<HTMLInputElement>('.tree-show-hidden');
+    expect(showToggle?.checked).toBe(false);
+    if (showToggle === null || showToggle === undefined) {
+      return;
+    }
+    showToggle.checked = true;
+    showToggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(treeRows(harness).map((row) => row.dataset['taskId'])).toEqual(['1', '2', '3', '5']);
+    expect(
+      treeRow(harness, 2)?.classList.contains('is-hidden'),
+    ).toBe(true);
+
+    // The toggle is persisted in config.txt.
+    expect(harness.bridge.files.get('/home/user/projects/config.txt')).toContain(
+      'tree_gantt_show_hidden=true',
+    );
+
+    // Unchecking it hides the rows again.
+    showToggle.checked = false;
+    showToggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(treeRows(harness).map((row) => row.dataset['taskId'])).toEqual(['1', '3', '5']);
+
+    harness.app.dispose();
+  });
+
   it('reopens with the focus saved in config.txt', async () => {
     const harness = await createHarness(0, {
       tasks: [
@@ -2056,6 +2112,54 @@ describe('App and the Gantt chart', () => {
   function ganttRow(harness: Harness, taskId: number): HTMLElement | null {
     return harness.root.querySelector<HTMLElement>(`.gantt-row[data-task-id="${taskId}"]`);
   }
+
+  function ganttRowIds(harness: Harness): (string | undefined)[] {
+    return [...harness.root.querySelectorAll<HTMLElement>('.gantt-row')].map(
+      (row) => row.dataset['taskId'],
+    );
+  }
+
+  it('hides a task of the chart and shows it again through the global toggle', async () => {
+    const harness = await createGanttHarness();
+    setDates(harness, 1, '20261019100000000', '20261023180000000');
+    await switchToGantt(harness);
+
+    // Expand the task to see its children.
+    click(harness.root.querySelector<HTMLButtonElement>('.gantt-twisty'));
+    await flush();
+    expect(ganttRowIds(harness)).toEqual(['1', '2', '3']);
+
+    // Hiding a task drops it from the chart and persists the flag.
+    const hideCheckbox = harness.root.querySelector<HTMLInputElement>(
+      '.gantt-row[data-task-id="2"] .gantt-hide-checkbox',
+    );
+    expect(hideCheckbox?.checked).toBe(false);
+    if (hideCheckbox === null || hideCheckbox === undefined) {
+      return;
+    }
+    hideCheckbox.checked = true;
+    hideCheckbox.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(harness.bridge.files.get('/home/user/projects/task_2.txt')).toContain(
+      'tree_gantt_hidden=true',
+    );
+    expect(ganttRowIds(harness)).toEqual(['1', '3']);
+
+    // The global toggle of the chart shows the hidden rows again.
+    const showToggle = harness.root.querySelector<HTMLInputElement>(
+      '.gantt-focus-show-hidden',
+    );
+    expect(showToggle?.checked).toBe(false);
+    if (showToggle === null || showToggle === undefined) {
+      return;
+    }
+    showToggle.checked = true;
+    showToggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(ganttRowIds(harness)).toEqual(['1', '2', '3']);
+
+    harness.app.dispose();
+  });
 
   it('indents the rows of the chart by half of the indentation of the tree', async () => {
     const harness = await createGanttHarness();

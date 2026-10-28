@@ -51,6 +51,8 @@ export interface TaskSummary {
   readonly kanbanOrder: number;
   /** Whether the card is hidden on the Kanban board. */
   readonly kanbanHidden: boolean;
+  /** Whether the task is hidden in the tree view and the Gantt chart. */
+  readonly treeGanttHidden: boolean;
   /** Order of the task in the tree view and in the Gantt chart. */
   readonly treeGanttOrder: number;
   /** The path of the file, relative to the project folder. */
