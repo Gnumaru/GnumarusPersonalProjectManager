@@ -476,6 +476,12 @@ export class TaskDialog {
       placeholder: 'Describe the task…',
       rows: 12,
     });
+    this.descriptionInput.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        void this.submit();
+      }
+    });
 
     this.errorLabel = el(this.doc, 'div', { class: 'form-error' });
 

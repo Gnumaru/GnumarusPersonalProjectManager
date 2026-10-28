@@ -633,6 +633,37 @@ describe('App', () => {
     harness.app.dispose();
   });
 
+  it('saves the task with ctrl+enter in the description box', async () => {
+    const harness = await createHarness(3);
+    await selectFolder(harness);
+
+    const editButtons = harness.root.querySelectorAll<HTMLButtonElement>('.row-action');
+    click(editButtons[1]);
+    await flush();
+
+    const description = harness.doc.querySelector<HTMLTextAreaElement>('#task-description');
+    expect(description).not.toBeNull();
+    if (description === null) {
+      return;
+    }
+    description.value = 'Saved through the keyboard';
+    description.dispatchEvent(
+      new harness.dom.window.KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        bubbles: true,
+      }),
+    );
+    await flush();
+
+    expect(harness.bridge.files.get('/home/user/projects/task_1.txt')).toContain(
+      'Saved through the keyboard',
+    );
+    expect(harness.doc.querySelector('#task-description')).toBeNull();
+
+    harness.app.dispose();
+  });
+
   it('creates, edits and deletes a task', async () => {
     const harness = await createHarness(3);
     await selectFolder(harness);
