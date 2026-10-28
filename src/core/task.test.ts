@@ -18,7 +18,11 @@ import {
   parseTaskTimestamp,
   serializeTask,
   withDefaultDates,
+  TASK_ROLES,
   TASK_STATUSES,
+  TASK_TYPES,
+  isTaskRole,
+  isTaskType,
   taskFileName,
   timestampFromDateInput,
   withParent,
@@ -302,6 +306,33 @@ describe('task statuses', () => {
     expect(isDimmedStatus('doing')).toBe(false);
     expect(isDimmedStatus('next')).toBe(false);
     expect(isDimmedStatus('paused')).toBe(false);
+  });
+});
+
+describe('task types and roles', () => {
+  it('knows every type and role of the application', () => {
+    expect([...TASK_TYPES]).toEqual(['Bug', 'Improvement', 'Feature']);
+    expect([...TASK_ROLES]).toEqual([
+      'Graphics',
+      'Audio',
+      'Programming',
+      'Design',
+      'Assembly',
+      'Management',
+      'Test',
+      'Research',
+    ]);
+  });
+
+  it('accepts only the known types and roles', () => {
+    for (const type of TASK_TYPES) {
+      expect(isTaskType(type)).toBe(true);
+    }
+    expect(isTaskType('whatever')).toBe(false);
+    for (const role of TASK_ROLES) {
+      expect(isTaskRole(role)).toBe(true);
+    }
+    expect(isTaskRole('whatever')).toBe(false);
   });
 });
 

@@ -102,6 +102,7 @@ export const TASK_ROLES = [
   'Assembly',
   'Management',
   'Test',
+  'Research',
 ] as const;
 export type TaskRole = (typeof TASK_ROLES)[number];
 
