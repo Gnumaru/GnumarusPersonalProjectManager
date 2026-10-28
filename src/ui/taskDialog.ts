@@ -700,6 +700,12 @@ export class TaskDialog {
         value: comment.text,
         rows: 4,
       });
+      editor.addEventListener('keydown', (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+          event.preventDefault();
+          void this.saveComment(comment.id, editor.value);
+        }
+      });
       meta.append(
         button(this.doc, 'Save', {
           class: 'primary small',
@@ -753,6 +759,12 @@ export class TaskDialog {
     });
     editor.addEventListener('input', () => {
       this.newCommentText = editor.value;
+    });
+    editor.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        void this.addComment(editor.value);
+      }
     });
 
     return el(this.doc, 'div', { class: 'task-comment-new-row' }, [

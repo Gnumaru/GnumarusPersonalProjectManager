@@ -580,6 +580,59 @@ describe('App', () => {
     harness.app.dispose();
   });
 
+  it('submits the comments with ctrl+enter', async () => {
+    const harness = await createHarness(3);
+    await selectFolder(harness);
+
+    const editButtons = harness.root.querySelectorAll<HTMLButtonElement>('.row-action');
+    click(editButtons[1]);
+    await flush();
+
+    // Ctrl+Enter in the new comment box adds the comment.
+    const newComment = harness.doc.querySelector<HTMLTextAreaElement>('.task-comment-new');
+    expect(newComment).not.toBeNull();
+    if (newComment === null) {
+      return;
+    }
+    newComment.value = 'Comment through the keyboard';
+    newComment.dispatchEvent(
+      new harness.dom.window.KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        bubbles: true,
+      }),
+    );
+    await flush();
+
+    expect(harness.bridge.files.get('/home/user/projects/comment_1.txt')).toContain(
+      'Comment through the keyboard',
+    );
+
+    // Ctrl+Enter in the edit box saves the change.
+    click(buttonByText(harness.doc, 'Edit'));
+    await flush();
+    const editor = harness.doc.querySelector<HTMLTextAreaElement>('.task-comment-editor');
+    expect(editor).not.toBeNull();
+    if (editor === null) {
+      return;
+    }
+    editor.value = 'Edited through the keyboard';
+    editor.dispatchEvent(
+      new harness.dom.window.KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        bubbles: true,
+      }),
+    );
+    await flush();
+
+    expect(harness.bridge.files.get('/home/user/projects/comment_1.txt')).toContain(
+      'Edited through the keyboard',
+    );
+
+    harness.app.dispose();
+  });
+
   it('creates, edits and deletes a task', async () => {
     const harness = await createHarness(3);
     await selectFolder(harness);

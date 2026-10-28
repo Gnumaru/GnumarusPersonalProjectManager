@@ -130,7 +130,7 @@ faça com que o campo de tags da modal de editar tarefa funcione de forma simila
 ====
 em qualquer view, quando eu edito uma tarefa e adiciono um comentario, a contagem de comentarios nao é atualizada para aquela view. mas se eu mudo pra outra view a contagem atualiza. quero que a contagem dos comentarios atualize imediatamente na view atual ao fechar a modal.
 ====
-
+na modal de editar tarefa, tanto na caixa de texto que permite adicionar um comentario quanto na que permite editar comentario, ctrl+enter ou ctrl+return devem executar acao do botao add comment (no caso da caixa de texto de novo comentario) ou save (no caso da caixa de editar comentario)
 ====
 
 ====
