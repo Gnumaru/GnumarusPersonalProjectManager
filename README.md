@@ -81,7 +81,7 @@ The service status pill at the top right shows whether the service is online. Wh
 ```bash
 npm install
 npm run build
-npm run verify        # typecheck, 453 tests, build, smoke E2E, browser E2E (122 checks)
+npm run verify        # typecheck, 456 tests, build, smoke E2E, browser E2E (122 checks)
 npm run deploy        # builds and copies dist to /var/www/html/GnumarusProjectManager
 ```
 

@@ -7,6 +7,7 @@ import {
   formatTaskTimestamp,
   isTaskFileName,
   isTaskStatus,
+  isDimmedStatus,
   isValidTag,
   METADATA_SEPARATOR,
   normalizeTags,
@@ -291,6 +292,16 @@ describe('task statuses', () => {
     }
     expect(isTaskStatus('whatever')).toBe(false);
     expect(isTaskStatus('')).toBe(false);
+  });
+
+  it('dims only the planning, done and canceled statuses', () => {
+    expect(isDimmedStatus('planning')).toBe(true);
+    expect(isDimmedStatus('done')).toBe(true);
+    expect(isDimmedStatus('canceled')).toBe(true);
+    expect(isDimmedStatus('todo')).toBe(false);
+    expect(isDimmedStatus('doing')).toBe(false);
+    expect(isDimmedStatus('next')).toBe(false);
+    expect(isDimmedStatus('paused')).toBe(false);
   });
 });
 

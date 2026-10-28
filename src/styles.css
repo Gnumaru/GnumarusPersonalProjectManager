@@ -818,7 +818,9 @@ button[hidden] {
 
 /* A hidden row shown through the toggle looks dimmed. */
 .tree-row.is-hidden .tree-title,
-.gantt-row.is-hidden .gantt-row-name {
+.tree-row.is-dimmed .tree-title,
+.gantt-row.is-hidden .gantt-row-name,
+.gantt-row.is-dimmed .gantt-row-name {
   opacity: 0.55;
 }
 

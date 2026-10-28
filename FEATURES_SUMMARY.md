@@ -96,6 +96,7 @@ list or as a tree.
 | **Last view persisted in `config.txt`** | Done | `src/core/appConfig.ts`, `src/ui/app.ts` |
 | **Focused task of each view persisted in `config.txt`** | Done | `src/core/appConfig.ts`, `src/ui/app.ts` |
 | **Hide tasks in the tree and Gantt (`tree_gantt_hidden`), one global show toggle** | Done | `src/ui/taskTreeView.ts`, `src/ui/ganttView.ts`, `src/ui/app.ts` |
+| **Dimmed rows for `planning`, `done` and `canceled` in tree and Gantt** | Done | `src/ui/taskTreeView.ts`, `src/ui/ganttView.ts` |
 
 ## Gantt chart
 

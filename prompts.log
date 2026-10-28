@@ -146,6 +146,7 @@ as views tree e gantt também devem ter funcionalidade pra esconder tasks igual 
 ====
 na view tree, quando eu edito o titulo de uma tarefa e salvo, ao fechar a modal o titulo que aparece na tree ainda é o antigo. e ao editar a tarefa o titulo continua o antigo. mas a edicao persiste porque se eu editar, salvar e recarregar, vejo o titulo novo.
 ====
+nas views tree e gantt faca com que tarefas com status planning, done e canceled fiquem transparentes igual atualmente acontece pra tarefas escondidas
 ====
 ====
 ====

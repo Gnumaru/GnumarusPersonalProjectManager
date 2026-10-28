@@ -9,7 +9,7 @@
  * its end date.
  */
 
-import { STATUS_LABELS, type TaskStatus } from '../core/task.js';
+import { STATUS_LABELS, isDimmedStatus, type TaskStatus } from '../core/task.js';
 import {
   barGeometry,
   type GanttBar,
@@ -239,12 +239,14 @@ function renderSideRow(
   }
   nameElements.push(name, hideToggle, actions);
 
-  const element = el(
-    doc,
-    'div',
-    { class: `gantt-row${task?.hidden === true ? ' is-hidden' : ''}` },
-    nameElements,
-  );
+  const classes = ['gantt-row'];
+  if (task?.hidden === true) {
+    classes.push('is-hidden');
+  }
+  if (task !== undefined && isDimmedStatus(task.status)) {
+    classes.push('is-dimmed');
+  }
+  const element = el(doc, 'div', { class: classes.join(' ') }, nameElements);
   element.dataset['taskId'] = String(row.id);
   element.dataset['depth'] = String(row.depth);
   return element;

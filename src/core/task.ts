@@ -211,6 +211,19 @@ export function isTaskStatus(value: string): value is TaskStatus {
   return (TASK_STATUSES as readonly string[]).includes(value);
 }
 
+/**
+ * The statuses shown dimmed in the tree view and the Gantt chart.
+ *
+ * Tasks that are still planning, already done or canceled look transparent,
+ * like the hidden tasks.
+ */
+export const DIMMED_STATUSES: readonly TaskStatus[] = ['planning', 'done', 'canceled'];
+
+/** True when rows of the task look dimmed in the tree view and the Gantt chart. */
+export function isDimmedStatus(status: TaskStatus): boolean {
+  return (DIMMED_STATUSES as readonly string[]).includes(status);
+}
+
 /** Amount of characters of a compact timestamp: `YYYYMMDDHHNNSSIII`. */
 export const TIMESTAMP_LENGTH = 17;
 

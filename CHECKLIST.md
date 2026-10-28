@@ -1,5 +1,25 @@
 # Checklist
 
+## Batch 28 - Dimmed planning/done/canceled rows in tree and Gantt
+
+### Change
+
+- [x] Rows with status `planning`, `done` or `canceled` look dimmed in the
+      tree and Gantt views, like hidden tasks (`src/core/task.ts`,
+      `src/ui/taskTreeView.ts`, `src/ui/ganttView.ts`, `src/styles.css`)
+
+### Tests
+
+- [x] `src/core/task.test.ts` - `isDimmedStatus`
+- [x] `src/ui/app.test.ts` - tree rows dimmed by status
+- [x] `src/ui/ganttView.test.ts` - chart rows dimmed by status
+
+### Build / deploy
+
+- [x] `npm run typecheck`, `npm test` (456 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 27 - Edited tasks refresh in the tree view
 
 ### Fix

@@ -191,6 +191,29 @@ describe('renderGanttView', () => {
     expect(onToggleHidden).toHaveBeenCalledWith(2, false);
   });
 
+  it('dims the rows with planning, done and canceled statuses', () => {
+    const doc = createDocument();
+    const schedule = createSchedule();
+    const layout = createLayout(schedule);
+    const { handlers } = createHandlers();
+    const tasks = new Map(createTasks(layout));
+    const planning = tasks.get(1);
+    if (planning !== undefined) {
+      tasks.set(1, { ...planning, status: 'planning' });
+    }
+    const view = renderGanttView({ doc, rows, tasks, schedule, layout }, handlers);
+
+    expect(
+      view.querySelector('.gantt-row[data-task-id="1"]')?.classList.contains('is-dimmed'),
+    ).toBe(true);
+    expect(
+      view.querySelector('.gantt-row[data-task-id="2"]')?.classList.contains('is-dimmed'),
+    ).toBe(false);
+    expect(
+      view.querySelector('.gantt-row[data-task-id="3"]')?.classList.contains('is-dimmed'),
+    ).toBe(true);
+  });
+
   it('keeps every name row and its chart row on the same line of the grid', () => {
     const view = render();
 

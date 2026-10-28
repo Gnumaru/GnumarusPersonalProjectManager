@@ -1461,6 +1461,32 @@ describe('App and the tree view', () => {
     harness.app.dispose();
   });
 
+  it('dims the rows with planning, done and canceled statuses', async () => {
+    const harness = await createHarness(0, {
+      tasks: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+    const setStatus = (id: number, status: string): void => {
+      const path = `/home/user/projects/task_${id}.txt`;
+      const content = harness.bridge.files.get(path);
+      if (content === undefined) {
+        return;
+      }
+      harness.bridge.files.set(path, content.replace(/^status=.*$/mu, `status=${status}`));
+    };
+    setStatus(1, 'done');
+    setStatus(2, 'planning');
+    setStatus(3, 'canceled');
+    await switchToTree(harness);
+
+    expect(treeRow(harness, 1)?.classList.contains('is-dimmed')).toBe(true);
+    expect(treeRow(harness, 2)?.classList.contains('is-dimmed')).toBe(true);
+    expect(treeRow(harness, 3)?.classList.contains('is-dimmed')).toBe(true);
+    expect(treeRow(harness, 4)?.classList.contains('is-dimmed')).toBe(false);
+
+    harness.app.dispose();
+  });
+
   it('hides a task and shows it again through the global toggle', async () => {
     const harness = await createTreeHarness();
     await switchToTree(harness);

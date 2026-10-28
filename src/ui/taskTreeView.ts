@@ -7,6 +7,7 @@
  */
 
 import type { Task } from '../core/task.js';
+import { isDimmedStatus } from '../core/task.js';
 import type { TreeRow } from '../core/taskTree.js';
 import { el } from './dom.js';
 import { createIcon } from './icons.js';
@@ -154,12 +155,14 @@ function renderTreeRow(
     elements.push(commentBadge);
   }
   elements.push(title, tags, hideToggle, actions);
-  const element = el(
-    doc,
-    'div',
-    { class: `tree-row${task.treeGanttHidden === true ? ' is-hidden' : ''}` },
-    elements,
-  );
+  const classes = ['tree-row'];
+  if (task.treeGanttHidden === true) {
+    classes.push('is-hidden');
+  }
+  if (isDimmedStatus(task.status)) {
+    classes.push('is-dimmed');
+  }
+  const element = el(doc, 'div', { class: classes.join(' ') }, elements);
   element.dataset['taskId'] = String(task.id);
   element.dataset['depth'] = String(row.depth);
   return element;
