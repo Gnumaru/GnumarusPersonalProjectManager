@@ -40,6 +40,7 @@ import {
   type NoteSearchScope,
 } from './note.js';
 import type { NoteSummary, ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
+import { APP_CONFIG_FILE } from './appConfig.js';
 import type { DirectoryHandle } from './fileSystemAccess.js';
 
 /**
@@ -136,6 +137,14 @@ export class FileSystemProjectStore implements ProjectStore {
 
   async deleteFile(path: string): Promise<void> {
     await this.removeFile(path);
+  }
+
+  async readAppConfig(): Promise<string | null> {
+    return this.readFile(APP_CONFIG_FILE);
+  }
+
+  async writeAppConfig(content: string): Promise<void> {
+    await this.writeFile(APP_CONFIG_FILE, content);
   }
 
   // ------------------------------------------------------------ comments --

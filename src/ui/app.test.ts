@@ -1834,6 +1834,71 @@ describe('App and the board', () => {
 
     harness.app.dispose();
   });
+
+  it('persists the show-hidden toggles in config.txt', async () => {
+    const harness = await createBoardHarness();
+    await switchToBoard(harness);
+
+    const columnToggle = harness.root.querySelector<HTMLInputElement>(
+      '.kanban-column[data-status="todo"] .kanban-show-hidden',
+    );
+    if (columnToggle === null || columnToggle === undefined) {
+      return;
+    }
+    columnToggle.checked = true;
+    columnToggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(harness.bridge.files.get('/home/user/projects/config.txt')).toContain(
+      'kanban_show_hidden_todo=true',
+    );
+
+    const globalToggle = harness.root.querySelector<HTMLInputElement>(
+      '.kanban-show-all-hidden',
+    );
+    if (globalToggle === null || globalToggle === undefined) {
+      return;
+    }
+    globalToggle.checked = true;
+    globalToggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(harness.bridge.files.get('/home/user/projects/config.txt')).toContain(
+      'kanban_show_all_hidden=true',
+    );
+
+    columnToggle.checked = false;
+    columnToggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(
+      harness.bridge.files.get('/home/user/projects/config.txt'),
+    ).not.toContain('kanban_show_hidden_todo');
+
+    harness.app.dispose();
+  });
+
+  it('restores the show-hidden toggles from config.txt', async () => {
+    const harness = await createBoardHarness();
+    harness.bridge.files.set(
+      '/home/user/projects/config.txt',
+      'kanban_show_all_hidden=true\nkanban_show_hidden_doing=true\n',
+    );
+    await switchToBoard(harness);
+
+    expect(
+      harness.root.querySelector<HTMLInputElement>('.kanban-show-all-hidden')?.checked,
+    ).toBe(true);
+    expect(
+      harness.root.querySelector<HTMLInputElement>(
+        '.kanban-column[data-status="doing"] .kanban-show-hidden',
+      )?.checked,
+    ).toBe(true);
+    expect(
+      harness.root.querySelector<HTMLInputElement>(
+        '.kanban-column[data-status="todo"] .kanban-show-hidden',
+      )?.checked,
+    ).toBe(false);
+
+    harness.app.dispose();
+  });
 });
 
 describe('App and the Gantt chart', () => {

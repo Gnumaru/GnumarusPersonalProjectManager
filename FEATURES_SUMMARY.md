@@ -92,6 +92,7 @@ list or as a tree.
 | **Drag and drop between the columns changes the status** | Done | `src/ui/kanbanDrag.ts` |
 | **A card opens the task and its editor** | Done | `src/ui/kanbanBoard.ts` |
 | **Hide a card with a checkbox (`kanban_hidden`), show hidden per column or globally** | Done | `src/ui/kanbanBoard.ts`, `src/ui/app.ts` |
+| **Kanban show-hidden toggles persisted in `config.txt`** | Done | `src/core/appConfig.ts`, `src/ui/app.ts` |
 
 ## Gantt chart
 

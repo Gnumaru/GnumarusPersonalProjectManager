@@ -1,5 +1,28 @@
 # Checklist
 
+## Batch 23 - Kanban toggles persisted in config.txt
+
+### Data layer
+
+- [x] `src/core/appConfig.ts` - parse and serialize the `config.txt` metadata
+- [x] `readAppConfig` / `writeAppConfig` on the project stores
+
+### User interface
+
+- [x] The Kanban column and global show-hidden toggles load from `config.txt`
+- [x] Toggling a checkbox writes the file back
+
+### Tests
+
+- [x] `src/core/appConfig.test.ts` - format round trips
+- [x] `src/ui/app.test.ts` - toggles persist and reload from the file
+
+### Build / deploy
+
+- [x] `npm run typecheck`, `npm test` (435 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 22 - Hidden tasks on the Kanban board
 
 ### Data layer

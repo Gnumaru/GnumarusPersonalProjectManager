@@ -162,6 +162,12 @@ export interface ProjectStore {
   /** The path of the file of a comment, relative to the project folder. */
   commentPath(id: number): string;
 
+  /** Raw content of `config.txt`, `null` when the file does not exist. */
+  readAppConfig(): Promise<string | null>;
+
+  /** Writes `config.txt`, creating or replacing it. */
+  writeAppConfig(content: string): Promise<void>;
+
   /** Every file of the project: the export of the ZIP archive. */
   listFiles(): Promise<readonly ProjectFile[]>;
 

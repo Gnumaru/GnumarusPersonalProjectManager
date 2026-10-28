@@ -37,6 +37,7 @@ import {
   type NoteSearchScope,
 } from './note.js';
 import type { NoteSummary, ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
+import { APP_CONFIG_FILE } from './appConfig.js';
 
 /** The metadata of a task, while it is being read. */
 interface MutableMetadata {
@@ -409,6 +410,30 @@ export class ServiceProjectStore implements ProjectStore {
 
   async deleteFile(path: string): Promise<void> {
     await this.api.deleteFile(this.absolute(path));
+  }
+
+  async readAppConfig(): Promise<string | null> {
+    try {
+      const file = await this.api.readFile(this.absolute(APP_CONFIG_FILE));
+      return file.content;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async writeAppConfig(content: string): Promise<void> {
+    try {
+      await this.api.createFile(this.absolute(APP_CONFIG_FILE), content);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        await this.api.overwriteFile(this.absolute(APP_CONFIG_FILE), content);
+        return;
+      }
+      throw error;
+    }
   }
 
   async listComments(taskId: number): Promise<readonly TaskComment[]> {

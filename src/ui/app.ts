@@ -43,6 +43,12 @@ import {
 } from '../core/tableSort.js';
 import { commentFileName, type TaskComment } from '../core/comment.js';
 import {
+  EMPTY_GLOBAL_CONFIG,
+  parseGlobalConfig,
+  serializeGlobalConfig,
+  type GlobalConfig,
+} from '../core/appConfig.js';
+import {
   NOTE_SCOPE_LABELS,
   NOTE_SEARCH_SCOPES,
   applyNoteInput,
@@ -1412,6 +1418,9 @@ export class App
       return;
     }
     await this.normalizeKanbanOrders();
+    const visibility = await this.loadKanbanVisibility();
+    this.kanbanShowAllHidden = visibility.showAllHidden;
+    this.kanbanShowHiddenByStatus = new Map(visibility.showHiddenByStatus);
     const summaries = await store.listTasks();
     await this.seedTaskDates(summaries);
     const parents = new Set<number>();
@@ -1440,6 +1449,41 @@ export class App
       }));
   }
 
+  /**
+   * Reads the Kanban show-hidden toggles from `config.txt`.
+   *
+   * A missing or unreadable file means the defaults: nothing hidden is shown.
+   */
+  private async loadKanbanVisibility(): Promise<GlobalConfig> {
+    const store = this.store;
+    if (store === null) {
+      return EMPTY_GLOBAL_CONFIG;
+    }
+    try {
+      const content = await store.readAppConfig();
+      return content === null ? EMPTY_GLOBAL_CONFIG : parseGlobalConfig(content);
+    } catch {
+      return EMPTY_GLOBAL_CONFIG;
+    }
+  }
+
+  /** Writes the Kanban show-hidden toggles back to `config.txt`. */
+  private async persistKanbanVisibility(): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      return;
+    }
+    try {
+      await store.writeAppConfig(
+        serializeGlobalConfig({
+          showAllHidden: this.kanbanShowAllHidden,
+          showHiddenByStatus: this.kanbanShowHiddenByStatus,
+        }),
+      );
+    } catch {
+      // The board has already been drawn: an unreachable file cannot break it.
+    }
+  }
   /**
    * Reads the metadata of the tasks for the Gantt chart.
    *
@@ -1766,6 +1810,7 @@ export class App
       renderKanbanToolbar(this.doc, this.kanbanShowAllHidden, (show) => {
         this.kanbanShowAllHidden = show;
         this.renderKanban();
+        void this.persistKanbanVisibility();
       }),
     );
     this.kanbanElement.append(
@@ -1791,6 +1836,7 @@ export class App
           onToggleShowColumn: (status, show) => {
             this.kanbanShowHiddenByStatus.set(status, show);
             this.renderKanban();
+            void this.persistKanbanVisibility();
           },
         },
         this.commentCounts,

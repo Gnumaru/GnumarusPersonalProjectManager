@@ -52,6 +52,14 @@ async function createStore(): Promise<{ store: EmbeddedProjectStore; storage: Me
 }
 
 describe('EmbeddedProjectStore', () => {
+  it('reads and writes the application config file', async () => {
+    const { store } = await createStore();
+
+    expect(await store.readAppConfig()).toBeNull();
+    await store.writeAppConfig('kanban_show_hidden_todo=true\n');
+    expect(await store.readAppConfig()).toBe('kanban_show_hidden_todo=true\n');
+  });
+
   it('creates a task in a file of its own', async () => {
     const { store, storage } = await createStore();
 

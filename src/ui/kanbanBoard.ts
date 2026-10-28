@@ -75,6 +75,7 @@ export function renderKanbanBoard(
     const columnCards = cards.filter((card) => card.status === status);
     const showHidden =
       visibility.showAllHidden || (visibility.showHiddenByStatus.get(status) ?? false);
+    const showColumnHidden = visibility.showHiddenByStatus.get(status) ?? false;
     const visibleCards = showHidden
       ? columnCards
       : columnCards.filter((card) => !card.kanbanHidden);
@@ -82,7 +83,7 @@ export function renderKanbanBoard(
       el(doc, 'header', { class: 'kanban-column-header' }, [
         el(doc, 'span', { class: 'kanban-column-title', text: STATUS_LABELS[status] }),
         el(doc, 'span', { class: 'kanban-column-count', text: String(visibleCards.length) }),
-        renderShowHiddenToggle(doc, status, showHidden, handlers),
+        renderShowHiddenToggle(doc, status, showColumnHidden, handlers),
       ]),
       el(doc, 'div', { class: 'kanban-cards' }),
     ]);

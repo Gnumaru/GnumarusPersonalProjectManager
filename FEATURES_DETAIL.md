@@ -496,6 +496,14 @@ show-hidden checkbox above the board: when the global one is checked, the
 hidden cards of every column are shown regardless of the column toggles;
 otherwise each column follows its own toggle. Shown hidden cards look dimmed.
 
+### Persisted toggles
+
+The column toggles and the global toggle are saved in a `config.txt` file in
+the project folder, next to the task files. It holds global settings as
+`key=value` metadata in the same format as the other files, but it has no
+description section. The board reads it on load and rewrites it on every
+toggle change.
+
 ### Where the data comes from
 
 The whole board costs **two** round trips and reads no file at all:

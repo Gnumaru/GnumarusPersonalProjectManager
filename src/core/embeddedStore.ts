@@ -39,6 +39,7 @@ import {
 } from './note.js';
 import type { BrowserFileStorage } from './browserStorage.js';
 import type { NoteSummary, ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
+import { APP_CONFIG_FILE } from './appConfig.js';
 
 export class EmbeddedProjectStore implements ProjectStore {
   readonly kind: ProjectKind = 'embedded';
@@ -136,6 +137,14 @@ export class EmbeddedProjectStore implements ProjectStore {
   async deleteFile(path: string): Promise<void> {
     this.files.delete(path);
     await this.storage.remove(path);
+  }
+
+  async readAppConfig(): Promise<string | null> {
+    return this.files.get(APP_CONFIG_FILE) ?? null;
+  }
+
+  async writeAppConfig(content: string): Promise<void> {
+    await this.write(APP_CONFIG_FILE, content);
   }
 
   async listTaskPaths(): Promise<readonly string[]> {
