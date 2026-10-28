@@ -32,15 +32,21 @@ export type AppView = (typeof VIEW_MODES)[number];
 export interface GlobalConfig {
   /** The view the app reopens in, `null` for the default list view. */
   readonly view: AppView | null;
+  /** The task the tree view is focused on, `null` for the general root. */
+  readonly focusTree: number | null;
+  /** The task the Gantt chart is focused on, `null` for the general root. */
+  readonly focusGantt: number | null;
   /** Shows the hidden cards of every Kanban column. */
   readonly showAllHidden: boolean;
   /** Per Kanban column toggle, `false` when the column is absent. */
   readonly showHiddenByStatus: ReadonlyMap<TaskStatus, boolean>;
 }
 
-/** The default settings: list view, nothing hidden is shown. */
+/** The default settings: list view, no focus, nothing hidden is shown. */
 export const EMPTY_GLOBAL_CONFIG: GlobalConfig = {
   view: null,
+  focusTree: null,
+  focusGantt: null,
   showAllHidden: false,
   showHiddenByStatus: new Map<TaskStatus, boolean>(),
 };
@@ -57,12 +63,22 @@ function isView(value: string): value is AppView {
   return (VIEW_MODES as readonly string[]).includes(value);
 }
 
+function parseTaskId(value: string | undefined): number | null {
+  if (value === undefined) {
+    return null;
+  }
+  const id = Number.parseInt(value.trim(), 10);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
 /** Reads the settings from the content of a `config.txt` file. */
 export function parseGlobalConfig(content: string): GlobalConfig {
   const { metadata } = parseMetadataBlock(content);
   const rawView = (metadata.get('view') ?? '').trim();
   const view = isView(rawView) ? rawView : null;
   const showAllHidden = (metadata.get('kanban_show_all_hidden') ?? '').trim().toLowerCase() === 'true';
+  const focusTree = parseTaskId(metadata.get('focus_tree'));
+  const focusGantt = parseTaskId(metadata.get('focus_gantt'));
   const showHiddenByStatus = new Map<TaskStatus, boolean>();
   for (const [key, value] of metadata) {
     if (!key.startsWith('kanban_show_hidden_')) {
@@ -76,7 +92,7 @@ export function parseGlobalConfig(content: string): GlobalConfig {
       showHiddenByStatus.set(status, true);
     }
   }
-  return { view, showAllHidden, showHiddenByStatus };
+  return { view, focusTree, focusGantt, showAllHidden, showHiddenByStatus };
 }
 
 /** Serializes the settings into the content of a `config.txt` file. */
@@ -84,6 +100,12 @@ export function serializeGlobalConfig(config: GlobalConfig): string {
   const lines: string[] = [];
   if (config.view !== null) {
     lines.push(`view=${config.view}`);
+  }
+  if (config.focusTree !== null) {
+    lines.push(`focus_tree=${config.focusTree}`);
+  }
+  if (config.focusGantt !== null) {
+    lines.push(`focus_gantt=${config.focusGantt}`);
   }
   if (config.showAllHidden) {
     lines.push('kanban_show_all_hidden=true');

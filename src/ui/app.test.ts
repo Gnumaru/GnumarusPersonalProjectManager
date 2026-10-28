@@ -1447,6 +1447,42 @@ describe('App and the tree view', () => {
     harness.app.dispose();
   });
 
+  it('persists the focused task in config.txt', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    click(treeAction(harness, 1, 2));
+    await flush();
+
+    const content = harness.bridge.files.get('/home/user/projects/config.txt') ?? '';
+    expect(content).toContain('focus_tree=1');
+    expect(content).toContain('focus_gantt=1');
+
+    harness.app.dispose();
+  });
+
+  it('reopens with the focus saved in config.txt', async () => {
+    const harness = await createHarness(0, {
+      tasks: [
+        { id: 1 },
+        { id: 2, parentId: 1 },
+        { id: 3, parentId: 1 },
+        { id: 4, parentId: 2 },
+        { id: 5 },
+      ],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+      configTxt: 'view=tree\nfocus_tree=1\nfocus_gantt=1\n',
+    });
+
+    // The tree opens focused on task 1, with its children shown.
+    const rows = treeRows(harness);
+    expect(rows.map((row) => row.dataset['taskId'])).toEqual(['1', '2', '3']);
+    const crumbs = [...harness.root.querySelectorAll('.tree-crumb')];
+    expect(crumbs.map((crumb) => crumb.textContent)).toEqual(['General root', 'Task 1']);
+
+    harness.app.dispose();
+  });
+
   it('focuses a child task and hides the tasks outside of its hierarchy', async () => {
     const harness = await createTreeHarness();
     await switchToTree(harness);

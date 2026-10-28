@@ -94,6 +94,7 @@ list or as a tree.
 | **Hide a card with a checkbox (`kanban_hidden`), show hidden per column or globally** | Done | `src/ui/kanbanBoard.ts`, `src/ui/app.ts` |
 | **Kanban show-hidden toggles persisted in `config.txt`** | Done | `src/core/appConfig.ts`, `src/ui/app.ts` |
 | **Last view persisted in `config.txt`** | Done | `src/core/appConfig.ts`, `src/ui/app.ts` |
+| **Focused task of each view persisted in `config.txt`** | Done | `src/core/appConfig.ts`, `src/ui/app.ts` |
 
 ## Gantt chart
 

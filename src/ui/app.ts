@@ -1470,16 +1470,21 @@ export class App
   }
 
   /**
-   * Returns to the view saved in `config.txt`, if any.
+   * Returns to the view and the focus saved in `config.txt`, if any.
    *
-   * Runs once on startup, before the first render.
+   * Runs once on startup, before the first render. The hierarchy builder
+   * expands the focused task, like a focus made by hand.
    */
   private async restoreViewMode(): Promise<void> {
-    const view = (await this.loadGlobalConfig()).view;
-    if (view !== null && view !== this.viewMode) {
-      this.viewMode = view;
+    const config = await this.loadGlobalConfig();
+    if (config.view !== null && config.view !== this.viewMode) {
+      this.viewMode = config.view;
       this.updateViewToggle();
       this.updateToolbarForMode();
+    }
+    const focus = config.focusTree ?? config.focusGantt;
+    if (focus !== null) {
+      this.treeFocusId = focus;
     }
   }
 
@@ -1502,6 +1507,8 @@ export class App
       await store.writeAppConfig(
         serializeGlobalConfig({
           view: this.viewMode,
+          focusTree: this.treeFocusId,
+          focusGantt: this.treeFocusId,
           showAllHidden: this.kanbanShowAllHidden,
           showHiddenByStatus: this.kanbanShowHiddenByStatus,
         }),
@@ -1556,6 +1563,10 @@ export class App
       if (task.expanded) {
         expanded.add(task.id);
       }
+    }
+    // The focused task shows its children, like a focus made by hand.
+    if (this.treeFocusId !== null) {
+      expanded.add(this.treeFocusId);
     }
     this.treeExpanded = expanded;
     this.treeHierarchy = { parents, paths };
@@ -2728,6 +2739,7 @@ export class App
       await this.persistExpandedState(id, true);
     }
     await this.updateTree();
+    void this.persistGlobalConfig();
   }
 
   /**

@@ -510,6 +510,12 @@ The same file keeps the view the user was in (`view=list|tree|kanban|gantt|
 notes`), so reopening the app returns to it. Switching views writes the file
 back.
 
+### Focused task
+
+The same file keeps the task each view is focused on (`focus_tree=<id>`,
+`focus_gantt=<id>`), so reloading returns the focus exactly as before.
+Focusing a task writes the file back.
+
 ### Where the data comes from
 
 The whole board costs **two** round trips and reads no file at all:

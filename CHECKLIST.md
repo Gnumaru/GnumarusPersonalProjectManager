@@ -1,5 +1,27 @@
 # Checklist
 
+## Batch 25 - Focused task persisted in config.txt
+
+### Data layer
+
+- [x] `focus_tree=` and `focus_gantt=` keys in `src/core/appConfig.ts`
+
+### User interface
+
+- [x] Focusing a task writes the file back
+- [x] Reloading restores the focus of each view
+
+### Tests
+
+- [x] `src/core/appConfig.test.ts` - focus round trips
+- [x] `src/ui/app.test.ts` - focusing persists, reopening restores
+
+### Build / deploy
+
+- [x] `npm run typecheck`, `npm test` (443 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 24 - Last view persisted in config.txt
 
 ### Data layer
