@@ -8,10 +8,12 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
-- All planned batches (1-23) are implemented.
+- All planned batches (1-24) are implemented.
+- Batch 24 keeps the current view in `config.txt`, so the app reopens in the
+  same view.
 - Batch 23 persists the Kanban show-hidden toggles in a `config.txt` file in
   the project folder, written as `key=value` metadata with no description section.
-- Verification: 435 unit tests pass.
+- Verification: 439 unit tests pass.
 - Batch 22 adds hidden tasks on the Kanban board: `kanban_hidden` metadata, a
   hide checkbox on every card, a show-hidden checkbox per column and a global one.
 - Batch 21 adds task ordering: `kanban_order` and `tree_gantt_order` metadata,

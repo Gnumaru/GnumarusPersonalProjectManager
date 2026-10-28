@@ -68,6 +68,8 @@ interface HarnessOptions {
    * The user is then asked to choose it with the picker of the browser.
    */
   readonly folderKnown?: boolean;
+  /** Content of `config.txt`, seeded on the fake disk before startup. */
+  readonly configTxt?: string;
 }
 
 function taskContent(
@@ -139,6 +141,9 @@ export async function createHarness(taskCount = 25, options: HarnessOptions = {}
   }
   if (options.config !== undefined) {
     bridge.addFile('~/.config/GnumarusProjectManager/config.json', options.config);
+  }
+  if (options.configTxt !== undefined) {
+    bridge.addFile('/home/user/projects/config.txt', options.configTxt);
   }
 
   const api = new ApiClient({ baseUrl: bridge.baseUrl, token, fetchImpl: bridge.fetch });
@@ -1896,6 +1901,44 @@ describe('App and the board', () => {
         '.kanban-column[data-status="todo"] .kanban-show-hidden',
       )?.checked,
     ).toBe(false);
+
+    harness.app.dispose();
+  });
+
+  it('persists the current view in config.txt', async () => {
+    const harness = await createBoardHarness();
+    await switchToBoard(harness);
+
+    expect(harness.bridge.files.get('/home/user/projects/config.txt')).toContain(
+      'view=kanban',
+    );
+
+    // Toggling a checkbox keeps the saved view.
+    const columnToggle = harness.root.querySelector<HTMLInputElement>(
+      '.kanban-column[data-status="todo"] .kanban-show-hidden',
+    );
+    if (columnToggle === null || columnToggle === undefined) {
+      return;
+    }
+    columnToggle.checked = true;
+    columnToggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    const content = harness.bridge.files.get('/home/user/projects/config.txt') ?? '';
+    expect(content).toContain('view=kanban');
+    expect(content).toContain('kanban_show_hidden_todo=true');
+
+    harness.app.dispose();
+  });
+
+  it('reopens in the view saved in config.txt', async () => {
+    const harness = await createHarness(0, {
+      tasks: [{ id: 1 }],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+      configTxt: 'view=kanban\n',
+    });
+
+    expect(harness.root.querySelector('.kanban-board')).not.toBeNull();
+    expect(harness.root.querySelector('.table-wrap')?.hasAttribute('hidden')).toBe(true);
 
     harness.app.dispose();
   });

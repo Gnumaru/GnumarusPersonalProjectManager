@@ -504,6 +504,12 @@ the project folder, next to the task files. It holds global settings as
 description section. The board reads it on load and rewrites it on every
 toggle change.
 
+### Last view
+
+The same file keeps the view the user was in (`view=list|tree|kanban|gantt|
+notes`), so reopening the app returns to it. Switching views writes the file
+back.
+
 ### Where the data comes from
 
 The whole board costs **two** round trips and reads no file at all:

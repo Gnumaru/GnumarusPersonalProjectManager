@@ -6,12 +6,14 @@
  * files, but it has no description section: only the metadata block.
  *
  * ```
+ * view=kanban
  * kanban_show_all_hidden=true
  * kanban_show_hidden_todo=true
  * ```
  *
- * A key that is absent means `false`, so a default configuration is an empty
- * file. Only the keys that are `true` are written.
+ * A key that is absent means its default: the board shows nothing hidden and
+ * the app opens in the list view. Only the keys that differ from the defaults
+ * are written.
  */
 
 import { TASK_STATUSES, type TaskStatus } from './task.js';
@@ -20,16 +22,25 @@ import { parseMetadataBlock } from './task.js';
 /** Name of the configuration file, relative to the project folder. */
 export const APP_CONFIG_FILE = 'config.txt';
 
+/** The views of the application, in the order of the toolbar. */
+export const VIEW_MODES = ['list', 'tree', 'kanban', 'gantt', 'notes'] as const;
+
+/** One of the views of the application. */
+export type AppView = (typeof VIEW_MODES)[number];
+
 /** Global settings of the application. */
 export interface GlobalConfig {
+  /** The view the app reopens in, `null` for the default list view. */
+  readonly view: AppView | null;
   /** Shows the hidden cards of every Kanban column. */
   readonly showAllHidden: boolean;
   /** Per Kanban column toggle, `false` when the column is absent. */
   readonly showHiddenByStatus: ReadonlyMap<TaskStatus, boolean>;
 }
 
-/** The default settings: nothing hidden is shown. */
+/** The default settings: list view, nothing hidden is shown. */
 export const EMPTY_GLOBAL_CONFIG: GlobalConfig = {
+  view: null,
   showAllHidden: false,
   showHiddenByStatus: new Map<TaskStatus, boolean>(),
 };
@@ -42,9 +53,15 @@ function isStatus(value: string): value is TaskStatus {
   return (TASK_STATUSES as readonly string[]).includes(value);
 }
 
+function isView(value: string): value is AppView {
+  return (VIEW_MODES as readonly string[]).includes(value);
+}
+
 /** Reads the settings from the content of a `config.txt` file. */
 export function parseGlobalConfig(content: string): GlobalConfig {
   const { metadata } = parseMetadataBlock(content);
+  const rawView = (metadata.get('view') ?? '').trim();
+  const view = isView(rawView) ? rawView : null;
   const showAllHidden = (metadata.get('kanban_show_all_hidden') ?? '').trim().toLowerCase() === 'true';
   const showHiddenByStatus = new Map<TaskStatus, boolean>();
   for (const [key, value] of metadata) {
@@ -59,12 +76,15 @@ export function parseGlobalConfig(content: string): GlobalConfig {
       showHiddenByStatus.set(status, true);
     }
   }
-  return { showAllHidden, showHiddenByStatus };
+  return { view, showAllHidden, showHiddenByStatus };
 }
 
 /** Serializes the settings into the content of a `config.txt` file. */
 export function serializeGlobalConfig(config: GlobalConfig): string {
   const lines: string[] = [];
+  if (config.view !== null) {
+    lines.push(`view=${config.view}`);
+  }
   if (config.showAllHidden) {
     lines.push('kanban_show_all_hidden=true');
   }

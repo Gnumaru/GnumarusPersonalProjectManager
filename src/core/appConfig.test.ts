@@ -15,9 +15,16 @@ describe('parseGlobalConfig', () => {
     const config = parseGlobalConfig(
       'kanban_show_all_hidden=true\nkanban_show_hidden_todo=true\n',
     );
+    expect(config.view).toBeNull();
     expect(config.showAllHidden).toBe(true);
     expect(config.showHiddenByStatus.get('todo')).toBe(true);
     expect(config.showHiddenByStatus.get('doing')).toBeUndefined();
+  });
+
+  it('reads the saved view and ignores unknown ones', () => {
+    expect(parseGlobalConfig('view=kanban\n').view).toBe('kanban');
+    expect(parseGlobalConfig('view=bogus\n').view).toBeNull();
+    expect(parseGlobalConfig('').view).toBeNull();
   });
 
   it('ignores unknown keys, unknown statuses and non-true values', () => {
@@ -43,6 +50,7 @@ describe('serializeGlobalConfig', () => {
 
   it('writes only the toggles that are on', () => {
     const content = serializeGlobalConfig({
+      view: null,
       showAllHidden: true,
       showHiddenByStatus: new Map([
         ['todo', true],
@@ -52,14 +60,27 @@ describe('serializeGlobalConfig', () => {
     expect(content).toContain('kanban_show_all_hidden=true');
     expect(content).toContain('kanban_show_hidden_todo=true');
     expect(content).not.toContain('doing');
+    expect(content).not.toContain('view=');
+  });
+
+  it('writes the saved view', () => {
+    expect(
+      serializeGlobalConfig({
+        view: 'gantt',
+        showAllHidden: false,
+        showHiddenByStatus: new Map(),
+      }),
+    ).toContain('view=gantt');
   });
 
   it('round trips through the parser', () => {
     const config = {
+      view: 'kanban' as const,
       showAllHidden: true,
       showHiddenByStatus: new Map([['doing', true]] as const),
     };
     const parsed = parseGlobalConfig(serializeGlobalConfig(config));
+    expect(parsed.view).toBe('kanban');
     expect(parsed.showAllHidden).toBe(true);
     expect(parsed.showHiddenByStatus.get('doing')).toBe(true);
   });

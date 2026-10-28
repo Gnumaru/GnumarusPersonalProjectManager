@@ -1,5 +1,27 @@
 # Checklist
 
+## Batch 24 - Last view persisted in config.txt
+
+### Data layer
+
+- [x] `view=` key in `src/core/appConfig.ts` (parsed, validated, serialized)
+
+### User interface
+
+- [x] The app opens in the view saved in `config.txt`
+- [x] Switching views writes the file back
+
+### Tests
+
+- [x] `src/core/appConfig.test.ts` - view round trips
+- [x] `src/ui/app.test.ts` - switching persists, reopening restores
+
+### Build / deploy
+
+- [x] `npm run typecheck`, `npm test` (439 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 23 - Kanban toggles persisted in config.txt
 
 ### Data layer

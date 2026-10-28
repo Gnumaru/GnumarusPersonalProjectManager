@@ -138,6 +138,7 @@ na modal de edicao de tarefa, na caixa de texto de descricao, faça com que ctrl
 ====
 salve configuracoes globais da aplicacao em um arquivo config.txt no mesmo diretorio dos outros arquivos. ele salvara configuracoes globais como metadados no mesmo formato dos outros arquivos. ele nao tera uma secao de texto como os outros arquivos. salve nele o stado dos campos hidden das colunas do kanban e do checkbox global show hidden do kanban
 ====
+guarde na config global a view que o usuario estava, para quando ele abrir o app retornar na mesma view
 ====
 
 ====

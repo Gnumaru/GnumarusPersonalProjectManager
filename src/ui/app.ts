@@ -46,6 +46,7 @@ import {
   EMPTY_GLOBAL_CONFIG,
   parseGlobalConfig,
   serializeGlobalConfig,
+  type AppView,
   type GlobalConfig,
 } from '../core/appConfig.js';
 import {
@@ -130,7 +131,7 @@ export interface TokenStorage extends ConfigStorage {
 export type ServiceState = 'checking' | 'online' | 'offline' | 'unauthorized';
 
 /** The five ways the project can be displayed. */
-export type ViewMode = 'list' | 'tree' | 'kanban' | 'gantt' | 'notes';
+export type ViewMode = AppView;
 
 export interface AppOptions {
   readonly doc: Document;
@@ -340,6 +341,7 @@ export class App
     // The path of the project can be known only once the store is open: the
     // name of the folder comes from the handle of the browser.
     this.updateProjectPath();
+    await this.restoreViewMode();
     await this.refresh();
 
     this.startServiceWatch();
@@ -1450,11 +1452,11 @@ export class App
   }
 
   /**
-   * Reads the Kanban show-hidden toggles from `config.txt`.
+   * Reads the global settings from `config.txt`.
    *
-   * A missing or unreadable file means the defaults: nothing hidden is shown.
+   * A missing or unreadable file means the defaults.
    */
-  private async loadKanbanVisibility(): Promise<GlobalConfig> {
+  private async loadGlobalConfig(): Promise<GlobalConfig> {
     const store = this.store;
     if (store === null) {
       return EMPTY_GLOBAL_CONFIG;
@@ -1467,8 +1469,31 @@ export class App
     }
   }
 
-  /** Writes the Kanban show-hidden toggles back to `config.txt`. */
-  private async persistKanbanVisibility(): Promise<void> {
+  /**
+   * Returns to the view saved in `config.txt`, if any.
+   *
+   * Runs once on startup, before the first render.
+   */
+  private async restoreViewMode(): Promise<void> {
+    const view = (await this.loadGlobalConfig()).view;
+    if (view !== null && view !== this.viewMode) {
+      this.viewMode = view;
+      this.updateViewToggle();
+      this.updateToolbarForMode();
+    }
+  }
+
+  /**
+   * Reads the Kanban show-hidden toggles from `config.txt`.
+   *
+   * A missing or unreadable file means the defaults: nothing hidden is shown.
+   */
+  private async loadKanbanVisibility(): Promise<GlobalConfig> {
+    return this.loadGlobalConfig();
+  }
+
+  /** Writes the global settings back to `config.txt`. */
+  private async persistGlobalConfig(): Promise<void> {
     const store = this.store;
     if (store === null) {
       return;
@@ -1476,13 +1501,19 @@ export class App
     try {
       await store.writeAppConfig(
         serializeGlobalConfig({
+          view: this.viewMode,
           showAllHidden: this.kanbanShowAllHidden,
           showHiddenByStatus: this.kanbanShowHiddenByStatus,
         }),
       );
     } catch {
-      // The board has already been drawn: an unreachable file cannot break it.
+      // The screen has already been drawn: an unreachable file cannot break it.
     }
+  }
+
+  /** Writes the Kanban show-hidden toggles back to `config.txt`. */
+  private async persistKanbanVisibility(): Promise<void> {
+    await this.persistGlobalConfig();
   }
   /**
    * Reads the metadata of the tasks for the Gantt chart.
@@ -2643,6 +2674,9 @@ export class App
     this.updateViewToggle();
     this.updateToolbarForMode();
     await this.refresh();
+    // Persisted after the refresh: entering the board reloads the toggles
+    // from the file first, so the write keeps them.
+    void this.persistGlobalConfig();
   }
 
   private updateViewToggle(): void {
