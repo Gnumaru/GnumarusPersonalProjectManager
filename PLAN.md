@@ -8,7 +8,9 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
-- All planned batches (1-26) are implemented.
+- All planned batches (1-27) are implemented.
+- Batch 27 fixes stale tree rows after editing: saving a task invalidates its
+  cached copy so the refresh re-reads the file.
 - Batch 26 hides tasks in the tree and Gantt views with a `tree_gantt_hidden`
   flag and a single global show-hidden toggle.
 - Batch 25 keeps the focused task of each view in `config.txt`, so reloading
@@ -17,7 +19,7 @@ plain text file on the local disk, accessed exclusively through the
   same view.
 - Batch 23 persists the Kanban show-hidden toggles in a `config.txt` file in
   the project folder, written as `key=value` metadata with no description section.
-- Verification: 452 unit tests pass.
+- Verification: 453 unit tests pass.
 - Batch 22 adds hidden tasks on the Kanban board: `kanban_hidden` metadata, a
   hide checkbox on every card, a show-hidden checkbox per column and a global one.
 - Batch 21 adds task ordering: `kanban_order` and `tree_gantt_order` metadata,

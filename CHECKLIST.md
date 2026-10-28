@@ -1,5 +1,23 @@
 # Checklist
 
+## Batch 27 - Edited tasks refresh in the tree view
+
+### Fix
+
+- [x] Saving a task drops it from the tree task cache, so the next refresh
+      re-reads the file (`src/ui/app.ts`)
+- [x] The editor reopened afterwards shows the new values
+
+### Tests
+
+- [x] `src/ui/app.test.ts` - editing a title updates the row and the editor
+
+### Build / deploy
+
+- [x] `npm run typecheck`, `npm test` (453 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 26 - Hidden tasks in the tree and Gantt views
 
 ### Data layer

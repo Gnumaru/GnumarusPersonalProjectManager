@@ -1696,6 +1696,35 @@ describe('App and the tree view', () => {
     harness.app.dispose();
   });
 
+  it('shows the edited title in the tree right away', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    click(treeAction(harness, 1, 4));
+    await flush();
+    const title = harness.doc.querySelector<HTMLInputElement>('#task-title');
+    if (title === null || title === undefined) {
+      return;
+    }
+    title.value = 'Renamed task';
+    click(buttonByText(harness.doc, 'Save changes'));
+    await flush();
+
+    // The row shows the new title without reloading the page.
+    expect(treeRow(harness, 1)?.querySelector('.tree-title')?.textContent).toBe(
+      'Renamed task',
+    );
+
+    // Reopening the editor shows the new title as well.
+    click(treeAction(harness, 1, 4));
+    await flush();
+    expect(harness.doc.querySelector<HTMLInputElement>('#task-title')?.value).toBe(
+      'Renamed task',
+    );
+
+    harness.app.dispose();
+  });
+
   it('searches in the tree and keeps the ancestors of the matches', async () => {
     const harness = await createTreeHarness();
     await switchToTree(harness);

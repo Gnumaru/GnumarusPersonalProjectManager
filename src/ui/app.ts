@@ -2140,6 +2140,8 @@ export class App
     try {
       const task = await store.readTask(path);
       await store.writeTask(path, change(task));
+      // Same cache rule as the editor save: the refresh must re-read the file.
+      this.treeTasks.delete(taskId);
       await this.refresh();
     } catch (error) {
       this.handleError(error);
@@ -3338,6 +3340,9 @@ export class App
     const current = await store.readTask(path);
     const updated = applyTaskInput(current, taskInput, new Date());
     await store.writeTask(path, updated);
+    // The tree keeps the displayed tasks in memory: drop the edited one so
+    // the refresh re-reads its file instead of showing the old values.
+    this.treeTasks.delete(task.id);
     showToast({ doc: this.doc, message: `Task #${task.id} updated.`, kind: 'success' });
     await this.refresh();
   }
