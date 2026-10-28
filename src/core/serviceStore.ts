@@ -49,6 +49,7 @@ interface MutableMetadata {
   end: string;
   updated: string;
   expanded: boolean;
+  kanbanHidden: boolean;
   kanbanOrder: number;
   treeGanttOrder: number;
 }
@@ -107,7 +108,7 @@ export const COUNT_COMMENTS_COMMAND =
  * dates. The description of the tasks never reaches the browser.
  */
 export const READ_METADATA_COMMAND =
-  "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' -e '^start=' -e '^end=' -e '^updated=' -e '^expanded=' -e '^kanban_order=' -e '^tree_gantt_order=' .";
+  "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' -e '^start=' -e '^end=' -e '^updated=' -e '^expanded=' -e '^kanban_hidden=' -e '^kanban_order=' -e '^tree_gantt_order=' .";
 
 /**
  * Command used to detect the presence of ripgrep (`rg`) on the machine.
@@ -259,7 +260,7 @@ export class ServiceProjectStore implements ProjectStore {
       if (trimmed.length === 0) {
         continue;
       }
-      const match = /^(.*?):(id|parent|status|title|tags|start|end|updated|expanded|kanban_order|tree_gantt_order)=(.*)$/u.exec(trimmed);
+      const match = /^(.*?):(id|parent|status|title|tags|start|end|updated|expanded|kanban_hidden|kanban_order|tree_gantt_order)=(.*)$/u.exec(trimmed);
       if (match === null) {
         continue;
       }
@@ -279,6 +280,7 @@ export class ServiceProjectStore implements ProjectStore {
         end: '',
         updated: '',
         expanded: false,
+        kanbanHidden: false,
         kanbanOrder: 0,
         treeGanttOrder: 0,
       };
@@ -302,6 +304,8 @@ export class ServiceProjectStore implements ProjectStore {
         current.updated = value;
       } else if (key === 'expanded') {
         current.expanded = value.trim().toLowerCase() === 'true';
+      } else if (key === 'kanban_hidden') {
+        current.kanbanHidden = value.trim().toLowerCase() === 'true';
       } else if (key === 'kanban_order') {
         const order = Number.parseInt(value, 10);
         current.kanbanOrder = Number.isSafeInteger(order) && order >= 0 ? order : 0;
@@ -328,6 +332,7 @@ export class ServiceProjectStore implements ProjectStore {
         end: current.end,
         updated: current.updated,
         expanded: current.expanded,
+        kanbanHidden: current.kanbanHidden,
         kanbanOrder: current.kanbanOrder,
         treeGanttOrder: current.treeGanttOrder,
         path: relative,

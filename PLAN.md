@@ -8,7 +8,9 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
-- All planned batches (1-21) are implemented.
+- All planned batches (1-22) are implemented.
+- Batch 22 adds hidden tasks on the Kanban board: `kanban_hidden` metadata, a
+  hide checkbox on every card, a show-hidden checkbox per column and a global one.
 - Batch 21 adds task ordering: `kanban_order` and `tree_gantt_order` metadata,
   up/down reordering in the Kanban, tree and Gantt views, a shared order for
   tree/Gantt, an independent order for Kanban, column-aware reordering when a
@@ -23,7 +25,7 @@ plain text file on the local disk, accessed exclusively through the
   subgrids, the names stay pinned on the left, the indentation is 9px per
   level, every row has focus/edit/add-child actions and the chart keeps the
   focus breadcrumb of the tree view.
-- Verification: 417 unit tests and 121/121 browser checks pass.
+- Verification: 425 unit tests pass.
 - Documentation consistency verified.
 
 ## Architecture

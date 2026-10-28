@@ -17,7 +17,7 @@ Notes (`note_<id>.txt`) are a new kind of thing: a simple note-taking replacemen
 - Search by title, tag or description (recursive grep in service mode)
 - Paginated listing with first / previous / next / last buttons
 - Tree view with collapsible/expandable branches and focus
-- Kanban board with drag-and-drop between status columns
+- Kanban board with drag-and-drop between status columns, hide checkboxes per card, show-hidden toggles per column and globally
 - Gantt chart with draggable bars, wrapping task names, row actions and focus breadcrumb
 - Notes mode with markdown editing, preview, paginated listing, page jump input, configurable page size
 - Comments on tasks
@@ -81,7 +81,7 @@ The service status pill at the top right shows whether the service is online. Wh
 ```bash
 npm install
 npm run build
-npm run verify        # typecheck, 417 tests, build, smoke E2E, browser E2E (122 checks)
+npm run verify        # typecheck, 425 tests, build, smoke E2E, browser E2E (122 checks)
 npm run deploy        # builds and copies dist to /var/www/html/GnumarusProjectManager
 ```
 

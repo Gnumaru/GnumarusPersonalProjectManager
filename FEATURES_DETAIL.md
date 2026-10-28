@@ -64,6 +64,9 @@ Rules:
   tree view. The key is **removed** when the branch is collapsed (absent means
   collapsed). It is a view preference: writing it does not change `updated`,
   and every view but the tree and the Gantt ignores it.
+* `kanban_hidden` - `true` only when the card of the task is hidden on the
+  Kanban board. Absent means visible. Same view-preference rule as `expanded`:
+  writing it does not change `updated`, and only the board reads it.
 
 ### The blocking and the related tasks in the editor
 
@@ -483,6 +486,15 @@ A card is **dragged from one column to another one**: the `status=` key of its
 file is rewritten and the card moves to its new column. The column under the
 pointer is highlighted, the dragged card is dimmed and a chip with the name of
 the task follows the pointer.
+
+### Hidden cards
+
+Every card carries a **hide checkbox**: checking it writes `kanban_hidden=true`
+in the file and the card disappears from the board. Every column has a
+**show hidden** checkbox (unchecked by default) and there is a **global**
+show-hidden checkbox above the board: when the global one is checked, the
+hidden cards of every column are shown regardless of the column toggles;
+otherwise each column follows its own toggle. Shown hidden cards look dimmed.
 
 ### Where the data comes from
 

@@ -91,6 +91,7 @@ list or as a tree.
 | **Only the tasks that have no child are on the board** | Done | `src/core/projectStore.ts` |
 | **Drag and drop between the columns changes the status** | Done | `src/ui/kanbanDrag.ts` |
 | **A card opens the task and its editor** | Done | `src/ui/kanbanBoard.ts` |
+| **Hide a card with a checkbox (`kanban_hidden`), show hidden per column or globally** | Done | `src/ui/kanbanBoard.ts`, `src/ui/app.ts` |
 
 ## Gantt chart
 

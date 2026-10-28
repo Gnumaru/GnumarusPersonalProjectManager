@@ -1728,6 +1728,81 @@ describe('App and the board', () => {
 
     harness.app.dispose();
   });
+
+  it('hides a card and shows it again through the toggles', async () => {
+    const harness = await createBoardHarness();
+    await switchToBoard(harness);
+
+    const todoCards = (): (string | null)[] =>
+      [
+        ...harness.root.querySelectorAll(
+          '.kanban-column[data-status="todo"] .kanban-card',
+        ),
+      ].map((card) => card.getAttribute('data-task-id'));
+
+    // Every card offers a hide checkbox, unchecked by default.
+    const hideCheckbox = harness.root.querySelector<HTMLInputElement>(
+      '.kanban-card[data-task-id="3"] .kanban-hide-checkbox',
+    );
+    expect(hideCheckbox?.checked).toBe(false);
+    if (hideCheckbox === null || hideCheckbox === undefined) {
+      return;
+    }
+    hideCheckbox.checked = true;
+    hideCheckbox.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+
+    // The flag is persisted and the card disappears from the board.
+    expect(harness.bridge.files.get('/home/user/projects/task_3.txt')).toContain(
+      'kanban_hidden=true',
+    );
+    expect(todoCards()).toEqual(['4', '5']);
+
+    // The column toggle is unchecked by default; checking it shows the card dimmed.
+    const columnToggle = harness.root.querySelector<HTMLInputElement>(
+      '.kanban-column[data-status="todo"] .kanban-show-hidden',
+    );
+    expect(columnToggle?.checked).toBe(false);
+    if (columnToggle === null || columnToggle === undefined) {
+      return;
+    }
+    columnToggle.checked = true;
+    columnToggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(todoCards()).toEqual(['3', '4', '5']);
+    expect(
+      harness.root
+        .querySelector('.kanban-card[data-task-id="3"]')
+        ?.classList.contains('is-hidden'),
+    ).toBe(true);
+
+    // Unchecking the column hides the card again.
+    columnToggle.checked = false;
+    columnToggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(todoCards()).toEqual(['4', '5']);
+
+    // The global toggle shows the hidden cards of every column.
+    const globalToggle = harness.root.querySelector<HTMLInputElement>(
+      '.kanban-show-all-hidden',
+    );
+    expect(globalToggle?.checked).toBe(false);
+    if (globalToggle === null || globalToggle === undefined) {
+      return;
+    }
+    globalToggle.checked = true;
+    globalToggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(todoCards()).toEqual(['3', '4', '5']);
+
+    // Unchecking it hides the card again, following the column toggle.
+    globalToggle.checked = false;
+    globalToggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(todoCards()).toEqual(['4', '5']);
+
+    harness.app.dispose();
+  });
 });
 
 describe('App and the Gantt chart', () => {

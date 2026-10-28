@@ -7,9 +7,18 @@ function createDocument(): Document {
   return new JSDOM('<!doctype html><html><body></body></html>').window.document;
 }
 
-function card(id: number, status: TaskCard['status'], title = `Task ${id}`): TaskCard {
-  return { id, title, status, parentId: null, tags: [`tag${id}`], path: `/tmp/task_${id}.txt` };
+function dispatchChange(checkbox: HTMLInputElement): void {
+  const view = checkbox.ownerDocument.defaultView;
+  if (view === null) {
+    return;
+  }
+  checkbox.dispatchEvent(new view.Event('change', { bubbles: true }));
 }
+
+function card(id: number, status: TaskCard['status'], title = `Task ${id}`): TaskCard {
+  return { id, title, status, parentId: null, tags: [`tag${id}`], kanbanHidden: false, path: `/tmp/task_${id}.txt` };
+}
+
 
 describe('renderKanbanBoard', () => {
   it('builds one column per status, in the expected order', () => {
@@ -19,6 +28,8 @@ describe('renderKanbanBoard', () => {
       onOpen: () => undefined,
       onEdit: () => undefined,
       onReorder: () => undefined,
+      onToggleHidden: () => undefined,
+      onToggleShowColumn: () => undefined,
     });
 
     const columns = [...board.querySelectorAll('.kanban-column')];
@@ -53,6 +64,8 @@ describe('renderKanbanBoard', () => {
         onOpen: () => undefined,
         onEdit: () => undefined,
       onReorder: () => undefined,
+      onToggleHidden: () => undefined,
+      onToggleShowColumn: () => undefined,
       },
     );
 
@@ -74,6 +87,8 @@ describe('renderKanbanBoard', () => {
       onOpen: () => undefined,
       onEdit: () => undefined,
       onReorder: () => undefined,
+      onToggleHidden: () => undefined,
+      onToggleShowColumn: () => undefined,
     });
 
     const tags = board.querySelectorAll('.kanban-card .tag');
@@ -85,7 +100,7 @@ describe('renderKanbanBoard', () => {
     const doc = createDocument();
     const onOpen = vi.fn();
     const onEdit = vi.fn();
-    const board = renderKanbanBoard(doc, [card(1, 'todo')], { onDrop: () => undefined, onOpen, onEdit, onReorder: () => undefined });
+    const board = renderKanbanBoard(doc, [card(1, 'todo')], { onDrop: () => undefined, onOpen, onEdit, onReorder: () => undefined, onToggleHidden: () => undefined, onToggleShowColumn: () => undefined });
 
     const element = board.querySelector('.kanban-card[data-task-id="1"]');
     const title = element?.querySelector<HTMLButtonElement>('.kanban-card-title');
@@ -105,8 +120,99 @@ describe('renderKanbanBoard', () => {
       onOpen: () => undefined,
       onEdit: () => undefined,
       onReorder: () => undefined,
+      onToggleHidden: () => undefined,
+      onToggleShowColumn: () => undefined,
     });
 
     expect(board.querySelector('.kanban-card-title')?.textContent).toBe('Untitled task');
+  });
+
+  it('hides the hidden cards unless their column shows them', () => {
+    const doc = createDocument();
+    const cards = [
+      { ...card(1, 'todo'), kanbanHidden: false },
+      { ...card(2, 'todo'), kanbanHidden: true },
+    ];
+    const handlers = {
+      onDrop: () => undefined,
+      onOpen: () => undefined,
+      onEdit: () => undefined,
+      onReorder: () => undefined,
+      onToggleHidden: () => undefined,
+      onToggleShowColumn: () => undefined,
+    };
+    const hidden = renderKanbanBoard(doc, cards, handlers);
+    const todo = hidden.querySelector('.kanban-column[data-status="todo"]');
+    expect(todo?.querySelectorAll('.kanban-card')).toHaveLength(1);
+    expect(todo?.querySelector('.kanban-column-count')?.textContent).toBe('1');
+    // The column toggle is unchecked by default.
+    expect(
+      todo?.querySelector<HTMLInputElement>('.kanban-show-hidden')?.checked,
+    ).toBe(false);
+
+    const shown = renderKanbanBoard(doc, cards, handlers, new Map(), {
+      showAllHidden: false,
+      showHiddenByStatus: new Map([['todo', true]]),
+    });
+    const shownTodo = shown.querySelector('.kanban-column[data-status="todo"]');
+    expect(shownTodo?.querySelectorAll('.kanban-card')).toHaveLength(2);
+    expect(
+      shownTodo?.querySelector('.kanban-card[data-task-id="2"]')?.classList.contains('is-hidden'),
+    ).toBe(true);
+
+    const all = renderKanbanBoard(doc, cards, handlers, new Map(), {
+      showAllHidden: true,
+      showHiddenByStatus: new Map(),
+    });
+    expect(
+      all.querySelector('.kanban-column[data-status="todo"] .kanban-card[data-task-id="2"]'),
+    ).not.toBeNull();
+  });
+
+  it('hides a card through its checkbox', () => {
+    const doc = createDocument();
+    const onToggleHidden = vi.fn();
+    const board = renderKanbanBoard(doc, [card(1, 'todo')], {
+      onDrop: () => undefined,
+      onOpen: () => undefined,
+      onEdit: () => undefined,
+      onReorder: () => undefined,
+      onToggleHidden,
+      onToggleShowColumn: () => undefined,
+    });
+
+    const checkbox = board.querySelector<HTMLInputElement>(
+      '.kanban-card[data-task-id="1"] .kanban-hide-checkbox',
+    );
+    expect(checkbox?.checked).toBe(false);
+    if (checkbox === null) {
+      return;
+    }
+    checkbox.checked = true;
+    dispatchChange(checkbox);
+    expect(onToggleHidden).toHaveBeenCalledWith(1, true);
+  });
+
+  it('toggles a column through its header checkbox', () => {
+    const doc = createDocument();
+    const onToggleShowColumn = vi.fn();
+    const board = renderKanbanBoard(doc, [card(1, 'todo')], {
+      onDrop: () => undefined,
+      onOpen: () => undefined,
+      onEdit: () => undefined,
+      onReorder: () => undefined,
+      onToggleHidden: () => undefined,
+      onToggleShowColumn,
+    });
+
+    const checkbox = board.querySelector<HTMLInputElement>(
+      '.kanban-column[data-status="todo"] .kanban-show-hidden',
+    );
+    if (checkbox === null) {
+      return;
+    }
+    checkbox.checked = true;
+    dispatchChange(checkbox);
+    expect(onToggleShowColumn).toHaveBeenCalledWith('todo', true);
   });
 });

@@ -762,6 +762,48 @@ button[hidden] {
   padding: 0 7px;
 }
 
+.kanban-show-hidden-label,
+.kanban-show-all-label,
+.kanban-hide-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-faint);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.kanban-show-hidden-label:hover,
+.kanban-show-all-label:hover,
+.kanban-hide-label:hover {
+  color: var(--text);
+}
+
+.kanban-show-hidden,
+.kanban-show-all-hidden,
+.kanban-hide-checkbox {
+  accent-color: var(--accent);
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.kanban-toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+}
+
+/* A hidden card shown through a toggle looks dimmed. */
+.kanban-card.is-hidden {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
 /* The amount of comments of a task, shown as a number inside a small circle,
    to the left of its name, in every view that lists the tasks. */
 .comment-count {

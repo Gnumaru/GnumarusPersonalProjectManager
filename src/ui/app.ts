@@ -82,6 +82,7 @@ import {
   withDates,
   withDefaultDates,
   withExpandedState,
+  withKanbanHidden,
   withParent,
   withStatus,
   type Task,
@@ -95,7 +96,7 @@ import { renderGanttView, type GanttTask } from './ganttView.js';
 import { GanttDragController, type GanttDragContext } from './ganttDrag.js';
 import { createIcon } from './icons.js';
 import { KanbanDragController } from './kanbanDrag.js';
-import { renderKanbanBoard } from './kanbanBoard.js';
+import { renderKanbanBoard, renderKanbanToolbar } from './kanbanBoard.js';
 import { Modal } from './modal.js';
 import { NoteDialog } from './noteDialog.js';
 import { renderNoteRows } from './noteTable.js';
@@ -243,6 +244,10 @@ export class App
   private noteTableHead!: HTMLElement;
   /** The cards of the board: the tasks that have no child. */
   private kanbanCards: TaskCard[] = [];
+  /** When `true`, the hidden cards of every column are shown. */
+  private kanbanShowAllHidden = false;
+  /** Per column toggle for the hidden cards, `false` when absent. */
+  private kanbanShowHiddenByStatus = new Map<TaskStatus, boolean>();
   /** The metadata of the tasks, read for the Gantt chart. */
   private ganttMetadata = new Map<number, TaskSummary>();
   /** The weeks and the months that are collapsed in the Gantt chart. */
@@ -1430,6 +1435,7 @@ export class App
         status: task.status,
         parentId: task.parentId,
         tags: task.tags,
+        kanbanHidden: task.kanbanHidden,
         path: task.path,
       }));
   }
@@ -1757,25 +1763,74 @@ export class App
   private renderKanban(): void {
     clear(this.kanbanElement);
     this.kanbanElement.append(
-      renderKanbanBoard(this.doc, this.kanbanCards, {
-        onDrop: (taskId, status) => {
-          void this.changeTaskStatus(taskId, status);
+      renderKanbanToolbar(this.doc, this.kanbanShowAllHidden, (show) => {
+        this.kanbanShowAllHidden = show;
+        this.renderKanban();
+      }),
+    );
+    this.kanbanElement.append(
+      renderKanbanBoard(
+        this.doc,
+        this.kanbanCards,
+        {
+          onDrop: (taskId, status) => {
+            void this.changeTaskStatus(taskId, status);
+          },
+          onOpen: (taskId) => {
+            void this.openTaskById(taskId);
+          },
+          onEdit: (taskId) => {
+            void this.openEditTaskById(taskId);
+          },
+          onReorder: (taskId, delta) => {
+            void this.moveTaskKanban(taskId, delta);
+          },
+          onToggleHidden: (taskId, hidden) => {
+            void this.setKanbanHidden(taskId, hidden);
+          },
+          onToggleShowColumn: (status, show) => {
+            this.kanbanShowHiddenByStatus.set(status, show);
+            this.renderKanban();
+          },
         },
-        onOpen: (taskId) => {
-          void this.openTaskById(taskId);
+        this.commentCounts,
+        {
+          showAllHidden: this.kanbanShowAllHidden,
+          showHiddenByStatus: this.kanbanShowHiddenByStatus,
         },
-        onEdit: (taskId) => {
-          void this.openEditTaskById(taskId);
-        },
-        onReorder: (taskId, delta) => {
-          void this.moveTaskKanban(taskId, delta);
-        },
-      }, this.commentCounts),
+      ),
     );
 
     this.updateEmptyState(this.kanbanCards.length === 0);
     this.resultCountElement.textContent = this.buildResultCount();
     this.updateToolbarState();
+  }
+
+  /**
+   * Writes the `kanban_hidden=` key of the file of a task.
+   *
+   * Like the expanded state, it is a view preference: the write is silent and
+   * follows the change of the screen.
+   */
+  private async setKanbanHidden(taskId: number, hidden: boolean): Promise<void> {
+    const store = this.store;
+    if (store === null) {
+      return;
+    }
+    const card = this.kanbanCards.find((candidate) => candidate.id === taskId);
+    if (card !== undefined) {
+      this.kanbanCards = this.kanbanCards.map((candidate) =>
+        candidate.id === taskId ? { ...candidate, kanbanHidden: hidden } : candidate,
+      );
+      this.renderKanban();
+    }
+    try {
+      const path = this.pathOfTask(taskId);
+      const task = await store.readTask(path);
+      await store.writeTask(path, withKanbanHidden(task, hidden));
+    } catch {
+      // The board has already been drawn: an unreachable file cannot break it.
+    }
   }
 
   /** Draws the Gantt chart of the tasks. */

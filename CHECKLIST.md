@@ -1,5 +1,33 @@
 # Checklist
 
+## Batch 22 - Hidden tasks on the Kanban board
+
+### Data layer
+
+- [x] `kanban_hidden` boolean metadata key in `src/core/task.ts` (parsed,
+      serialized only when hidden, `updated` untouched)
+- [x] `TaskSummary.kanbanHidden` and `TaskCard.kanbanHidden`
+- [x] The four stores read and pass the flag, plus the fake bridge
+
+### User interface
+
+- [x] Checkbox on every Kanban card to hide the task
+- [x] Checkbox on every column to show its hidden cards (unchecked by default)
+- [x] Global checkbox to show the hidden cards of every column
+- [x] Hidden cards shown dimmed while the toggle is on
+
+### Tests
+
+- [x] `src/core/task.test.ts` - parse and serialize `kanban_hidden`
+- [x] `src/ui/kanbanBoard.test.ts` - hide checkbox, column and global toggles
+- [x] `src/ui/app.test.ts` - hiding persists to the file, toggles filter cards
+
+### Build / deploy
+
+- [x] `npm run typecheck`, `npm test` (425 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 1 - Root tasks (CRUD + search + pagination)
 ### Scaffold
 - [x] `package.json` with `dev`, `build`, `preview`, `test`, `e2e`, `deploy` scripts

@@ -132,7 +132,7 @@ em qualquer view, quando eu edito uma tarefa e adiciono um comentario, a contage
 ====
 na modal de editar tarefa, tanto na caixa de texto que permite adicionar um comentario quanto na que permite editar comentario, ctrl+enter ou ctrl+return devem executar acao do botao add comment (no caso da caixa de texto de novo comentario) ou save (no caso da caixa de editar comentario)
 ====
-
+na view kanban, em cada card crie um checkbox para esconder a tarefa. isso será um novo metadado booleano da task chamado kanban_hidden. cada coluna terá um checkbox para exibir cards ocultos, que fica desabilitado por padrão. ao habilitar os cards ocultos são exibidos, ao desabilitar eles voltam a ficar ocultos. deve haver tambem um checkbox global para exibir todos os cards ocultos. se estiver marcado todos os cards ocultos de todas as colunas devem ser exibidos independente do checkbox da coluna. se estiver desmarcado só são exibidos segundo o valor do checkbox da coluna.
 ====
 ====
 ====

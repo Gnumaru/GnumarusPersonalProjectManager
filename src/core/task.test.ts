@@ -22,6 +22,7 @@ import {
   timestampFromDateInput,
   withParent,
   withExpandedState,
+  withKanbanHidden,
 } from './task.js';
 
 describe('task file names', () => {
@@ -217,6 +218,7 @@ describe('the blocking and the related tasks', () => {
       blockedBy: [] as number[],
       related: [] as number[],
       expanded: false,
+      kanbanHidden: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
       description: '',
@@ -400,6 +402,7 @@ describe('serializeTask', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanHidden: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
       type: 'Feature' as const,
@@ -441,6 +444,7 @@ describe('serializeTask', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanHidden: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
       type: 'Feature' as const,
@@ -475,6 +479,43 @@ describe('serializeTask', () => {
     expect(parseTask('id=1\nexpanded=false\n----\nbody').expanded).toBe(false);
   });
 
+  it('writes the kanban_hidden key only when the card is hidden', () => {
+    const base = {
+      id: 1,
+      title: 'T',
+      status: 'todo' as const,
+      parentId: null,
+      tags: [],
+      created: '',
+      updated: '',
+      start: '',
+      end: '',
+      description: '',
+      blockedBy: [],
+      related: [],
+    };
+    expect(serializeTask({ ...base, expanded: false, kanbanHidden: false })).not.toContain(
+      'kanban_hidden=',
+    );
+    expect(serializeTask({ ...base, expanded: false, kanbanHidden: true })).toContain(
+      'kanban_hidden=true',
+    );
+  });
+
+  it('parses the kanban_hidden key, visible when absent', () => {
+    expect(parseTask('id=1\nkanban_hidden=true\n----\nbody').kanbanHidden).toBe(true);
+    expect(parseTask('id=1\n----\nbody').kanbanHidden).toBe(false);
+    expect(parseTask('id=1\nkanban_hidden=false\n----\nbody').kanbanHidden).toBe(false);
+  });
+
+  it('keeps the hidden state without touching the update timestamp', () => {
+    const task = parseTask('id=1\nupdated=20261002100000000\n----\nbody');
+    const hidden = withKanbanHidden(task, true);
+    expect(hidden.kanbanHidden).toBe(true);
+    expect(hidden.updated).toBe('20261002100000000');
+    expect(withKanbanHidden(hidden, false).kanbanHidden).toBe(false);
+  });
+
   it('does not change the update time when the expanded state changes', () => {
     const base = {
       id: 1,
@@ -490,6 +531,7 @@ describe('serializeTask', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanHidden: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
       type: 'Feature' as const,
@@ -517,6 +559,7 @@ describe('serializeTask', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanHidden: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
       type: 'Feature' as const,
@@ -544,6 +587,7 @@ describe('serializeTask', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanHidden: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
       description: '',
@@ -576,6 +620,7 @@ describe('serializeTask', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanHidden: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
       type: 'Feature' as const,
@@ -603,6 +648,7 @@ describe('round trip', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanHidden: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
       type: 'Feature' as const,
@@ -628,6 +674,7 @@ describe('round trip', () => {
       blockedBy: [],
       related: [],
       expanded: false,
+      kanbanHidden: false,
       kanbanOrder: 0,
       treeGanttOrder: 0,
       type: 'Feature' as const,

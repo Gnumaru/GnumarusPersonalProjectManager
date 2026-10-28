@@ -85,6 +85,8 @@ export interface TaskCard {
   /** `null` for a task without parent. */
   readonly parentId: number | null;
   readonly tags: readonly string[];
+  /** Whether the card is hidden on the board. */
+  readonly kanbanHidden: boolean;
   /** Path of the file of the task. */
   readonly path: string;
 }
@@ -142,6 +144,12 @@ export interface Task {
   readonly type?: TaskType;
   /** The role responsible for the task. */
   readonly role?: TaskRole;
+  /**
+   * Whether the task is hidden on the Kanban board.
+   *
+   * It is a view preference, like `expanded`: only the board reads it.
+   */
+  readonly kanbanHidden?: boolean;
   /**
    * Order of the task among its siblings in the Kanban view.
    *
@@ -484,6 +492,7 @@ export function parseTask(content: string, idHint?: number): Task {
     blockedBy: parseIdList(metadata.get('blocked_by') ?? ''),
     related: parseIdList(metadata.get('related') ?? ''),
     expanded: (metadata.get('expanded') ?? '').trim().toLowerCase() === 'true',
+    kanbanHidden: (metadata.get('kanban_hidden') ?? '').trim().toLowerCase() === 'true',
     type: isTaskType((metadata.get('type') ?? '').trim()) ? ((metadata.get('type') ?? '').trim() as TaskType) : 'Feature',
     role: isTaskRole((metadata.get('role') ?? '').trim()) ? ((metadata.get('role') ?? '').trim() as TaskRole) : 'Programming',
     kanbanOrder: normalizeOrder(metadata.get('kanban_order')),
@@ -520,6 +529,10 @@ export function serializeTask(task: Task): string {
   if (task.expanded) {
     lines.push('expanded=true');
   }
+  // Same rule for the hidden cards of the board: absent means visible.
+  if (task.kanbanHidden === true) {
+    lines.push('kanban_hidden=true');
+  }
   lines.push(`type=${task.type ?? 'Feature'}`);
   lines.push(`role=${task.role ?? 'Programming'}`);
   lines.push(`kanban_order=${task.kanbanOrder ?? 0}`);
@@ -552,6 +565,7 @@ export function buildTask(
     blockedBy: [...input.blockedBy],
     related: [...input.related],
     expanded: false,
+    kanbanHidden: false,
     type: input.type ?? 'Feature',
     role: input.role ?? 'Programming',
     kanbanOrder: 0,
@@ -624,6 +638,19 @@ export function withExpandedState(task: Task, expanded: boolean): Task {
   return {
     ...task,
     expanded,
+  };
+}
+
+/**
+ * Returns a copy of the task with another Kanban hidden state.
+ *
+ * Like the expanded state, it is a **view preference**: changing it does not
+ * touch the `updated` timestamp of the file.
+ */
+export function withKanbanHidden(task: Task, hidden: boolean): Task {
+  return {
+    ...task,
+    kanbanHidden: hidden,
   };
 }
 

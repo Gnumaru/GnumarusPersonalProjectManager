@@ -21,10 +21,45 @@ export interface KanbanHandlers {
   readonly onEdit: (taskId: number) => void;
   /** Moves the card up or down in its column. */
   readonly onReorder: (taskId: number, delta: -1 | 1) => void;
+  /** Hides a card or shows it again. */
+  readonly onToggleHidden: (taskId: number, hidden: boolean) => void;
+  /** Shows or hides the hidden cards of a column. */
+  readonly onToggleShowColumn: (status: TaskStatus, show: boolean) => void;
+}
+
+/** Which hidden cards are shown on the board. */
+export interface KanbanVisibility {
+  /** When `true`, the hidden cards of every column are shown. */
+  readonly showAllHidden: boolean;
+  /** Per column toggle, `false` when the column is absent. */
+  readonly showHiddenByStatus: ReadonlyMap<TaskStatus, boolean>;
 }
 
 /** The class of the columns of the board. */
 export const COLUMN_CLASS = 'kanban-column';
+
+/** The global toggle above the board: shows the hidden cards of every column. */
+export function renderKanbanToolbar(
+  doc: Document,
+  showAllHidden: boolean,
+  onToggleShowAll: (show: boolean) => void,
+): HTMLElement {
+  const checkbox = doc.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.className = 'kanban-show-all-hidden';
+  checkbox.checked = showAllHidden;
+  checkbox.title = 'Show every hidden card';
+  checkbox.setAttribute('aria-label', 'Show every hidden card');
+  checkbox.addEventListener('change', () => {
+    onToggleShowAll(checkbox.checked);
+  });
+  return el(doc, 'div', { class: 'kanban-toolbar' }, [
+    el(doc, 'label', { class: 'kanban-show-all-label', title: 'Show every hidden card' }, [
+      checkbox,
+      el(doc, 'span', { text: 'Show hidden' }),
+    ]),
+  ]);
+}
 
 /** Builds the board: one column per status, with the cards of the tasks. */
 export function renderKanbanBoard(
@@ -32,28 +67,57 @@ export function renderKanbanBoard(
   cards: readonly TaskCard[],
   handlers: KanbanHandlers,
   commentCounts: ReadonlyMap<number, number> = new Map<number, number>(),
+  visibility: KanbanVisibility = { showAllHidden: false, showHiddenByStatus: new Map() },
 ): HTMLElement {
   const board = el(doc, 'div', { class: 'kanban-board' });
 
   for (const status of BOARD_STATUSES) {
     const columnCards = cards.filter((card) => card.status === status);
+    const showHidden =
+      visibility.showAllHidden || (visibility.showHiddenByStatus.get(status) ?? false);
+    const visibleCards = showHidden
+      ? columnCards
+      : columnCards.filter((card) => !card.kanbanHidden);
     const column = el(doc, 'section', { class: 'kanban-column' }, [
       el(doc, 'header', { class: 'kanban-column-header' }, [
         el(doc, 'span', { class: 'kanban-column-title', text: STATUS_LABELS[status] }),
-        el(doc, 'span', { class: 'kanban-column-count', text: String(columnCards.length) }),
+        el(doc, 'span', { class: 'kanban-column-count', text: String(visibleCards.length) }),
+        renderShowHiddenToggle(doc, status, showHidden, handlers),
       ]),
       el(doc, 'div', { class: 'kanban-cards' }),
     ]);
     column.dataset['status'] = status;
 
     const list = column.querySelector('.kanban-cards');
-    for (const card of columnCards) {
+    for (const card of visibleCards) {
       list?.append(renderKanbanCard(doc, card, handlers, commentCounts));
     }
     board.append(column);
   }
 
   return board;
+}
+
+/** The "show hidden" checkbox of a column header. */
+function renderShowHiddenToggle(
+  doc: Document,
+  status: TaskStatus,
+  show: boolean,
+  handlers: KanbanHandlers,
+): HTMLElement {
+  const checkbox = doc.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.className = 'kanban-show-hidden';
+  checkbox.checked = show;
+  checkbox.title = 'Show hidden cards';
+  checkbox.setAttribute('aria-label', `Show hidden cards in ${STATUS_LABELS[status]}`);
+  checkbox.addEventListener('change', () => {
+    handlers.onToggleShowColumn(status, checkbox.checked);
+  });
+  return el(doc, 'label', { class: 'kanban-show-hidden-label', title: 'Show hidden cards' }, [
+    checkbox,
+    el(doc, 'span', { text: 'Hidden' }),
+  ]);
 }
 
 function renderKanbanCard(
@@ -90,6 +154,23 @@ function renderKanbanCard(
     tags.append(el(doc, 'span', { class: 'tag', text: tag }));
   }
 
+  const hideCheckbox = doc.createElement('input');
+  hideCheckbox.type = 'checkbox';
+  hideCheckbox.className = 'kanban-hide-checkbox';
+  hideCheckbox.checked = card.kanbanHidden;
+  hideCheckbox.title = card.kanbanHidden ? 'Show this task' : 'Hide this task';
+  hideCheckbox.setAttribute(
+    'aria-label',
+    card.kanbanHidden ? `Show task #${card.id}` : `Hide task #${card.id}`,
+  );
+  hideCheckbox.addEventListener('change', () => {
+    handlers.onToggleHidden(card.id, hideCheckbox.checked);
+  });
+  const hideToggle = el(doc, 'label', { class: 'kanban-hide-label', title: 'Hide this task' }, [
+    hideCheckbox,
+    el(doc, 'span', { text: 'Hide' }),
+  ]);
+
   const actions = el(doc, 'div', { class: 'kanban-card-actions' }, [
     actionButton(doc, 'up', 'Move the card up', () => {
       handlers.onReorder(card.id, -1);
@@ -105,7 +186,12 @@ function renderKanbanCard(
     }),
   ]);
 
-  const element = el(doc, 'article', { class: 'kanban-card' }, [...children, tags, actions]);
+  const element = el(
+    doc,
+    'article',
+    { class: `kanban-card${card.kanbanHidden ? ' is-hidden' : ''}` },
+    [...children, tags, hideToggle, actions],
+  );
   element.dataset['taskId'] = String(card.id);
   return element;
 }
