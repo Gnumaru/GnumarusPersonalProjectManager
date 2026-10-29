@@ -1,5 +1,18 @@
 # Checklist
 
+## Batch 31 - Kanban global show-hidden above the columns
+
+### Change
+
+- [x] `.kanban-wrap` stacks vertically so `kanban-toolbar` sits above
+      `.kanban-board` instead of left of the last column (`src/styles.css`)
+
+### Tests
+
+- [x] `npm run typecheck`, `npm test` (459 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 30 - Search shortcut is Ctrl+Shift+F
 
 ### Change

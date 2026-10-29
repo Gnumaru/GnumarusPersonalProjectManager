@@ -494,7 +494,9 @@ the task follows the pointer.
 Every card carries a **hide checkbox**: checking it writes `kanban_hidden=true`
 in the file and the card disappears from the board. Every column has a
 **show hidden** checkbox (unchecked by default) and there is a **global**
-show-hidden checkbox above the board: when the global one is checked, the
+show-hidden toolbar stacked **above** the columns (`.kanban-wrap` is a
+vertical flex column, so the toolbar takes no horizontal space from the
+columns): when the global one is checked, the
 hidden cards of every column are shown regardless of the column toggles;
 otherwise each column follows its own toggle. Shown hidden cards look dimmed.
 

@@ -8,6 +8,10 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 31 moves the Kanban global show-hidden toolbar above the
+  columns: `.kanban-wrap` becomes a vertical stack so the toolbar no longer
+  sits to the left of the last column.
+- Verification: 459 unit tests pass.
 - All planned batches (1-30) are implemented.
 - Batch 30 moves the search shortcut to Ctrl+Shift+F so plain Ctrl+F stays
   with the browser find-in-page.

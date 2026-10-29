@@ -154,6 +154,7 @@ crie um novo tipo de role de tarefa chamado 'Research'
 ====
 atualmente o atalho para a busca é ctrl+f. eu quero que mude para ctrl+shift+f para que o usuario ainda possa usar a busca normal do navegador.
 ====
+na view kanban o checkbox show hidden global esta do lado esquerdo da ultima coluna, ocupando espaco horizontal na tela. ao inves disso quero que ele fique em cima das area das colunas
 ====
 ====
 
