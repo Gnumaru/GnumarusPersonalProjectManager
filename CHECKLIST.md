@@ -1,5 +1,20 @@
 # Checklist
 
+## Batch 32 - Colored status, type and role dropdowns in the task editor
+
+### Change
+
+- [x] Status options reuse the Kanban column colours, type options are red /
+      yellow / green, roles share an 8-colour palette; the closed select
+      follows the current value (`src/ui/taskDialog.ts`, `src/styles.css`)
+
+### Tests
+
+- [x] `src/ui/taskDialog.test.ts` - tones on the options, select follows value
+- [x] `npm run typecheck`, `npm test` (463 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 31 - Kanban global show-hidden above the columns
 
 ### Change

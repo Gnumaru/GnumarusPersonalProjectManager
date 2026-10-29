@@ -156,6 +156,7 @@ atualmente o atalho para a busca é ctrl+f. eu quero que mude para ctrl+shift+f 
 ====
 na view kanban o checkbox show hidden global esta do lado esquerdo da ultima coluna, ocupando espaco horizontal na tela. ao inves disso quero que ele fique em cima das area das colunas
 ====
+na modal de edicao de tarefas no dropdown de status é possível deixar cada opcao com uma cor de fundo diferente? se for, deixe com as mesmas cores utilizadas pra cada status nas colunas do kanban. faça a mesma coisa pro tipo (bug vermelho, improvement amarelo e feature verde e para os roles
 ====
 
 ====

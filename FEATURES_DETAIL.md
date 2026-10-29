@@ -208,6 +208,16 @@ The dialog works in three modes (`view`, `edit`, `create`) and validates the
 title before saving. Errors raised by the service are shown inside the dialog
 instead of closing it.
 
+The **status, type and role dropdowns are colored**: every option carries the
+background and text colour of its value, and the closed select follows the
+currently selected one (kept in sync on `change` through a `data-tone`
+attribute). Statuses reuse the Kanban column colours (planning blue, todo
+neutral gray, next purple, paused slate, doing amber, done green, canceled
+red); types are Bug red, Improvement amber and Feature green; roles share an
+8-colour palette from the app theme (Graphics purple, Audio blue, Programming
+green, Design amber, Assembly red, Management slate, Test neutral gray,
+Research teal).
+
 The same actions work the same way with the **embedded project**: the store of
 the browser writes the very same files, in the very same format. The embedded
 project needs **no folder**: the guard of the creation of a task follows the

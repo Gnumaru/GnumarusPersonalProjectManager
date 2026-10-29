@@ -8,6 +8,12 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 32 colors the status, type and role dropdowns of the
+  task editor: each option carries the colour of its value (statuses reuse the
+  Kanban column colours, Bug is red, Improvement yellow, Feature green, roles
+  share an 8-colour palette from the app theme), and the closed select follows
+  the current value.
+- Verification: 463 unit tests pass.
 - Batch 31 moves the Kanban global show-hidden toolbar above the
   columns: `.kanban-wrap` becomes a vertical stack so the toolbar no longer
   sits to the left of the last column.

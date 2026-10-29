@@ -381,6 +381,7 @@ export class TaskDialog {
       value: task?.status ?? 'todo',
       options: TASK_STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] })),
     });
+    paintSelect(this.statusSelect);
 
     this.typeSelect = select(this.doc, {
       class: 'field-input',
@@ -388,6 +389,7 @@ export class TaskDialog {
       value: this.typeValue,
       options: TASK_TYPES.map((type) => ({ value: type, label: type })),
     });
+    paintSelect(this.typeSelect);
 
     this.roleSelect = select(this.doc, {
       class: 'field-input',
@@ -395,6 +397,7 @@ export class TaskDialog {
       value: this.roleValue,
       options: TASK_ROLES.map((role) => ({ value: role, label: role })),
     });
+    paintSelect(this.roleSelect);
 
     this.tagField = new TagField({
       doc: this.doc,
@@ -923,4 +926,22 @@ export function statusBadge(doc: Document, status: TaskStatus): HTMLElement {
     class: `status-badge status-${status}`,
     text: STATUS_LABELS[status],
   });
+}
+
+/**
+ * Colors a dropdown of the task editor by its value.
+ *
+ * Every option is tagged with `data-tone="<its value>"` and the select keeps
+ * its own `data-tone` in sync with the current value, so the stylesheet paints
+ * each option and the closed select with the colour of its value.
+ */
+function paintSelect(selectElement: HTMLSelectElement): void {
+  for (const option of Array.from(selectElement.options)) {
+    option.dataset['tone'] = option.value;
+  }
+  const sync = (): void => {
+    selectElement.dataset['tone'] = selectElement.value;
+  };
+  sync();
+  selectElement.addEventListener('change', sync);
 }

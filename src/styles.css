@@ -695,6 +695,192 @@ button[hidden] {
   color: var(--danger);
 }
 
+/* Colored dropdowns of the task editor: every option and the closed select
+   carry the background and text colour of their value (tagged with
+   `data-tone` by paintSelect in taskDialog.ts). Statuses reuse the Kanban
+   column colours, types are Bug red / Improvement amber / Feature green and
+   roles share an 8-colour palette from the app theme. Native popups may ignore
+   the option colours on some platforms; the closed select is always painted. */
+#task-status[data-tone='planning'],
+#task-status option[data-tone='planning'] {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+#task-status[data-tone='todo'],
+#task-status option[data-tone='todo'] {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+#task-status[data-tone='next'],
+#task-status option[data-tone='next'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+#task-status[data-tone='paused'],
+#task-status option[data-tone='paused'] {
+  background: var(--paused-soft);
+  color: var(--paused);
+}
+
+#task-status[data-tone='doing'],
+#task-status option[data-tone='doing'] {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+#task-status[data-tone='done'],
+#task-status option[data-tone='done'] {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+#task-status[data-tone='canceled'],
+#task-status option[data-tone='canceled'] {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+#task-status[data-tone='planning'] {
+  border-color: color-mix(in srgb, var(--info) 55%, var(--border-strong));
+}
+
+#task-status[data-tone='todo'] {
+  border-color: var(--border-strong);
+}
+
+#task-status[data-tone='next'] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
+}
+
+#task-status[data-tone='paused'] {
+  border-color: color-mix(in srgb, var(--paused) 55%, var(--border-strong));
+}
+
+#task-status[data-tone='doing'] {
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border-strong));
+}
+
+#task-status[data-tone='done'] {
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border-strong));
+}
+
+#task-status[data-tone='canceled'] {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border-strong));
+}
+
+#task-type[data-tone='Bug'],
+#task-type option[data-tone='Bug'] {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+#task-type[data-tone='Improvement'],
+#task-type option[data-tone='Improvement'] {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+#task-type[data-tone='Feature'],
+#task-type option[data-tone='Feature'] {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+#task-type[data-tone='Bug'] {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border-strong));
+}
+
+#task-type[data-tone='Improvement'] {
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border-strong));
+}
+
+#task-type[data-tone='Feature'] {
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border-strong));
+}
+
+#task-role[data-tone='Graphics'],
+#task-role option[data-tone='Graphics'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+#task-role[data-tone='Audio'],
+#task-role option[data-tone='Audio'] {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+#task-role[data-tone='Programming'],
+#task-role option[data-tone='Programming'] {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+#task-role[data-tone='Design'],
+#task-role option[data-tone='Design'] {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+#task-role[data-tone='Assembly'],
+#task-role option[data-tone='Assembly'] {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+#task-role[data-tone='Management'],
+#task-role option[data-tone='Management'] {
+  background: var(--paused-soft);
+  color: var(--paused);
+}
+
+#task-role[data-tone='Test'],
+#task-role option[data-tone='Test'] {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+#task-role[data-tone='Research'],
+#task-role option[data-tone='Research'] {
+  background: color-mix(in srgb, var(--info-soft) 50%, var(--success-soft));
+  color: color-mix(in srgb, var(--info) 50%, var(--success));
+}
+
+#task-role[data-tone='Graphics'] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
+}
+
+#task-role[data-tone='Audio'] {
+  border-color: color-mix(in srgb, var(--info) 55%, var(--border-strong));
+}
+
+#task-role[data-tone='Programming'] {
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border-strong));
+}
+
+#task-role[data-tone='Design'] {
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border-strong));
+}
+
+#task-role[data-tone='Assembly'] {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border-strong));
+}
+
+#task-role[data-tone='Management'] {
+  border-color: color-mix(in srgb, var(--paused) 55%, var(--border-strong));
+}
+
+#task-role[data-tone='Test'] {
+  border-color: var(--border-strong);
+}
+
+#task-role[data-tone='Research'] {
+  border-color: color-mix(in srgb, var(--info) 30%, var(--success) 25%, var(--border-strong));
+}
+
 /* ------------------------------------------------------------ tree view -- */
 
 .kanban-wrap {
