@@ -158,6 +158,28 @@ na view kanban o checkbox show hidden global esta do lado esquerdo da ultima col
 ====
 na modal de edicao de tarefas no dropdown de status é possível deixar cada opcao com uma cor de fundo diferente? se for, deixe com as mesmas cores utilizadas pra cada status nas colunas do kanban. faça a mesma coisa pro tipo (bug vermelho, improvement amarelo e feature verde e para os roles
 ====
+o highlight do mouseover nas opcoes dos dropdowns faz o usuario esquecer qual é a cor do item atualmente destacado. ao inves de ser a mesma cor de highlith pra todos, é possível que o highlight seja a mesm cor do item, porém um tom mais forte da mesma cor?
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
 
 ====
 	crie um novo modo de visualização de tarefas, de calendario. o usuario pode escolher visualizar apenas uma semana especifica

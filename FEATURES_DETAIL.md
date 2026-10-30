@@ -216,7 +216,10 @@ neutral gray, next purple, paused slate, doing amber, done green, canceled
 red); types are Bug red, Improvement amber and Feature green; roles share an
 8-colour palette from the app theme (Graphics purple, Audio blue, Programming
 green, Design amber, Assembly red, Management slate, Test neutral gray,
-Research teal).
+Research teal). The **highlight keeps the colour of the item in a stronger
+tone**: the hovered option, the selected option and the hovered closed select
+mix more of the full colour into the soft background (35%), so browsing the
+options never hides which colour each value has.
 
 The same actions work the same way with the **embedded project**: the store of
 the browser writes the very same files, in the very same format. The embedded

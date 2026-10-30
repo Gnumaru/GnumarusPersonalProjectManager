@@ -881,6 +881,144 @@ button[hidden] {
   border-color: color-mix(in srgb, var(--info) 30%, var(--success) 25%, var(--border-strong));
 }
 
+/* Highlight of the colored editor dropdowns: the hovered option, the selected
+   option and the hovered closed select use a stronger tone of their own
+   colour (more of the full colour mixed into the soft background), instead of
+   a single highlight colour for every item. Author styles of open option
+   lists apply in some browsers (Firefox) while others keep their native
+   highlight (Chrome); the hovered closed select is painted everywhere. */
+#task-status[data-tone='planning']:hover,
+#task-status option[data-tone='planning']:hover,
+#task-status option[data-tone='planning']:checked {
+  background: color-mix(in srgb, var(--info) 35%, var(--info-soft));
+  color: var(--info);
+}
+
+#task-status[data-tone='todo']:hover,
+#task-status option[data-tone='todo']:hover,
+#task-status option[data-tone='todo']:checked {
+  background: color-mix(in srgb, var(--text-muted) 30%, var(--bg-subtle));
+  color: var(--text-muted);
+}
+
+#task-status[data-tone='next']:hover,
+#task-status option[data-tone='next']:hover,
+#task-status option[data-tone='next']:checked {
+  background: color-mix(in srgb, var(--accent) 35%, var(--accent-soft));
+  color: var(--accent);
+}
+
+#task-status[data-tone='paused']:hover,
+#task-status option[data-tone='paused']:hover,
+#task-status option[data-tone='paused']:checked {
+  background: color-mix(in srgb, var(--paused) 35%, var(--paused-soft));
+  color: var(--paused);
+}
+
+#task-status[data-tone='doing']:hover,
+#task-status option[data-tone='doing']:hover,
+#task-status option[data-tone='doing']:checked {
+  background: color-mix(in srgb, var(--warning) 35%, var(--warning-soft));
+  color: var(--warning);
+}
+
+#task-status[data-tone='done']:hover,
+#task-status option[data-tone='done']:hover,
+#task-status option[data-tone='done']:checked {
+  background: color-mix(in srgb, var(--success) 35%, var(--success-soft));
+  color: var(--success);
+}
+
+#task-status[data-tone='canceled']:hover,
+#task-status option[data-tone='canceled']:hover,
+#task-status option[data-tone='canceled']:checked {
+  background: color-mix(in srgb, var(--danger) 35%, var(--danger-soft));
+  color: var(--danger);
+}
+
+#task-type[data-tone='Bug']:hover,
+#task-type option[data-tone='Bug']:hover,
+#task-type option[data-tone='Bug']:checked {
+  background: color-mix(in srgb, var(--danger) 35%, var(--danger-soft));
+  color: var(--danger);
+}
+
+#task-type[data-tone='Improvement']:hover,
+#task-type option[data-tone='Improvement']:hover,
+#task-type option[data-tone='Improvement']:checked {
+  background: color-mix(in srgb, var(--warning) 35%, var(--warning-soft));
+  color: var(--warning);
+}
+
+#task-type[data-tone='Feature']:hover,
+#task-type option[data-tone='Feature']:hover,
+#task-type option[data-tone='Feature']:checked {
+  background: color-mix(in srgb, var(--success) 35%, var(--success-soft));
+  color: var(--success);
+}
+
+#task-role[data-tone='Graphics']:hover,
+#task-role option[data-tone='Graphics']:hover,
+#task-role option[data-tone='Graphics']:checked {
+  background: color-mix(in srgb, var(--accent) 35%, var(--accent-soft));
+  color: var(--accent);
+}
+
+#task-role[data-tone='Audio']:hover,
+#task-role option[data-tone='Audio']:hover,
+#task-role option[data-tone='Audio']:checked {
+  background: color-mix(in srgb, var(--info) 35%, var(--info-soft));
+  color: var(--info);
+}
+
+#task-role[data-tone='Programming']:hover,
+#task-role option[data-tone='Programming']:hover,
+#task-role option[data-tone='Programming']:checked {
+  background: color-mix(in srgb, var(--success) 35%, var(--success-soft));
+  color: var(--success);
+}
+
+#task-role[data-tone='Design']:hover,
+#task-role option[data-tone='Design']:hover,
+#task-role option[data-tone='Design']:checked {
+  background: color-mix(in srgb, var(--warning) 35%, var(--warning-soft));
+  color: var(--warning);
+}
+
+#task-role[data-tone='Assembly']:hover,
+#task-role option[data-tone='Assembly']:hover,
+#task-role option[data-tone='Assembly']:checked {
+  background: color-mix(in srgb, var(--danger) 35%, var(--danger-soft));
+  color: var(--danger);
+}
+
+#task-role[data-tone='Management']:hover,
+#task-role option[data-tone='Management']:hover,
+#task-role option[data-tone='Management']:checked {
+  background: color-mix(in srgb, var(--paused) 35%, var(--paused-soft));
+  color: var(--paused);
+}
+
+#task-role[data-tone='Test']:hover,
+#task-role option[data-tone='Test']:hover,
+#task-role option[data-tone='Test']:checked {
+  background: color-mix(in srgb, var(--text-muted) 30%, var(--bg-subtle));
+  color: var(--text-muted);
+}
+
+#task-role[data-tone='Research']:hover,
+#task-role option[data-tone='Research']:hover,
+#task-role option[data-tone='Research']:checked {
+  background: color-mix(
+    in srgb,
+    var(--info) 17%,
+    var(--success) 18%,
+    var(--info-soft) 32%,
+    var(--success-soft) 33%
+  );
+  color: color-mix(in srgb, var(--info) 50%, var(--success));
+}
+
 /* ------------------------------------------------------------ tree view -- */
 
 .kanban-wrap {

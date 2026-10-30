@@ -1,5 +1,20 @@
 # Checklist
 
+## Batch 33 - Stronger same-colour highlight in the colored editor dropdowns
+
+### Change
+
+- [x] Hovered/selected options and hovered closed selects use a stronger tone
+      of their own colour instead of a single highlight for all
+      (`src/styles.css`)
+
+### Tests
+
+- [x] `src/ui/taskDialog.test.ts` - every tone has hover/checked highlight rules
+- [x] `npm run typecheck`, `npm test` (467 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 32 - Colored status, type and role dropdowns in the task editor
 
 ### Change

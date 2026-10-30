@@ -64,7 +64,7 @@ list or as a tree.
 | **A new task is created with the start date of today and the end date of tomorrow** | Done | `src/ui/taskDialog.ts` |
 | **A task loaded without dates receives today (start) and tomorrow (end)** | Done | `src/core/task.ts`, `src/ui/app.ts` |
 | **Date pickers for the start and the end date in the editor** | Done | `src/ui/taskDialog.ts` |
-| **Colored status, type and role dropdowns in the editor (Kanban colours for statuses, red/yellow/green for types, 8-colour palette for roles)** | Done | `src/ui/taskDialog.ts`, `src/styles.css` |
+| **Colored status, type and role dropdowns in the editor (Kanban colours for statuses, red/yellow/green for types, 8-colour palette for roles; highlight keeps a stronger tone of the same colour)** | Done | `src/ui/taskDialog.ts`, `src/styles.css` |
 | Amount of children per task (read with `grep`) | Done | `src/core/serviceStore.ts`, `src/core/embeddedStore.ts` |
 
 ## Bridge integration

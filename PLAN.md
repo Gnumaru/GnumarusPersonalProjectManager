@@ -8,6 +8,11 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 33 strengthens the highlight of the colored editor
+  dropdowns: the hovered/selected option and the hovered closed select use a
+  stronger tone of the same colour, so the highlight never hides which colour
+  the item has.
+- Verification: 467 unit tests pass.
 - Batch 32 colors the status, type and role dropdowns of the
   task editor: each option carries the colour of its value (statuses reuse the
   Kanban column colours, Bug is red, Improvement yellow, Feature green, roles

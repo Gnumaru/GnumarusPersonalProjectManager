@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vite-plus/test';
 import {
@@ -7,6 +8,9 @@ import {
   type Task,
 } from '../core/task.js';
 import { TaskDialog } from './taskDialog.js';
+
+/** The stylesheet, so the tests guard that every tone owns highlight rules. */
+const stylesCss = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
 
 function createDocument(): Document {
   return new JSDOM('<!doctype html><html><body></body></html>').window.document;
@@ -141,5 +145,40 @@ describe('colored editor dropdowns', () => {
     expect(role?.value).toBe('Audio');
     expect(role?.dataset['tone']).toBe('Audio');
     expect(onSave).not.toHaveBeenCalled();
+  });
+});
+
+describe('highlight tones of the editor dropdowns', () => {
+  it('paints the hovered and selected option of every status with a stronger tone', () => {
+    for (const status of TASK_STATUSES) {
+      expect(stylesCss).toContain(`#task-status option[data-tone='${status}']:hover`);
+      expect(stylesCss).toContain(`#task-status option[data-tone='${status}']:checked`);
+    }
+  });
+
+  it('paints the hovered and selected option of every type with a stronger tone', () => {
+    for (const type of TASK_TYPES) {
+      expect(stylesCss).toContain(`#task-type option[data-tone='${type}']:hover`);
+      expect(stylesCss).toContain(`#task-type option[data-tone='${type}']:checked`);
+    }
+  });
+
+  it('paints the hovered and selected option of every role with a stronger tone', () => {
+    for (const role of TASK_ROLES) {
+      expect(stylesCss).toContain(`#task-role option[data-tone='${role}']:hover`);
+      expect(stylesCss).toContain(`#task-role option[data-tone='${role}']:checked`);
+    }
+  });
+
+  it('strengthens the hovered closed select of every dropdown', () => {
+    for (const status of TASK_STATUSES) {
+      expect(stylesCss).toContain(`#task-status[data-tone='${status}']:hover`);
+    }
+    for (const type of TASK_TYPES) {
+      expect(stylesCss).toContain(`#task-type[data-tone='${type}']:hover`);
+    }
+    for (const role of TASK_ROLES) {
+      expect(stylesCss).toContain(`#task-role[data-tone='${role}']:hover`);
+    }
   });
 });
