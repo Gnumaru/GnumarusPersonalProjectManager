@@ -36,6 +36,10 @@ export interface TaskDialogOptions {
   readonly candidates?: readonly { readonly id: number; readonly title: string }[] | undefined;
   /** The children of the task being viewed. */
   readonly children?: readonly Task[] | undefined;
+  /** The ancestors of the task being viewed, from the root down to the parent. */
+  readonly parents?: readonly Task[] | undefined;
+  /** Called when the user clicks one of the parents. */
+  readonly onOpenParent?: ((parent: Task) => void) | undefined;
   readonly onSave: (input: TaskInput) => void | Promise<void>;
   readonly onDelete?: (() => void | Promise<void>) | undefined;
   /** Called when the user asks to switch from the read only view to the editor. */
@@ -64,6 +68,10 @@ export class TaskDialog {
   private readonly parent: Task | undefined;
   private readonly candidates: readonly { readonly id: number; readonly title: string }[];
   private readonly children: readonly Task[];
+  /** The ancestors of the task being viewed, from the root down to the parent. */
+  private readonly parents: readonly Task[];
+  /** Called when the user clicks one of the parents. */
+  private readonly onOpenParent: ((parent: Task) => void) | undefined;
   private readonly onSave: (input: TaskInput) => void | Promise<void>;
   private readonly onDelete: (() => void | Promise<void>) | undefined;
   private readonly onEdit: (() => void) | undefined;
@@ -113,6 +121,8 @@ export class TaskDialog {
     this.parent = options.parent;
     this.candidates = options.candidates ?? [];
     this.children = options.children ?? [];
+    this.parents = options.parents ?? [];
+    this.onOpenParent = options.onOpenParent;
     this.onSave = options.onSave;
     this.onDelete = options.onDelete;
     this.onEdit = options.onEdit;
@@ -218,7 +228,9 @@ export class TaskDialog {
 
     const body: HTMLElement[] = [];
 
-    if (task.parentId !== null) {
+    if (this.parents.length > 0) {
+      body.push(this.renderParentChain());
+    } else if (task.parentId !== null) {
       body.push(
         el(this.doc, 'div', { class: 'task-parent-banner' }, [
           createIcon(this.doc, 'child'),
@@ -322,8 +334,43 @@ export class TaskDialog {
     ]);
   }
 
-  private renderChildren(): HTMLElement {
-    if (this.children.length === 0) {
+  /**
+   * The chain of parents of the task, from the root down to its parent.
+   *
+   * Every ancestor shows its id and its title, truncated to 64 characters
+   * like the other task labels, and opens when clicked.
+   */
+  private renderParentChain(): HTMLElement {
+    const chain = el(this.doc, 'div', { class: 'task-parent-chain' });
+    this.parents.forEach((parent, index) => {
+      if (index > 0) {
+        chain.append(el(this.doc, 'span', { class: 'task-parent-sep', text: '›' }));
+      }
+      const label = parentLabelOf(parent);
+      if (this.onOpenParent !== undefined) {
+        const item = el(this.doc, 'button', {
+          class: 'task-parent-link',
+          text: label,
+          attrs: { type: 'button', title: `Open task #${parent.id}` },
+          on: {
+            click: () => {
+              this.modal.close();
+              this.onOpenParent?.(parent);
+            },
+          },
+        });
+        chain.append(item);
+      } else {
+        chain.append(el(this.doc, 'span', { class: 'task-parent-name', text: label }));
+      }
+    });
+    return el(this.doc, 'div', { class: 'task-parent-banner' }, [
+      createIcon(this.doc, 'child'),
+      chain,
+    ]);
+  }
+
+  private renderChildren(): HTMLElement {    if (this.children.length === 0) {
       return el(this.doc, 'p', {
         class: 'task-children-empty',
         text: 'This task has no child yet.',
@@ -920,9 +967,21 @@ export class TaskDialog {
   }
 }
 
+/**
+ * The label of a parent of the chain: its id and its title, truncated to 64
+ * characters like the other task labels.
+ */
+export function parentLabelOf(parent: Task): string {
+  const title = parent.title.length > 0 ? parent.title : 'Untitled task';
+  const label = `#${parent.id} ${title}`;
+  if (label.length <= 64) {
+    return label;
+  }
+  return `${label.slice(0, 63)}…`;
+}
+
 /** Renders the colored badge used in the task table. */
-export function statusBadge(doc: Document, status: TaskStatus): HTMLElement {
-  return el(doc, 'span', {
+export function statusBadge(doc: Document, status: TaskStatus): HTMLElement {  return el(doc, 'span', {
     class: `status-badge status-${status}`,
     text: STATUS_LABELS[status],
   });

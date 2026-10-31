@@ -182,3 +182,101 @@ describe('highlight tones of the editor dropdowns', () => {
     }
   });
 });
+
+function viewTask(overrides: Partial<Task> = {}): Task {
+  return {
+    id: 3,
+    title: 'Deep task',
+    status: 'todo',
+    parentId: 2,
+    tags: [],
+    created: '20261001100000000',
+    updated: '20261002110000000',
+    start: '',
+    end: '',
+    blockedBy: [],
+    related: [],
+    expanded: false,
+    type: 'Feature',
+    role: 'Programming',
+    description: '',
+    ...overrides,
+  };
+}
+
+function openViewDialog(
+  doc: Document,
+  options: {
+    task?: Task;
+    parents?: readonly Task[];
+    onOpenParent?: (parent: Task) => void;
+  } = {},
+): void {
+  new TaskDialog({
+    doc,
+    mode: 'view',
+    task: options.task ?? viewTask(),
+    parents: options.parents,
+    onOpenParent: options.onOpenParent,
+    onSave: () => undefined,
+  }).open();
+}
+
+describe('parent chain of the task view', () => {
+  const root = viewTask({ id: 1, title: 'Root task', parentId: null });
+  const middle = viewTask({ id: 2, title: 'Middle task', parentId: 1 });
+
+  it('shows every ancestor from the root to the parent with ids and titles', () => {
+    const doc = createDocument();
+    openViewDialog(doc, { parents: [root, middle], onOpenParent: () => undefined });
+
+    const links = [...doc.querySelectorAll('.task-parent-chain .task-parent-link')];
+    expect(links.map((link) => link.textContent)).toEqual(['#1 Root task', '#2 Middle task']);
+    expect(doc.querySelectorAll('.task-parent-chain .task-parent-sep')).toHaveLength(1);
+  });
+
+  it('truncates a long ancestor title to 64 characters', () => {
+    const doc = createDocument();
+    const long = viewTask({ id: 7, title: 't'.repeat(100), parentId: null });
+    openViewDialog(doc, { parents: [long], onOpenParent: () => undefined });
+
+    const text = doc.querySelector('.task-parent-chain .task-parent-link')?.textContent ?? '';
+    expect(text.length).toBeLessThanOrEqual(64);
+    expect(text.startsWith('#7 ')).toBe(true);
+    expect(text.endsWith('…')).toBe(true);
+  });
+
+  it('shows plain names when ancestors cannot be opened', () => {
+    const doc = createDocument();
+    openViewDialog(doc, { parents: [root, middle] });
+
+    expect(doc.querySelectorAll('.task-parent-chain .task-parent-link')).toHaveLength(0);
+    const names = [...doc.querySelectorAll('.task-parent-chain .task-parent-name')];
+    expect(names.map((name) => name.textContent)).toEqual(['#1 Root task', '#2 Middle task']);
+  });
+
+  it('opens the ancestor when its chain item is clicked', () => {
+    const doc = createDocument();
+    const onOpenParent = vi.fn();
+    openViewDialog(doc, { parents: [root, middle], onOpenParent });
+
+    const links = doc.querySelectorAll<HTMLButtonElement>('.task-parent-chain .task-parent-link');
+    links[0]?.click();
+    expect(onOpenParent).toHaveBeenCalledWith(root);
+  });
+
+  it('shows no banner for a root task', () => {
+    const doc = createDocument();
+    openViewDialog(doc, { task: viewTask({ parentId: null }), parents: [] });
+
+    expect(doc.querySelector('.task-parent-banner')).toBeNull();
+  });
+
+  it('falls back to the immediate parent when no chain is given', () => {
+    const doc = createDocument();
+    openViewDialog(doc);
+
+    expect(doc.querySelector('.task-parent-chain')).toBeNull();
+    expect(doc.querySelector('.task-parent-banner')?.textContent).toContain('Child of task #2');
+  });
+});

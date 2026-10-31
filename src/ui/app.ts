@@ -3364,12 +3364,14 @@ export class App
 
   private async openViewDialog(task: Task): Promise<void> {
     const children = await this.loadChildren(task.id);
+    const parents = await this.loadParents(task);
     const candidates = await this.loadTaskCandidates(task.id);
     const dialog = new TaskDialog({
       doc: this.doc,
       mode: 'view',
       task,
       children,
+      parents,
       candidates,
       onSave: async () => {
         // The read only view never saves.
@@ -3385,6 +3387,9 @@ export class App
       },
       onOpenChild: (child) => {
         void this.openViewDialog(child);
+      },
+      onOpenParent: (parent) => {
+        void this.openViewDialog(parent);
       },
       onLoadComments: async (taskId) => {
         return this.loadTaskComments(taskId);
@@ -3469,6 +3474,44 @@ export class App
         }
       }
       return children;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * The ancestors of a task, from the root down to its parent.
+   *
+   * Only the files of the chain are read: the memory holds the ancestors on
+   * the screen and nothing else. A cycle in the `parent=` keys ends the walk.
+   */
+  private async loadParents(task: Task): Promise<Task[]> {
+    const store = this.store;
+    if (store === null || task.parentId === null) {
+      return [];
+    }
+    try {
+      const summaries = await store.listTasks();
+      const byId = new Map(summaries.map((summary) => [summary.id, summary] as const));
+      const chain: Task[] = [];
+      const seen = new Set<number>([task.id]);
+      let parentId: number | null = task.parentId;
+      while (parentId !== null && !seen.has(parentId)) {
+        seen.add(parentId);
+        const summary = byId.get(parentId);
+        if (summary === undefined) {
+          break;
+        }
+        try {
+          const parent = await store.readTask(summary.path);
+          chain.unshift(parent);
+          parentId = parent.parentId;
+        } catch {
+          // The file disappeared: stop the chain here.
+          break;
+        }
+      }
+      return chain;
     } catch {
       return [];
     }

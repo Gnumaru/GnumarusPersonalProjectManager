@@ -1,5 +1,28 @@
 # Checklist
 
+## Batch 37 - Full parent chain in the task view modal
+
+### Change
+
+- [x] `TaskDialog` accepts `parents` (root-first) and `onOpenParent`,
+      view banner shows the whole chain with `#id title` labels truncated
+      to 64 chars, clickable ancestors (`src/ui/taskDialog.ts`)
+- [x] `App.loadParents` walks the ancestor chain (few files, cycle-safe),
+      `openViewDialog` passes it (`src/ui/app.ts`)
+- [x] Chain styles (`.task-parent-chain`, `.task-parent-link`,
+      `.task-parent-sep`, `.task-parent-name`) in `src/styles.css`
+
+### Tests
+
+- [x] `src/ui/taskDialog.test.ts` - full chain with ids and titles,
+      64-char truncation, ancestor click, root task without banner,
+      plain names without handler, legacy fallback banner
+- [x] `src/ui/app.test.ts` - 3-level chain in the view modal, ancestor
+      click opens the parent with its own shorter chain
+- [x] `npm run typecheck`, `npm test` (482 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 36 - Faithful fake orders and append-on-create
 
 ### Change

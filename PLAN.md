@@ -8,6 +8,10 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 37 shows the whole parent chain in the task view modal:
+  every ancestor from the root down to the immediate parent, each with its
+  id and title truncated to 64 characters, clickable to open the ancestor.
+- Verification: 482 unit tests pass.
 - Batch 36 makes the fake bridge return `kanban_order` /
   `tree_gantt_order` like the real bridge and makes creation append new
   tasks at the end (sibling count for tree/Gantt, status-column size for

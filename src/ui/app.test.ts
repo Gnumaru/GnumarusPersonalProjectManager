@@ -1512,6 +1512,29 @@ describe('App and the tree view', () => {
     harness.app.dispose();
   });
 
+  it('shows the whole parent chain in the view modal', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row[data-task-id="1"] .tree-twisty'));
+    await flush();
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row[data-task-id="2"] .tree-twisty'));
+    await flush();
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row[data-task-id="4"] .tree-title'));
+    await flush();
+
+    const links = [...harness.doc.querySelectorAll('.task-parent-chain .task-parent-link')];
+    expect(links.map((link) => link.textContent)).toEqual(['#1 Task 1', '#2 Task 2']);
+
+    // Opening an ancestor shows its own shorter chain.
+    links[0]?.dispatchEvent(new harness.dom.window.MouseEvent('click', { bubbles: true }));
+    await flush();
+    expect(harness.doc.querySelector('.modal-title')?.textContent).toContain('Task #1');
+    expect(harness.doc.querySelector('.task-parent-banner')).toBeNull();
+
+    harness.app.dispose();
+  });
+
   it('focuses a task so that it becomes the root of the tree', async () => {
     const harness = await createTreeHarness();
     await switchToTree(harness);

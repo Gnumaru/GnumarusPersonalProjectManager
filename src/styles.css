@@ -2247,6 +2247,46 @@ input[type='date'] {
   margin-bottom: 12px;
 }
 
+/* The chain of parents of the viewed task, from the root to its parent. */
+.task-parent-chain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.task-parent-sep {
+  opacity: 0.6;
+}
+
+.task-parent-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-parent-link:hover:not(:disabled) {
+  background: transparent;
+  text-decoration: underline;
+}
+
+.task-parent-name {
+  font-weight: 600;
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .task-children {
   margin-top: 6px;
 }
