@@ -435,12 +435,12 @@ export class ProjectDialog {
       );
       return;
     }
-    if (check.issue.kind === 'write-denied') {
+    if (check.issue.kind === 'access-denied') {
       if (this.supabaseError !== null) {
         this.supabaseError.textContent = check.issue.detail;
       }
       this.showSupabaseSetup(
-        'The key can read but not write. Run these queries (they carry the row level security policies the key needs), then press Connect again.',
+        'The key cannot use the tables. Run these queries, then press Connect again.',
       );
       return;
     }

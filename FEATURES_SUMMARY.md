@@ -157,8 +157,8 @@ list or as a tree.
 | ------- | ------ | ----- |
 | **The files live in the service, in an embedded project, in a folder of the disk or in Supabase** | Done | `src/ui/projectDialog.ts` |
 | **The File System Access API: the files live in a folder chosen by the user** | Done | `src/core/fileSystemStore.ts` |
-| **Supabase: the files live in one `public.gnumarus_files` table, reached with the project URL and API key** | Done | `src/core/supabaseStore.ts`, `src/api/supabase.ts` |
-| **Supabase credentials tested before use (DDL check, setup queries shown, re-ask on rejection)** | Done | `src/ui/projectDialog.ts`, `src/api/supabase.ts` |
+| **Supabase: the records live in normalized tables, reached with the project URL and API key** | Done | `src/core/supabaseStore.ts`, `src/api/supabase.ts` |
+| **Supabase credentials tested before use (per-table probes, setup queries shown, re-ask on rejection)** | Done | `src/ui/projectDialog.ts`, `src/api/supabase.ts` |
 | **The choices the browser does not offer are disabled** | Done | `src/ui/projectDialog.ts` |
 | **The default is the File System Access API, then the OPFS, then the service** | Done | `src/core/config.ts` |
 | **The application works without the low level service in that mode** | Done | `src/ui/app.ts` |

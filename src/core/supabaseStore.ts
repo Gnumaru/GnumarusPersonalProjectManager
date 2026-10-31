@@ -1,46 +1,217 @@
 /**
- * The implementation of the project store that keeps the files in Supabase.
+ * The implementation of the project store that keeps the records in Supabase.
  *
- * Every file of the project is one row of a single `public.gnumarus_files`
- * table (`path` primary key, `content` text): the listing, the hierarchy and
- * the search are computed in JavaScript over those rows, exactly like the
- * embedded implementation, while the table itself is reached through the
- * PostgREST API of the Supabase project.
+ * Every record is one row of a normalized table (`tasks`, `comments`,
+ * `notes`, a key/value `config` table and an `ids` registry table), reached
+ * through the PostgREST API of the Supabase project. File paths are virtual
+ * identifiers (`task_<id>.txt` and friends): the project has no subfolders,
+ * and the ZIP export and import translate through the same file format as
+ * every other backend.
  */
 
 import { ApiError } from '../api/client.js';
-import { SupabaseClient } from '../api/supabase.js';
+import { SupabaseClient, type SupabaseRow, type SupabaseTable } from '../api/supabase.js';
 import {
   buildComment,
   commentFileName,
-  isCommentFileName,
   parseComment,
-  parseCommentIdFromFileName,
   serializeComment,
   sortComments,
   type TaskComment,
 } from './comment.js';
 import {
-  isTaskFileName,
+  isTaskRole,
+  isTaskStatus,
+  isTaskType,
+  normalizeTags,
+  normalizeTaskTimestamp,
+  parseIdList,
+  parseMetadataBlock,
   parseTask,
-  parseTaskIdFromFileName,
   serializeTask,
   taskFileName,
   type Task,
 } from './task.js';
 import {
-  isNoteFileName,
   noteFileName,
   noteMatches,
   parseNote,
-  parseNoteIdFromFileName,
   serializeNote,
   type Note,
   type NoteSearchScope,
 } from './note.js';
-import { IDS_FILE, generateUniqueId, parseIdsFile, serializeIdsFile } from './ids.js';
+import {
+  IDS_FILE,
+  MAX_ID_ATTEMPTS,
+  isValidRecordId,
+  parseIdsFile,
+  randomCandidateId,
+  serializeIdsFile,
+} from './ids.js';
 import type { NoteSummary, ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
 import { APP_CONFIG_FILE } from './appConfig.js';
+
+/** All columns of the tasks table, for the full reads. */
+const TASK_COLUMNS = [
+  'id',
+  'title',
+  'status',
+  'parent',
+  'tags',
+  'created',
+  'updated',
+  'start',
+  'end',
+  'blocked_by',
+  'related',
+  'expanded',
+  'type',
+  'role',
+  'kanban_hidden',
+  'tree_gantt_hidden',
+  'kanban_order',
+  'tree_gantt_order',
+  'description',
+] as const;
+
+/** All columns of the comments table. */
+const COMMENT_COLUMNS = ['id', 'task', 'created', 'updated', 'body'] as const;
+
+/** All columns of the notes table. */
+const NOTE_COLUMNS = ['id', 'title', 'created', 'updated', 'body'] as const;
+
+function textOf(row: SupabaseRow, column: string, fallback = ''): string {
+  const value = row[column];
+  return typeof value === 'string' ? value : fallback;
+}
+
+function booleanOf(row: SupabaseRow, column: string): boolean {
+  return row[column] === true;
+}
+
+function orderOf(row: SupabaseRow, column: string): number {
+  const value = row[column];
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
+function idOf(value: SupabaseValueOfRow): number | null {
+  return typeof value === 'number' && isValidRecordId(value) ? value : null;
+}
+
+type SupabaseValueOfRow = string | number | boolean | null | undefined;
+
+/** A task row as the summary the tree, the board and the chart need. */
+function rowToSummary(row: SupabaseRow, path: string): TaskSummary | null {
+  const id = idOf(row['id']);
+  if (id === null) {
+    return null;
+  }
+  const rawStatus = textOf(row, 'status');
+  const rawType = textOf(row, 'type');
+  const rawRole = textOf(row, 'role');
+  return {
+    id,
+    title: textOf(row, 'title'),
+    status: isTaskStatus(rawStatus) ? rawStatus : 'todo',
+    parentId: idOf(row['parent']),
+    tags: normalizeTags(textOf(row, 'tags')),
+    type: isTaskType(rawType) ? rawType : 'Feature',
+    role: isTaskRole(rawRole) ? rawRole : 'Programming',
+    start: normalizeTaskTimestamp(textOf(row, 'start')),
+    end: normalizeTaskTimestamp(textOf(row, 'end')),
+    updated: normalizeTaskTimestamp(textOf(row, 'updated')),
+    expanded: booleanOf(row, 'expanded'),
+    kanbanHidden: booleanOf(row, 'kanban_hidden'),
+    treeGanttHidden: booleanOf(row, 'tree_gantt_hidden'),
+    kanbanOrder: orderOf(row, 'kanban_order'),
+    treeGanttOrder: orderOf(row, 'tree_gantt_order'),
+    path,
+  };
+}
+
+/** A task row as a full task. */
+function rowToTask(row: SupabaseRow): Task | null {
+  const summary = rowToSummary(row, '');
+  if (summary === null) {
+    return null;
+  }
+  return {
+    id: summary.id,
+    title: summary.title,
+    status: summary.status,
+    parentId: summary.parentId,
+    tags: summary.tags,
+    created: normalizeTaskTimestamp(textOf(row, 'created')),
+    updated: summary.updated,
+    start: summary.start,
+    end: summary.end,
+    blockedBy: parseIdList(textOf(row, 'blocked_by')),
+    related: parseIdList(textOf(row, 'related')),
+    expanded: summary.expanded,
+    type: summary.type,
+    role: summary.role,
+    kanbanHidden: summary.kanbanHidden,
+    treeGanttHidden: summary.treeGanttHidden,
+    kanbanOrder: summary.kanbanOrder,
+    treeGanttOrder: summary.treeGanttOrder,
+    description: textOf(row, 'description'),
+  };
+}
+
+/** A full task as a task row. */
+function taskToRow(task: Task): SupabaseRow {
+  return {
+    id: task.id,
+    title: task.title,
+    status: task.status,
+    parent: task.parentId,
+    tags: task.tags.join(' '),
+    created: task.created,
+    updated: task.updated,
+    start: task.start,
+    end: task.end,
+    blocked_by: task.blockedBy.join(','),
+    related: task.related.join(','),
+    expanded: task.expanded,
+    type: task.type ?? 'Feature',
+    role: task.role ?? 'Programming',
+    kanban_hidden: task.kanbanHidden ?? false,
+    tree_gantt_hidden: task.treeGanttHidden ?? false,
+    kanban_order: task.kanbanOrder ?? 0,
+    tree_gantt_order: task.treeGanttOrder ?? 0,
+    description: task.description,
+  };
+}
+
+/** A comment row as a full comment. */
+function rowToComment(row: SupabaseRow): TaskComment | null {
+  const id = idOf(row['id']);
+  if (id === null) {
+    return null;
+  }
+  return {
+    id,
+    taskId: idOf(row['task']) ?? 0,
+    created: normalizeTaskTimestamp(textOf(row, 'created')),
+    updated: normalizeTaskTimestamp(textOf(row, 'updated')),
+    text: textOf(row, 'body'),
+  };
+}
+
+/** A note row as a full note. */
+function rowToNote(row: SupabaseRow): Note | null {
+  const id = idOf(row['id']);
+  if (id === null) {
+    return null;
+  }
+  return {
+    id,
+    title: textOf(row, 'title'),
+    created: normalizeTaskTimestamp(textOf(row, 'created')),
+    updated: normalizeTaskTimestamp(textOf(row, 'updated')),
+    content: textOf(row, 'body'),
+  };
+}
 
 export class SupabaseProjectStore implements ProjectStore {
   readonly kind: ProjectKind = 'supabase';
@@ -50,171 +221,228 @@ export class SupabaseProjectStore implements ProjectStore {
     this.client = client;
   }
 
-  /** The name of a file, without its folders. */
-  private static nameOf(path: string): string {
-    return path.slice(path.lastIndexOf('/') + 1);
+  /** The virtual path of a task row. */
+  private static taskPathOf(id: number): string {
+    return taskFileName(id);
   }
 
-  /** True when the error means the row does not exist. */
-  private static isMissing(error: unknown): boolean {
-    return error instanceof ApiError && error.status === 404;
+  private async selectTaskRows(): Promise<SupabaseRow[]> {
+    return this.client.selectRows('tasks', { select: [...TASK_COLUMNS], order: 'id' });
   }
 
   async listTaskPaths(): Promise<readonly string[]> {
-    return (await this.client.listPaths()).filter((path) =>
-      isTaskFileName(SupabaseProjectStore.nameOf(path)),
-    );
+    const rows = await this.client.selectRows('tasks', { select: ['id'], order: 'id' });
+    const paths: string[] = [];
+    for (const row of rows) {
+      const id = idOf(row['id']);
+      if (id !== null) {
+        paths.push(SupabaseProjectStore.taskPathOf(id));
+      }
+    }
+    return paths.sort((left, right) => left.localeCompare(right));
   }
 
   async searchTaskPaths(term: string): Promise<readonly string[]> {
     const needle = term.trim().toLowerCase();
-    const paths = await this.listTaskPaths();
-    if (needle.length === 0) {
-      return paths;
-    }
+    const rows = await this.client.selectRows('tasks', {
+      select: ['id', 'title', 'tags', 'description'],
+      order: 'id',
+    });
     const matches: string[] = [];
-    for (const path of paths) {
-      const content = await this.client.readRow(path).then(
-        (row) => row?.content ?? null,
-        (error: unknown) => {
-          if (SupabaseProjectStore.isMissing(error)) {
-            return null;
-          }
-          throw error;
-        },
-      );
-      if (content !== null && content.toLowerCase().includes(needle)) {
-        matches.push(path);
+    for (const row of rows) {
+      const id = idOf(row['id']);
+      if (id === null) {
+        continue;
+      }
+      if (needle.length === 0) {
+        matches.push(SupabaseProjectStore.taskPathOf(id));
+        continue;
+      }
+      const haystack = [textOf(row, 'title'), textOf(row, 'tags'), textOf(row, 'description')]
+        .join('\n')
+        .toLowerCase();
+      if (haystack.includes(needle)) {
+        matches.push(SupabaseProjectStore.taskPathOf(id));
       }
     }
-    return matches;
+    return matches.sort((left, right) => left.localeCompare(right));
   }
 
   async listTasks(): Promise<readonly TaskSummary[]> {
     const summaries: TaskSummary[] = [];
-    for (const row of await this.client.listRows()) {
-      if (!isTaskFileName(SupabaseProjectStore.nameOf(row.path))) {
-        continue;
+    for (const row of await this.selectTaskRows()) {
+      const summary = rowToSummary(row, '');
+      if (summary !== null) {
+        summaries.push({ ...summary, path: SupabaseProjectStore.taskPathOf(summary.id) });
       }
-      const task = parseTask(
-        row.content,
-        parseTaskIdFromFileName(SupabaseProjectStore.nameOf(row.path)) ?? undefined,
-      );
-      summaries.push({
-        id: task.id,
-        title: task.title,
-        status: task.status,
-        parentId: task.parentId,
-        tags: task.tags,
-        type: task.type ?? 'Feature',
-        role: task.role ?? 'Programming',
-        start: task.start,
-        end: task.end,
-        updated: task.updated,
-        expanded: task.expanded,
-        kanbanHidden: task.kanbanHidden ?? false,
-        treeGanttHidden: task.treeGanttHidden ?? false,
-        kanbanOrder: task.kanbanOrder ?? 0,
-        treeGanttOrder: task.treeGanttOrder ?? 0,
-        path: row.path,
-      });
     }
     return summaries;
   }
 
   async readTask(path: string): Promise<Task> {
-    const row = await this.client.readRow(path);
-    if (row === null) {
-      throw new ApiError(`The file "${path}" does not exist in the Supabase project.`, 404);
+    const id = SupabaseProjectStore.idOfTaskPath(path);
+    const rows =
+      id === null
+        ? []
+        : await this.client.selectRows('tasks', {
+            select: [...TASK_COLUMNS],
+            filter: { column: 'id', value: id },
+          });
+    const task = rows.length > 0 && rows[0] !== undefined ? rowToTask(rows[0]) : null;
+    if (task === null) {
+      throw new ApiError(`The task "${path}" does not exist in the Supabase project.`, 404);
     }
-    return parseTask(
-      row.content,
-      parseTaskIdFromFileName(SupabaseProjectStore.nameOf(path)) ?? undefined,
-    );
+    return task;
   }
 
-  async writeTask(path: string, task: Task): Promise<void> {
-    await this.client.upsertRow({ path, content: serializeTask(task) });
+  /** The id encoded in a virtual task path, `null` when invalid. */
+  private static idOfTaskPath(path: string): number | null {
+    const match = /task_(-?\d+)\.txt$/.exec(path.slice(path.lastIndexOf('/') + 1));
+    if (match === null) {
+      return null;
+    }
+    const id = Number.parseInt(match[1] ?? '', 10);
+    return isValidRecordId(id) ? id : null;
   }
 
-  async createTaskFile(path: string, task: Task): Promise<void> {
+  async writeTask(_path: string, task: Task): Promise<void> {
+    await this.client.upsertRows('tasks', [taskToRow(task)]);
+  }
+
+  async createTaskFile(_path: string, task: Task): Promise<void> {
     try {
-      await this.client.insertRow({ path, content: serializeTask(task) });
+      await this.client.insertRows('tasks', [taskToRow(task)]);
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        throw new Error(`The file "${path}" already exists in the Supabase project.`);
+        throw new Error(`The task #${task.id} already exists in the Supabase project.`);
       }
       throw error;
     }
   }
 
   async deleteFile(path: string): Promise<void> {
-    await this.client.deleteRow(path);
+    // Paths are virtual identifiers: the record kind comes from the name.
+    const name = path.slice(path.lastIndexOf('/') + 1);
+    for (const table of ['tasks', 'comments', 'notes'] as const) {
+      const id = SupabaseProjectStore.idOfName(table, name);
+      if (id !== null) {
+        await this.client.deleteRows(table, { column: 'id', value: id });
+        return;
+      }
+    }
+  }
+
+  /** The id encoded in a record file name of the table, `null` otherwise. */
+  private static idOfName(table: SupabaseTable, name: string): number | null {
+    const patterns: Readonly<Record<SupabaseTable, RegExp>> = {
+      tasks: /^task_(-?\d+)\.txt$/,
+      comments: /^comment_(-?\d+)\.txt$/,
+      notes: /^note_(-?\d+)\.txt$/,
+      config: /^$/,
+      ids: /^$/,
+    };
+    const match = patterns[table].exec(name);
+    if (match === null) {
+      return null;
+    }
+    const id = Number.parseInt(match[1] ?? '', 10);
+    return isValidRecordId(id) ? id : null;
   }
 
   async readAppConfig(): Promise<string | null> {
-    return (await this.client.readRow(APP_CONFIG_FILE))?.content ?? null;
+    const rows = await this.client.selectRows('config', { select: ['key', 'value'], order: 'key' });
+    if (rows.length === 0) {
+      return null;
+    }
+    const lines: string[] = [];
+    for (const row of rows) {
+      if (typeof row['key'] === 'string') {
+        lines.push(`${row['key']}=${textOf(row, 'value')}`);
+      }
+    }
+    return lines.length === 0 ? null : `${lines.join('\n')}\n`;
   }
 
   async writeAppConfig(content: string): Promise<void> {
-    await this.client.upsertRow({ path: APP_CONFIG_FILE, content });
+    const { metadata } = parseMetadataBlock(content);
+    for (const row of await this.client.selectRows('config', { select: ['key'] })) {
+      if (typeof row['key'] === 'string') {
+        await this.client.deleteRows('config', { column: 'key', value: row['key'] });
+      }
+    }
+    if (metadata.size > 0) {
+      await this.client.insertRows(
+        'config',
+        [...metadata.entries()].map(([key, value]) => ({ key, value })),
+      );
+    }
   }
 
   /**
    * Allocates the id of a new record: a random nonzero integer used by
    * nothing yet, whatever the kind of record.
    *
-   * The used ids live in a single `ids.txt` registry row, so allocation
-   * reads that one row instead of scanning the whole table. The id is
-   * reserved in the registry before it is returned (reserve-then-create),
-   * and ids are never removed from it, not even when their record is
-   * deleted, so an id is never reused.
+   * The `ids` table is the registry: the id is inserted before it is
+   * returned, so the primary key itself rejects a duplicate and allocation
+   * retries with a new random id. Ids are never removed, not even when their
+   * record is deleted, so an id is never reused.
    */
   async allocateId(): Promise<number> {
-    const taken = await this.readTakenIds();
-    const id = generateUniqueId((candidate) => taken.has(candidate));
-    taken.add(id);
-    await this.client.upsertRow({ path: IDS_FILE, content: serializeIdsFile(taken) });
-    return id;
-  }
-
-  /** Every id used by the project, from the `ids.txt` registry row. */
-  private async readTakenIds(): Promise<Set<number>> {
-    const content = (await this.client.readRow(IDS_FILE))?.content ?? null;
-    if (content !== null) {
-      return parseIdsFile(content);
+    await this.readTakenIds();
+    for (let attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt += 1) {
+      const id = randomCandidateId();
+      try {
+        await this.client.insertRows('ids', [{ id }]);
+        return id;
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 409) {
+          continue;
+        }
+        throw error;
+      }
     }
-    return this.bootstrapIdsFile();
+    throw new Error('Unable to allocate a free id');
   }
 
-  /**
-   * Builds the `ids.txt` registry from the record rows already stored.
-   *
-   * Runs once for projects created before the registry existed: every id
-   * encoded in a `task_*.txt`, `comment_*.txt` or `note_*.txt` path is
-   * registered, so a later allocation never reuses one.
-   */
-  private async bootstrapIdsFile(): Promise<Set<number>> {
+  /** Every id used by the project, registering the existing records once. */
+  private async readTakenIds(): Promise<Set<number>> {
     const taken = new Set<number>();
-    for (const path of await this.client.listPaths()) {
-      const name = SupabaseProjectStore.nameOf(path);
-      const id =
-        parseTaskIdFromFileName(name) ??
-        parseCommentIdFromFileName(name) ??
-        parseNoteIdFromFileName(name);
+    for (const row of await this.client.selectRows('ids', { select: ['id'] })) {
+      const id = idOf(row['id']);
       if (id !== null) {
         taken.add(id);
       }
     }
-    await this.client.upsertRow({ path: IDS_FILE, content: serializeIdsFile(taken) });
+    if (taken.size > 0) {
+      return taken;
+    }
+    // Empty registry with existing records: register them once, so a later
+    // allocation never reuses one.
+    let bootstrapped = false;
+    for (const table of ['tasks', 'comments', 'notes'] as const) {
+      for (const row of await this.client.selectRows(table, { select: ['id'] })) {
+        const id = idOf(row['id']);
+        if (id !== null && !taken.has(id)) {
+          taken.add(id);
+          bootstrapped = true;
+        }
+      }
+    }
+    if (bootstrapped) {
+      await this.client.insertRows(
+        'ids',
+        [...taken].map((id) => ({ id })),
+      );
+    }
     return taken;
   }
 
   async childCounts(): Promise<ReadonlyMap<number, number>> {
     const counts = new Map<number, number>();
-    for (const task of await this.listTasks()) {
-      if (task.parentId !== null) {
-        counts.set(task.parentId, (counts.get(task.parentId) ?? 0) + 1);
+    for (const row of await this.client.selectRows('tasks', { select: ['parent'] })) {
+      const parentId = idOf(row['parent']);
+      if (parentId !== null) {
+        counts.set(parentId, (counts.get(parentId) ?? 0) + 1);
       }
     }
     return counts;
@@ -222,32 +450,23 @@ export class SupabaseProjectStore implements ProjectStore {
 
   async commentCounts(): Promise<ReadonlyMap<number, number>> {
     const counts = new Map<number, number>();
-    for (const row of await this.client.listRows()) {
-      const name = SupabaseProjectStore.nameOf(row.path);
-      if (!isCommentFileName(name)) {
-        continue;
+    for (const row of await this.client.selectRows('comments', { select: ['task'] })) {
+      const taskId = idOf(row['task']);
+      if (taskId !== null) {
+        counts.set(taskId, (counts.get(taskId) ?? 0) + 1);
       }
-      const comment = parseComment(
-        row.content,
-        parseCommentIdFromFileName(name) ?? undefined,
-      );
-      counts.set(comment.taskId, (counts.get(comment.taskId) ?? 0) + 1);
     }
     return counts;
   }
 
   async listComments(taskId: number): Promise<readonly TaskComment[]> {
     const comments: TaskComment[] = [];
-    for (const row of await this.client.listRows()) {
-      const name = SupabaseProjectStore.nameOf(row.path);
-      if (!isCommentFileName(name)) {
-        continue;
-      }
-      const comment = parseComment(
-        row.content,
-        parseCommentIdFromFileName(name) ?? undefined,
-      );
-      if (comment.taskId === taskId) {
+    for (const row of await this.client.selectRows('comments', {
+      select: [...COMMENT_COLUMNS],
+      filter: { column: 'task', value: taskId },
+    })) {
+      const comment = rowToComment(row);
+      if (comment !== null) {
         comments.push(comment);
       }
     }
@@ -258,10 +477,18 @@ export class SupabaseProjectStore implements ProjectStore {
     const id = await this.allocateId();
     const comment = buildComment(id, taskId, text, new Date());
     try {
-      await this.client.insertRow({ path: this.commentPath(id), content: serializeComment(comment) });
+      await this.client.insertRows('comments', [
+        {
+          id: comment.id,
+          task: comment.taskId,
+          created: comment.created,
+          updated: comment.updated,
+          body: comment.text,
+        },
+      ]);
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        throw new Error(`The file "${this.commentPath(id)}" already exists in the Supabase project.`);
+        throw new Error(`The comment #${comment.id} already exists in the Supabase project.`);
       }
       throw error;
     }
@@ -269,86 +496,120 @@ export class SupabaseProjectStore implements ProjectStore {
   }
 
   async writeComment(comment: TaskComment): Promise<void> {
-    await this.client.upsertRow({
-      path: this.commentPath(comment.id),
-      content: serializeComment(comment),
-    });
+    await this.client.upsertRows('comments', [
+      {
+        id: comment.id,
+        task: comment.taskId,
+        created: comment.created,
+        updated: comment.updated,
+        body: comment.text,
+      },
+    ]);
   }
 
   async deleteComment(path: string): Promise<void> {
-    await this.client.deleteRow(path);
+    const id = SupabaseProjectStore.idOfName('comments', path.slice(path.lastIndexOf('/') + 1));
+    if (id !== null) {
+      await this.client.deleteRows('comments', { column: 'id', value: id });
+    }
   }
 
   // --------------------------------------------------------------- notes --
 
   async listNotePaths(): Promise<readonly string[]> {
-    return (await this.client.listPaths()).filter((path) =>
-      isNoteFileName(SupabaseProjectStore.nameOf(path)),
-    );
+    const rows = await this.client.selectRows('notes', { select: ['id'], order: 'id' });
+    const paths: string[] = [];
+    for (const row of rows) {
+      const id = idOf(row['id']);
+      if (id !== null) {
+        paths.push(noteFileName(id));
+      }
+    }
+    return paths.sort((left, right) => left.localeCompare(right));
   }
 
   async listNoteSummaries(): Promise<readonly NoteSummary[]> {
     const summaries: NoteSummary[] = [];
-    for (const row of await this.client.listRows()) {
-      const name = SupabaseProjectStore.nameOf(row.path);
-      if (!isNoteFileName(name)) {
+    for (const row of await this.client.selectRows('notes', {
+      select: ['id', 'title', 'updated'],
+      order: 'id',
+    })) {
+      const id = idOf(row['id']);
+      if (id === null) {
         continue;
       }
-      const note = parseNote(row.content, parseNoteIdFromFileName(name) ?? undefined);
-      summaries.push({ id: note.id, title: note.title, updated: note.updated, path: row.path });
+      summaries.push({
+        id,
+        title: textOf(row, 'title'),
+        updated: normalizeTaskTimestamp(textOf(row, 'updated')),
+        path: noteFileName(id),
+      });
     }
     return summaries;
   }
 
   async searchNotePaths(term: string, scope: NoteSearchScope): Promise<readonly string[]> {
-    const paths = await this.listNotePaths();
+    const rows = await this.client.selectRows('notes', { select: ['id', 'title', 'body'], order: 'id' });
     const needle = term.trim();
     if (needle.length === 0) {
-      return paths;
+      return this.listNotePaths();
     }
     const matches: string[] = [];
-    for (const path of paths) {
-      const row = await this.client.readRow(path).catch((error: unknown) => {
-        if (SupabaseProjectStore.isMissing(error)) {
-          return null;
-        }
-        throw error;
-      });
-      if (row === null) {
+    for (const row of rows) {
+      const id = idOf(row['id']);
+      if (id === null) {
         continue;
       }
-      const note = parseNote(
-        row.content,
-        parseNoteIdFromFileName(SupabaseProjectStore.nameOf(path)) ?? undefined,
-      );
-      if (noteMatches(note, needle, scope)) {
-        matches.push(path);
+      const note = rowToNote({ ...row, created: '', updated: '' });
+      if (note !== null && noteMatches(note, needle, scope)) {
+        matches.push(noteFileName(id));
       }
     }
-    return matches;
+    return matches.sort((left, right) => left.localeCompare(right));
   }
 
   async readNote(path: string): Promise<Note> {
-    const row = await this.client.readRow(path);
-    if (row === null) {
-      throw new ApiError(`The file "${path}" does not exist in the Supabase project.`, 404);
+    const id = SupabaseProjectStore.idOfName('notes', path.slice(path.lastIndexOf('/') + 1));
+    const rows =
+      id === null
+        ? []
+        : await this.client.selectRows('notes', {
+            select: [...NOTE_COLUMNS],
+            filter: { column: 'id', value: id },
+          });
+    const note = rows.length > 0 && rows[0] !== undefined ? rowToNote(rows[0]) : null;
+    if (note === null) {
+      throw new ApiError(`The note "${path}" does not exist in the Supabase project.`, 404);
     }
-    return parseNote(
-      row.content,
-      parseNoteIdFromFileName(SupabaseProjectStore.nameOf(path)) ?? undefined,
-    );
+    return note;
   }
 
-  async writeNote(path: string, note: Note): Promise<void> {
-    await this.client.upsertRow({ path, content: serializeNote(note) });
+  async writeNote(_path: string, note: Note): Promise<void> {
+    await this.client.upsertRows('notes', [
+      {
+        id: note.id,
+        title: note.title,
+        created: note.created,
+        updated: note.updated,
+        body: note.content,
+      },
+    ]);
   }
 
-  async createNoteFile(path: string, note: Note): Promise<void> {
+  async createNoteFile(_path: string, note: Note): Promise<void> {
     try {
-      await this.client.insertRow({ path, content: serializeNote(note) });
+      await this.client.insertRows('notes', [
+        {
+          id: note.id,
+          title: note.title,
+          created: note.created,
+          updated: note.updated,
+          body: note.content,
+        },
+      ]);
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        throw new Error(`The file "${path}" already exists in the Supabase project.`);
+        throw new Error(`The note #${note.id} already exists in the Supabase project.`);
       }
       throw error;
     }
@@ -367,38 +628,110 @@ export class SupabaseProjectStore implements ProjectStore {
   }
 
   async listFiles(): Promise<readonly ProjectFile[]> {
-    return (await this.client.listRows())
-      .map((row) => ({ path: row.path, content: row.content }))
-      .sort((left, right) => left.path.localeCompare(right.path));
+    const files: ProjectFile[] = [];
+    for (const row of await this.client.selectRows('tasks', { select: [...TASK_COLUMNS] })) {
+      const task = rowToTask(row);
+      if (task !== null) {
+        files.push({ path: taskFileName(task.id), content: serializeTask(task) });
+      }
+    }
+    for (const row of await this.client.selectRows('comments', { select: [...COMMENT_COLUMNS] })) {
+      const comment = rowToComment(row);
+      if (comment !== null) {
+        files.push({
+          path: commentFileName(comment.id),
+          content: serializeComment(comment),
+        });
+      }
+    }
+    for (const row of await this.client.selectRows('notes', { select: [...NOTE_COLUMNS] })) {
+      const note = rowToNote(row);
+      if (note !== null) {
+        files.push({ path: noteFileName(note.id), content: serializeNote(note) });
+      }
+    }
+    const config = await this.readAppConfig();
+    if (config !== null) {
+      files.push({ path: APP_CONFIG_FILE, content: config });
+    }
+    const taken = await this.readTakenIds();
+    if (taken.size > 0) {
+      files.push({ path: IDS_FILE, content: serializeIdsFile(taken) });
+    }
+    return files.sort((left, right) => left.path.localeCompare(right.path));
   }
 
   async replaceAll(files: readonly ProjectFile[]): Promise<void> {
-    for (const path of await this.client.listPaths()) {
-      await this.client.deleteRow(path);
+    for (const table of ['tasks', 'comments', 'notes', 'config', 'ids'] as const) {
+      const key = table === 'config' ? 'key' : 'id';
+      for (const row of await this.client.selectRows(table, { select: [key] })) {
+        const value = row[key];
+        if (typeof value === 'string' || typeof value === 'number') {
+          await this.client.deleteRows(table, { column: key, value });
+        }
+      }
     }
-    for (const file of files) {
-      await this.client.upsertRow({ path: file.path, content: file.content });
-    }
-    // The import replaces the whole project: rebuild the registry from the
-    // imported files, keeping the previously registered ids (an id is never
-    // reused, even when its record is gone).
     const taken = new Set<number>();
     for (const file of files) {
-      const name = SupabaseProjectStore.nameOf(file.path);
+      const name = file.path.slice(file.path.lastIndexOf('/') + 1);
       if (name === IDS_FILE) {
         for (const id of parseIdsFile(file.content)) {
           taken.add(id);
         }
         continue;
       }
-      const id =
-        parseTaskIdFromFileName(name) ??
-        parseCommentIdFromFileName(name) ??
-        parseNoteIdFromFileName(name);
-      if (id !== null) {
-        taken.add(id);
+      if (name === APP_CONFIG_FILE) {
+        const { metadata } = parseMetadataBlock(file.content);
+        if (metadata.size > 0) {
+          await this.client.insertRows(
+            'config',
+            [...metadata.entries()].map(([key, value]) => ({ key, value })),
+          );
+        }
+        continue;
+      }
+      const taskId = SupabaseProjectStore.idOfName('tasks', name);
+      if (taskId !== null) {
+        const task = parseTask(file.content, taskId);
+        await this.client.insertRows('tasks', [taskToRow(task)]);
+        taken.add(task.id);
+        continue;
+      }
+      const commentId = SupabaseProjectStore.idOfName('comments', name);
+      if (commentId !== null) {
+        const comment = parseComment(file.content, commentId);
+        await this.client.insertRows('comments', [
+          {
+            id: comment.id,
+            task: comment.taskId,
+            created: comment.created,
+            updated: comment.updated,
+            body: comment.text,
+          },
+        ]);
+        taken.add(comment.id);
+        continue;
+      }
+      const noteId = SupabaseProjectStore.idOfName('notes', name);
+      if (noteId !== null) {
+        const note = parseNote(file.content, noteId);
+        await this.client.insertRows('notes', [
+          {
+            id: note.id,
+            title: note.title,
+            created: note.created,
+            updated: note.updated,
+            body: note.content,
+          },
+        ]);
+        taken.add(note.id);
       }
     }
-    await this.client.upsertRow({ path: IDS_FILE, content: serializeIdsFile(taken) });
+    if (taken.size > 0) {
+      await this.client.insertRows(
+        'ids',
+        [...taken].map((id) => ({ id })),
+      );
+    }
   }
 }

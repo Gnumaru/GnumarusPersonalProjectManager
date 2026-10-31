@@ -950,7 +950,7 @@ The files of the project can live in four places:
 * an **embedded project**: the files are kept in the browser;
 * a **folder of the disk, reached with the File System Access API**: the files
   are read and written directly by the browser;
-* a **Supabase database**: every file is one row of a single table.
+* a **Supabase database**: every record is one row of a normalized table.
 
 The dialog of the project (the button **Project…** of the top bar) chooses
 between them, and offers the export and the import of a ZIP archive.
@@ -962,7 +962,7 @@ between them, and offers the export and the import of a ZIP archive.
 | The Gnumarus OS Bridge service | the disk, through the service | the service |
 | An embedded project, in this browser | the OPFS of the browser | the Origin Private File System |
 | File System Access API (Chromium based browsers only) | a folder of the disk, chosen by the user | `window.showDirectoryPicker` |
-| Supabase (PostgreSQL in the cloud) | one `public.gnumarus_files` table | the project URL and an API key |
+| Supabase (PostgreSQL in the cloud) | normalized tables (`tasks`, `comments`, `notes`, `config`, `ids`) | the project URL and an API key |
 
 A choice the browser does not offer is **disabled**: the description says why.
 The test environment (jsdom) offers neither API, so only the service is
@@ -1006,13 +1006,16 @@ the application never talks to the storage directly: it goes through the
 
 | | `ServiceProjectStore` | `EmbeddedProjectStore` / `FileSystemProjectStore` | `SupabaseProjectStore` |
 |---|---|---|---|
-| The files | on the disk, through the service | in the browser / in a folder of the disk | one `public.gnumarus_files` table |
-| The listing | `find` | the paths of the storage | the paths of the rows |
-| The search | `grep` | the content of the files, in JavaScript | the content of the rows, in JavaScript |
-| The hierarchy | `grep` on the `parent=` keys | the metadata of the files, in JavaScript | the metadata of the rows, in JavaScript |
+| The files | on the disk, through the service | in the browser / in a folder of the disk | normalized rows (`tasks`, `comments`, `notes`, `config`, `ids`) |
+| The listing | `find` | the paths of the storage | the rows of the tables |
+| The search | `grep` | the content of the files, in JavaScript | title, tags and description, in JavaScript |
+| The hierarchy | `grep` on the `parent=` keys | the metadata of the files, in JavaScript | the `parent` column, in JavaScript |
 
 The paths are always **relative** to the project folder, so every
-implementation agrees on the names of the files.
+implementation agrees on the names of the files. In the Supabase backend the
+paths are virtual identifiers (`task_<id>.txt` and friends): the project has
+no subfolders, and the ZIP export and import translate through the same file
+format as every other backend.
 
 ### Supabase
 
@@ -1023,24 +1026,28 @@ kept in the local storage of the browser, like the bridge token, under
 `gnumarus-project-manager.supabase-key`. No dependency was added: the
 application talks to the PostgREST API of the project with plain `fetch`.
 
-Pressing **Connect** tests whether the database is as expected:
+Every record is one row of a normalized table: each task metadata is a
+column of `tasks` plus a `description` column, comments and notes work the
+same way with a `body` column, `config` holds one row per setting (the
+setting name as primary key), and `ids` holds every used id. Lists stay
+space-separated (`tags`) or comma-separated (`blocked_by`, `related`) text,
+exactly like the files, and missing values read back with the same defaults
+as the file format. Numeric ids are the primary keys; there are no foreign
+keys, like the files allow dangling references.
 
-1. a probe reads the table without any row, proving the table and both
-   columns exist (the REST equivalent of asking for the DDL of every
-   table);
-2. the OpenAPI document of the project is read and the definition of the
-   table is checked for text `path` and `content` columns;
-3. a probe row is written, read back and deleted, so permission problems
-   surface here and not in the middle of the work.
+Pressing **Connect** tests whether the database is as expected by probing
+every table with all of its columns, then a write-read-delete round trip on
+the tasks table, so denied writes surface here and not in the middle of the
+work.
 
 Rejected credentials keep the dialog open with a warning and ask for new
-ones. A missing schema or table, wrong columns or denied writes show the
-queries that create the database (`SUPABASE_SETUP_SQL` in
-`src/api/supabase.ts`): one `public.gnumarus_files` table (`path` primary
-key, `content` text), the grants the keys need and permissive row level
-security policies, without which a default Supabase project rejects every
-request. Anyone holding the project URL and key can read and write this
-table.
+ones. A missing table or a missing column shows the queries that create the
+database (`SUPABASE_SETUP_SQL` in `src/api/supabase.ts`): every table is
+created with just its id column and all other columns follow one by one with
+`add column if not exists`, so the block is safe on a new database and on
+one that already holds some tables. Nothing else is included (no grants and
+no policies), on the assumption of a new database without row level
+security.
 
 The Supabase project never needs the bridge service, and a `401` answer
 reopens the project dialog instead of the bridge token dialog.

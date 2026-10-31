@@ -13,8 +13,10 @@
 import { ApiClient, ApiError, ApiUnavailableError } from '../api/client.js';
 import {
   SUPABASE_KEY_KEY,
+  SUPABASE_TABLES,
   SUPABASE_URL_KEY,
   SupabaseClient,
+  supabaseColumns,
   type SupabaseCredentials,
 } from '../api/supabase.js';
 import {
@@ -504,7 +506,9 @@ export class App
     }
     const client = new SupabaseClient({ ...credentials, fetchImpl: this.supabaseFetch });
     try {
-      await client.probeTable();
+      await Promise.all(
+        SUPABASE_TABLES.map((table) => client.probeTable(table, supabaseColumns(table))),
+      );
     } catch (error) {
       this.supabaseError = error instanceof Error ? error.message : String(error);
       this.store = null;

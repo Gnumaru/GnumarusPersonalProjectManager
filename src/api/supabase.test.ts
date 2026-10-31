@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
   SUPABASE_SETUP_SQL,
-  SUPABASE_TABLE,
+  SUPABASE_TABLES,
   SupabaseClient,
   normalizeSupabaseUrl,
+  supabaseColumns,
   verifySupabaseSchema,
 } from './supabase.js';
 
@@ -24,11 +25,13 @@ interface SeenRequest {
   readonly body: string;
 }
 
+type Route = {
+  match: (url: string, method: string) => boolean;
+  respond: (url: string) => Response;
+};
+
 /** A fetch mock answering from a route table, recording every request. */
-function mockFetch(
-  routes: ReadonlyArray<{ match: (url: string, method: string) => boolean; respond: (url: string) => Response }>,
-  seen: SeenRequest[] = [],
-): typeof fetch {
+function mockFetch(routes: readonly Route[], seen: SeenRequest[] = []): typeof fetch {
   return (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const method = (init?.method ?? 'GET').toUpperCase();
@@ -47,63 +50,53 @@ function mockFetch(
   }) as typeof fetch;
 }
 
-function tableUrl(): string {
-  return `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`;
+function tableUrl(table: string): string {
+  return `${SUPABASE_URL}/rest/v1/${table}`;
 }
 
-function openApiBody(columns: readonly string[] = ['path', 'content']): unknown {
-  const properties: Record<string, unknown> = {};
-  for (const column of columns) {
-    properties[column] = { type: 'string', format: 'text' };
-  }
-  return { definitions: { [SUPABASE_TABLE]: { required: [...columns], properties } } };
-}
-
-/** Routes of a healthy project: probe, OpenAPI and a write round trip. */
-function healthyRoutes(rows: { path: string; content: string }[] = []): {
-  routes: { match: (url: string, method: string) => boolean; respond: (url: string) => Response }[];
+/** Routes of a healthy project: probes plus a write round trip on tasks. */
+function healthyRoutes(stored: Map<string, Record<string, unknown>>): {
+  routes: Route[];
   seen: SeenRequest[];
 } {
   const seen: SeenRequest[] = [];
-  const stored = new Map(rows.map((row) => [row.path, row.content]));
-  const routes = [
+  const routes: Route[] = [
     {
-      match: (url: string) => url === `${SUPABASE_URL}/rest/v1/`,
-      respond: () => jsonResponse(openApiBody()),
-    },
-    {
-      match: (url: string, method: string) => method === 'GET' && url.startsWith(`${tableUrl()}?`),
+      match: (url, method) => method === 'GET' && url.includes('/rest/v1/tasks?'),
       respond: (url: string) => {
         const parsed = new URL(url);
-        const filter = parsed.searchParams.get('path') ?? '';
+        const filter = parsed.searchParams.get('id') ?? '';
         if (filter.startsWith('eq.')) {
           const wanted = filter.slice('eq.'.length);
-          const content = stored.get(wanted);
-          return jsonResponse(content === undefined ? [] : [{ path: wanted, content }]);
+          const row = stored.get(wanted);
+          return jsonResponse(row === undefined ? [] : [row]);
         }
         return jsonResponse([]);
       },
     },
     {
-      match: (url: string, method: string) => method === 'POST' && url === tableUrl(),
+      match: (url, method) =>
+        method === 'GET' &&
+        ['comments', 'notes', 'config', 'ids'].some((table) => url.startsWith(`${tableUrl(table)}?`)),
+      respond: () => jsonResponse([]),
+    },
+    {
+      match: (url, method) => method === 'POST' && url === tableUrl('tasks'),
       respond: () => {
         const last = seen[seen.length - 1];
-        const body = JSON.parse((last?.body ?? '[]') as string) as { path: string; content: string }[];
+        const body = JSON.parse((last?.body ?? '[]') as string) as Record<string, unknown>[];
         for (const row of body) {
-          stored.set(row.path, row.content);
+          stored.set(String(row['id']), row);
         }
         return jsonResponse([], 201);
       },
     },
     {
-      match: (url: string, method: string) => method === 'DELETE' && url.startsWith(`${tableUrl()}?`),
+      match: (url, method) => method === 'DELETE' && url.startsWith(`${tableUrl('tasks')}?`),
       respond: (url: string) => {
-        const parsed = new URL(url);
-        const filter = parsed.searchParams.get('path') ?? '';
-        for (const path of [...stored.keys()]) {
-          if (filter === `eq.${path}`) {
-            stored.delete(path);
-          }
+        const filter = new URL(url).searchParams.get('id') ?? '';
+        if (filter.startsWith('eq.')) {
+          stored.delete(filter.slice('eq.'.length));
         }
         return new Response(null, { status: 204 });
       },
@@ -112,10 +105,7 @@ function healthyRoutes(rows: { path: string; content: string }[] = []): {
   return { routes, seen };
 }
 
-function clientWith(
-  routes: { match: (url: string, method: string) => boolean; respond: (url: string) => Response }[],
-  seen: SeenRequest[],
-): SupabaseClient {
+function clientWith(routes: readonly Route[], seen: SeenRequest[]): SupabaseClient {
   return new SupabaseClient({ url: SUPABASE_URL, key: KEY, fetchImpl: mockFetch(routes, seen) });
 }
 
@@ -130,6 +120,17 @@ describe('normalizeSupabaseUrl', () => {
     expect(() => normalizeSupabaseUrl('')).toThrow();
     expect(() => normalizeSupabaseUrl('xyz.supabase.co')).toThrow();
     expect(() => normalizeSupabaseUrl('ftp://xyz.supabase.co')).toThrow();
+  });
+});
+
+describe('supabaseColumns', () => {
+  it('lists the id column first for every table', () => {
+    expect(supabaseColumns('tasks')[0]).toBe('id');
+    expect(supabaseColumns('tasks')).toContain('description');
+    expect(supabaseColumns('comments')).toEqual(['id', 'task', 'created', 'updated', 'body']);
+    expect(supabaseColumns('notes')).toEqual(['id', 'title', 'created', 'updated', 'body']);
+    expect(supabaseColumns('config')).toEqual(['key', 'value']);
+    expect(supabaseColumns('ids')).toEqual(['id']);
   });
 });
 
@@ -153,7 +154,7 @@ describe('SupabaseClient', () => {
     globalThis.fetch = strictFetch as typeof fetch;
     try {
       const client = new SupabaseClient({ url: SUPABASE_URL, key: KEY });
-      await client.probeTable();
+      await client.probeTable('tasks', supabaseColumns('tasks'));
       expect(seen).toHaveLength(1);
     } finally {
       globalThis.fetch = previous;
@@ -161,16 +162,16 @@ describe('SupabaseClient', () => {
   });
 
   it('sends the key as apikey and bearer on every request', async () => {
-    const { routes, seen } = healthyRoutes();
+    const { routes, seen } = healthyRoutes(new Map());
     const client = clientWith(routes, seen);
-    await client.probeTable();
+    await client.probeTable('tasks', supabaseColumns('tasks'));
 
     expect(seen.length).toBeGreaterThan(0);
     for (const request of seen) {
       expect(request.headers.get('apikey')).toBe(KEY);
       expect(request.headers.get('Authorization')).toBe(`Bearer ${KEY}`);
     }
-    expect(seen[0]?.url.startsWith('https://xyz.supabase.co/rest/v1/')).toBe(true);
+    expect(seen[0]?.url.startsWith(`${SUPABASE_URL}/rest/v1/tasks?`)).toBe(true);
   });
 
   it('upserts with merge-duplicates and fails inserts with 409', async () => {
@@ -178,7 +179,7 @@ describe('SupabaseClient', () => {
     const client = clientWith(
       [
         {
-          match: (url, method) => method === 'POST' && url === tableUrl(),
+          match: (url, method) => method === 'POST' && url === tableUrl('tasks'),
           respond: (url: string) => {
             void url;
             const last = seen[seen.length - 1];
@@ -192,43 +193,41 @@ describe('SupabaseClient', () => {
       ],
       seen,
     );
-    await client.upsertRow({ path: 'task_1.txt', content: 'x' });
+    await client.upsertRows('tasks', [{ id: 1, title: 'x' }]);
     expect(seen[0]?.headers.get('Prefer')).toContain('resolution=merge-duplicates');
-    await expect(client.insertRow({ path: 'task_1.txt', content: 'x' })).rejects.toMatchObject({
+    await expect(client.insertRows('tasks', [{ id: 1, title: 'x' }])).rejects.toMatchObject({
       status: 409,
     });
   });
 
   it('reads a missing row as null and pages the listing', async () => {
     const seen: SeenRequest[] = [];
-    const rows = Array.from({ length: 1001 }, (_, index) => ({
-      path: `task_${index + 1}.txt`,
-      content: 'x',
-    }));
+    const rows = Array.from({ length: 1001 }, (_, index) => ({ id: index + 1 }));
     const client = clientWith(
       [
         {
-          match: (url, method) => method === 'GET' && url.startsWith(`${tableUrl()}?`),
+          match: (url, method) => method === 'GET' && url.startsWith(`${tableUrl('tasks')}?`),
           respond: (url: string) => {
             const parsed = new URL(url);
-            const offset = Number.parseInt(parsed.searchParams.get('offset') ?? '0', 10);
-            if (parsed.searchParams.get('path')?.startsWith('eq.') === true) {
+            const filter = parsed.searchParams.get('id') ?? '';
+            if (filter.startsWith('eq.')) {
               return jsonResponse([]);
             }
+            const offset = Number.parseInt(parsed.searchParams.get('offset') ?? '0', 10);
             return jsonResponse(rows.slice(offset, offset + 1000));
           },
         },
       ],
       seen,
     );
-    expect(await client.readRow('task_9.txt')).toBeNull();
-    expect((await client.listRows()).length).toBe(1001);
+    expect(await client.selectRows('tasks', { select: ['id'], filter: { column: 'id', value: 9 } })).toEqual([]);
+    expect((await client.selectRows('tasks', { select: ['id'] })).length).toBe(1001);
   });
 });
 
 describe('verifySupabaseSchema', () => {
   it('accepts a healthy project and cleans the probe row', async () => {
-    const { routes, seen } = healthyRoutes();
+    const { routes, seen } = healthyRoutes(new Map());
     const client = clientWith(routes, seen);
     expect(await verifySupabaseSchema(client)).toEqual({ ok: true });
     const deletes = seen.filter((request) => request.method === 'DELETE');
@@ -253,7 +252,7 @@ describe('verifySupabaseSchema', () => {
     }
   });
 
-  it('reports a missing table or schema', async () => {
+  it('reports a missing table', async () => {
     const seen: SeenRequest[] = [];
     const client = clientWith(
       [
@@ -261,10 +260,7 @@ describe('verifySupabaseSchema', () => {
           match: () => true,
           respond: () =>
             jsonResponse(
-              {
-                code: 'PGRST205',
-                message: `Could not find the table 'public.${SUPABASE_TABLE}' in the schema cache`,
-              },
+              { code: 'PGRST205', message: "Could not find the table 'public.tasks' in the schema cache" },
               404,
             ),
         },
@@ -278,13 +274,13 @@ describe('verifySupabaseSchema', () => {
     }
   });
 
-  it('reports a wrong format when the columns do not match', async () => {
+  it('reports a wrong format when a column is missing', async () => {
     const seen: SeenRequest[] = [];
     const client = clientWith(
       [
         {
-          match: (url, method) => method === 'GET' && url.startsWith(`${tableUrl()}?`),
-          respond: () => jsonResponse({ message: 'column content does not exist' }, 400),
+          match: (url, method) => method === 'GET' && url.includes('/rest/v1/'),
+          respond: () => jsonResponse({ message: 'column description does not exist' }, 400),
         },
       ],
       seen,
@@ -296,24 +292,20 @@ describe('verifySupabaseSchema', () => {
     }
   });
 
-  it('reports a wrong format when the definition misses a column', async () => {
+  it('reports denied access with the setup queries', async () => {
     const seen: SeenRequest[] = [];
     const client = clientWith(
       [
         {
-          match: (url) => url === `${SUPABASE_URL}/rest/v1/`,
-          respond: () => jsonResponse(openApiBody(['path'])),
-        },
-        {
-          match: (url, method) => method === 'GET' && url.startsWith(`${tableUrl()}?`),
+          match: (url, method) => method === 'GET' && url.includes('/rest/v1/'),
           respond: () => jsonResponse([]),
         },
         {
-          match: (url, method) => method === 'POST' && url === tableUrl(),
-          respond: () => jsonResponse([], 201),
+          match: (url, method) => method === 'POST' && url === tableUrl('tasks'),
+          respond: () => jsonResponse({ message: 'permission denied for table tasks' }, 401),
         },
         {
-          match: (url, method) => method === 'DELETE' && url.startsWith(`${tableUrl()}?`),
+          match: (url, method) => method === 'DELETE' && url.startsWith(`${tableUrl('tasks')}?`),
           respond: () => new Response(null, { status: 204 }),
         },
       ],
@@ -322,37 +314,7 @@ describe('verifySupabaseSchema', () => {
     const check = await verifySupabaseSchema(client);
     expect(check.ok).toBe(false);
     if (!check.ok) {
-      expect(check.issue.kind).toBe('wrong-format');
-    }
-  });
-
-  it('reports denied writes with a policy hint', async () => {
-    const seen: SeenRequest[] = [];
-    const client = clientWith(
-      [
-        {
-          match: (url) => url === `${SUPABASE_URL}/rest/v1/`,
-          respond: () => jsonResponse(openApiBody()),
-        },
-        {
-          match: (url, method) => method === 'GET' && url.startsWith(`${tableUrl()}?`),
-          respond: () => jsonResponse([]),
-        },
-        {
-          match: (url, method) => method === 'POST' && url === tableUrl(),
-          respond: () => jsonResponse({ message: 'new row violates row-level security' }, 401),
-        },
-        {
-          match: (url, method) => method === 'DELETE' && url.startsWith(`${tableUrl()}?`),
-          respond: () => new Response(null, { status: 204 }),
-        },
-      ],
-      seen,
-    );
-    const check = await verifySupabaseSchema(client);
-    expect(check.ok).toBe(false);
-    if (!check.ok) {
-      expect(check.issue.kind).toBe('write-denied');
+      expect(check.issue.kind).toBe('access-denied');
     }
   });
 
@@ -373,11 +335,15 @@ describe('verifySupabaseSchema', () => {
 });
 
 describe('SUPABASE_SETUP_SQL', () => {
-  it('carries the table and the policies the application needs', () => {
-    expect(SUPABASE_SETUP_SQL).toContain(`create table if not exists public.${SUPABASE_TABLE}`);
-    expect(SUPABASE_SETUP_SQL).toContain('path text primary key');
-    expect(SUPABASE_SETUP_SQL).toContain('content text not null');
-    expect(SUPABASE_SETUP_SQL).toContain('enable row level security');
-    expect(SUPABASE_SETUP_SQL).toContain('create policy');
+  it('creates every table with its id column and adds the rest one by one', () => {
+    for (const table of SUPABASE_TABLES) {
+      expect(SUPABASE_SETUP_SQL).toContain(`create table if not exists public.${table}`);
+    }
+    expect(SUPABASE_SETUP_SQL).toContain('add column if not exists description');
+    expect(SUPABASE_SETUP_SQL).toContain('add column if not exists body');
+    expect(SUPABASE_SETUP_SQL).toContain('add column if not exists value');
+    expect(SUPABASE_SETUP_SQL).not.toContain('grant');
+    expect(SUPABASE_SETUP_SQL).not.toContain('policy');
+    expect(SUPABASE_SETUP_SQL).not.toContain('row level security');
   });
 });

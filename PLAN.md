@@ -8,6 +8,13 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 42 normalizes the Supabase backend: real `tasks`,
+  `comments`, `notes`, `config` (key/value, setting name as PK) and `ids`
+  tables, no path column, no subfolders. Setup SQL is idempotent DDL only
+  (CREATE TABLE with the id column, then ADD COLUMN IF NOT EXISTS one by
+  one, no grants or policies). Verification probes every table and keeps a
+  write probe; atomic id reservation via PK insert.
+- Verification: 530 unit tests pass.
 - Batch 41 adds a Supabase storage backend next to the service,
   embedded and file-system ones: `supabaseUrl` + `supabaseKey` credentials,
   connection test with DDL verification of the single

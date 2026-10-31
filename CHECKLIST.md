@@ -1,6 +1,39 @@
 # Checklist
 
+## Batch 42 - Normalized Supabase schema (tasks/comments/notes/config/ids)
+
+### Change
+
+- [x] `src/api/supabase.ts`: per-table select/insert/upsert/delete,
+      `SUPABASE_SCHEMA` as single source of truth, idempotent
+      `SUPABASE_SETUP_SQL` (create with id column + sequential ADD COLUMN
+      IF NOT EXISTS, nothing else), simplified verify (probe every table
+      + write probe, no OpenAPI comparison)
+- [x] `src/core/supabaseStore.ts`: Task/Note/Comment/config/ids row
+      mappers (tags space-joined, lists comma-joined, same defaults as the
+      files), virtual paths, atomic `allocateId` via PK insert, KV
+      `config.txt` assembly, `replaceAll` rebuild
+- [x] `src/test-support/fakePostgrest.ts`: multi-table fake with per-table
+      schemas; no subfolders in the Supabase backend
+
+### Tests
+
+- [x] `src/api/supabase.test.ts`: rewritten for per-table probes, paging,
+      setup SQL shape (create + add-columns only, no grants/policies)
+- [x] `src/core/supabaseStore.test.ts`: row mapping, defaults like files,
+      file round trip, KV config, bootstrap, never-reuse-after-delete
+- [x] `src/ui/app.test.ts`: smoke + credentials + dialog flows rerun
+      against the multi-table fake
+- [x] `npm run typecheck`, `npm test` (530 tests, 3 consecutive green runs),
+      `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 41 - Supabase storage backend
+
+> Superseded by Batch 42 for the schema: the single-table design below
+> became normalized tables. Mode plumbing, dialog, styles and e2e items
+> still stand as built.
 
 ### Change
 

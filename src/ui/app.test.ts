@@ -3635,9 +3635,8 @@ describe('the Supabase project', () => {
       (node) => node.textContent,
     );
     expect(titles).toContain('A Supabase task');
-    const rows = [...backend.rows.keys()].filter((path) => path.startsWith('task_'));
-    expect(rows).toHaveLength(1);
-    expect(backend.rows.has('ids.txt')).toBe(true);
+    expect([...backend.tables.tasks.keys()]).toHaveLength(1);
+    expect(backend.tables.ids.size).toBeGreaterThan(0);
 
     harness.app.dispose();
   });
@@ -3722,7 +3721,7 @@ describe('the Supabase project', () => {
   it('shows the setup queries when the table is missing', async () => {
     const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost/' });
     const doc = dom.window.document;
-    const backend = new FakePostgrest({ key: supabaseKey, missingTable: true });
+    const backend = new FakePostgrest({ key: supabaseKey, missingTables: ['tasks'] });
     const used: { url: string; key: string }[] = [];
     const dialog = new ProjectDialog({
       doc,

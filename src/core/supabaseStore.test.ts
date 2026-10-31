@@ -38,8 +38,8 @@ describe('SupabaseProjectStore', () => {
     const task = buildTask(input('The first task'), id, new Date());
     await store.createTaskFile(store.taskPath(id), task);
 
-    expect(backend.rows.get(store.taskPath(id))).toContain('title=The first task');
-    expect(backend.rows.get(store.taskPath(id))).toContain(`id=${id}`);
+    expect(backend.tables.tasks.get(String(id))?.['title']).toBe('The first task');
+    expect(backend.tables.tasks.get(String(id))?.['description']).toBe('The body');
   });
 
   it('allocates nonzero ids that never repeat, whatever the kind of record', async () => {
@@ -67,15 +67,15 @@ describe('SupabaseProjectStore', () => {
 
   it('bootstraps the registry from the rows already stored', async () => {
     const backend = new FakePostgrest({ key: KEY });
-    backend.addRow('task_7.txt', 'id=7\ntitle=Legacy\n----\nbody\n');
-    backend.addRow('note_9.txt', 'id=9\ntitle=Legacy note\n----\nbody\n');
+    backend.addRow('tasks', { id: 7, title: 'Legacy' });
+    backend.addRow('notes', { id: 9, title: 'Legacy note' });
     const { store } = createStore(backend);
 
     const id = await store.allocateId();
     expect(id).not.toBe(7);
     expect(id).not.toBe(9);
-    expect(backend.rows.get('ids.txt')).toContain('7');
-    expect(backend.rows.get('ids.txt')).toContain('9');
+    expect(backend.tables.ids.has('7')).toBe(true);
+    expect(backend.tables.ids.has('9')).toBe(true);
   });
 
   it('lists the tasks with their metadata', async () => {
@@ -92,6 +92,50 @@ describe('SupabaseProjectStore', () => {
     expect(summaries[0]?.title).toBe('A task');
     expect(summaries[0]?.status).toBe('doing');
     expect(summaries[0]?.path).toBe(store.taskPath(id));
+  });
+
+  it('reads rows with missing values like the equivalent files', async () => {
+    const backend = new FakePostgrest({ key: KEY });
+    backend.addRow('tasks', { id: 5, title: 'Sparse' });
+    const { store } = createStore(backend);
+
+    const summaries = await store.listTasks();
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]?.status).toBe('todo');
+    expect(summaries[0]?.type).toBe('Feature');
+    expect(summaries[0]?.role).toBe('Programming');
+    expect(summaries[0]?.tags).toEqual([]);
+    expect(summaries[0]?.kanbanOrder).toBe(0);
+  });
+
+  it('round trips a task through rows and files without losing anything', async () => {
+    const { store } = createStore();
+    const id = await store.allocateId();
+    const task = {
+      ...buildTask(
+        {
+          ...input('Round trip'),
+          tags: ['frontend', 'ui'],
+          blockedBy: [11, 13],
+          related: [17],
+          type: 'Bug' as const,
+          role: 'Design' as const,
+        },
+        id,
+        new Date(),
+      ),
+      description: 'First line\n\nSecond paragraph',
+    };
+    await store.createTaskFile(store.taskPath(id), task);
+
+    const files = await store.listFiles();
+    const file = files.find((entry) => entry.path === store.taskPath(id));
+    expect(file?.content).toContain('title=Round trip');
+    expect(file?.content).toContain('tags=frontend ui');
+    expect(file?.content).toContain('blocked_by=11,13');
+    expect(file?.content).toContain('related=17');
+    expect(file?.content).toContain('type=Bug');
+    expect(file?.content).toContain('First line');
   });
 
   it('searches the content of the tasks', async () => {
@@ -133,8 +177,8 @@ describe('SupabaseProjectStore', () => {
     );
 
     const comment = await store.createComment(taskId, 'A comment');
-    expect(backend.rows.get(store.commentPath(comment.id))).toContain(`task=${taskId}`);
-    expect(backend.rows.get(store.commentPath(comment.id))).toContain('A comment');
+    expect(backend.tables.comments.get(String(comment.id))?.['task']).toBe(taskId);
+    expect(backend.tables.comments.get(String(comment.id))?.['body']).toBe('A comment');
 
     const comments = await store.listComments(taskId);
     expect(comments).toHaveLength(1);
@@ -159,10 +203,10 @@ describe('SupabaseProjectStore', () => {
       { path: 'task_1.txt', content: 'id=1\ntitle=The imported task\n----\nbody\n' },
     ]);
 
-    // The imported task plus the rebuilt ids.txt registry: the import
-    // replaces the whole project, so only the imported ids are registered.
-    expect(backend.rows.get(store.taskPath(id))).toBeUndefined();
-    expect(backend.rows.get('ids.txt')).toBe('1\n');
+    // The import replaces the whole project: only the imported records and
+    // their ids are registered.
+    expect(backend.tables.tasks.has(String(id))).toBe(false);
+    expect([...backend.tables.ids.keys()].sort()).toEqual(['1']);
     const summaries = await store.listTasks();
     expect(summaries).toHaveLength(1);
     expect(summaries[0]?.title).toBe('The imported task');
@@ -190,9 +234,8 @@ describe('SupabaseProjectStore', () => {
     const note = buildNote({ title: 'The first note', content: '# Hello' }, id, new Date());
     await store.createNoteFile(store.notePath(id), note);
 
-    expect(backend.rows.get(store.notePath(id))).toContain(`id=${id}`);
-    expect(backend.rows.get(store.notePath(id))).toContain('title=The first note');
-    expect(backend.rows.get(store.notePath(id))).toContain('# Hello');
+    expect(backend.tables.notes.get(String(id))?.['title']).toBe('The first note');
+    expect(backend.tables.notes.get(String(id))?.['body']).toBe('# Hello');
   });
 
   it('lists and reads the notes', async () => {
@@ -257,11 +300,15 @@ describe('SupabaseProjectStore', () => {
     expect(await store.listNotePaths()).toEqual([store.notePath(noteId)]);
   });
 
-  it('reads and writes the application config row', async () => {
-    const { store } = createStore();
+  it('reads and writes the application config rows', async () => {
+    const { store, backend } = createStore();
 
     expect(await store.readAppConfig()).toBeNull();
-    await store.writeAppConfig('kanban_show_hidden_todo=true\n');
-    expect(await store.readAppConfig()).toBe('kanban_show_hidden_todo=true\n');
+    await store.writeAppConfig('kanban_show_hidden_todo=true\nview=kanban\n');
+    expect(await store.readAppConfig()).toBe('kanban_show_hidden_todo=true\nview=kanban\n');
+    expect(backend.tables.config.get('view')).toEqual({ key: 'view', value: 'kanban' });
+
+    await store.writeAppConfig('');
+    expect(await store.readAppConfig()).toBeNull();
   });
 });

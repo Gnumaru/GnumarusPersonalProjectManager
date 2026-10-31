@@ -180,7 +180,11 @@ adicione um novo backend pra armazenamento usando supabase, ao lado dos existent
 ====
 eu tentei conectar no supabase mas deu o erro "Unable to reach the Supabase project at https://.supabase.co: Failed to execute 'fetch' on 'Window': Illegal invocation" o erro foi o mesmo tanto acessando localhost como http ou como https
 ====
+percebi que na implementacao do supabase voce utilizou uma tabela unica gnumarus_files. perceba que nossa estrutura de arquivos reflete uma estrutura de banco. cada arquivo task_<id>.txt é como se fosse um registro em uma tabela task. cada arquivo comment_<id>.txt é como se fosse um registro em uma tabela comment e assim por diante. o arquivo config em especial é uma tabela de config chave-valor com apenas duas colunas, o id é uma string unique com o nome da config e o valor é outra string. no caso das tabelas task, comment e note, cada metadado é uma coluna, e o conteudo do arquivo é apenas mais uma coluna. o path do arquivo nao precisa ser armazenado porque nao faz sentido. os ids dos registros seriam os ids numericos que estamos usando. nao compensaria mudar a arquitetura pra funcionar assim? ou isso altera muito a abstracao da interface que o app faz com os backends?
 ====
+nao tem problema dropar suporte a subdiretorio porque na pratica nao usamos isso pra nada hoje.
+a tabela de config precisa sim ter duas colunas pra termos chaves primarias unicas reais para cada configuracao.
+ao inves de validarmos o ddl de cada tabela, apenas gere um sql que cria a tabela apenas com sua coluna de id e logo em seguida adiciona todas as outras colunas sequencialmente usando "if not exists". nao coloque nada mais no script, nada de grant nem drop ou create policy, assuma que o usuario vai criar um banco novo sem rls
 ====
 
 ====

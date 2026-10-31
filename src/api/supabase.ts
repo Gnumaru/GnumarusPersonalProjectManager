@@ -2,55 +2,144 @@
  * Minimal Supabase client over plain `fetch`.
  *
  * The application talks to a Supabase project through its PostgREST API, with
- * no extra dependency: every file of the project is one row of a single
- * table. Authentication is the project URL plus its API key, sent as the
- * `apikey` header and the `Authorization` bearer on every request.
+ * no extra dependency. Every record is one row of a normalized table:
+ * `tasks`, `comments`, `notes`, a key/value `config` table and an `ids`
+ * registry table. Authentication is the project URL plus its API key, sent as
+ * the `apikey` header and the `Authorization` bearer on every request.
  */
 
 import { ApiError } from './client.js';
 
-/** The table that holds every file of the project. */
-export const SUPABASE_TABLE = 'gnumarus_files';
+/** The tables of the project, in setup order. */
+export const SUPABASE_TABLES = ['tasks', 'comments', 'notes', 'config', 'ids'] as const;
 
-/** The PostgREST path of the table. */
-export const SUPABASE_TABLE_PATH = '/rest/v1/gnumarus_files';
+/** One of the tables of the project. */
+export type SupabaseTable = (typeof SUPABASE_TABLES)[number];
+
+/** A cell of a row: the columns are text, numbers, booleans or null. */
+export type SupabaseValue = string | number | boolean | null;
+
+/** One row, keyed by column name. */
+export type SupabaseRow = Record<string, SupabaseValue>;
+
+/** One column of the setup script: its name and the rest of its definition. */
+export interface SupabaseColumn {
+  readonly name: string;
+  /** Everything after the name, e.g. `text not null default ''`. */
+  readonly definition: string;
+}
+
+/** The shape of one table: its id column and its other columns. */
+export interface SupabaseTableDef {
+  /** The primary key column, created together with the table. */
+  readonly idColumn: string;
+  /** The type of the primary key, e.g. `bigint`. */
+  readonly idType: string;
+  /** The remaining columns, added one by one. */
+  readonly columns: readonly SupabaseColumn[];
+}
+
+/**
+ * The schema of the project, the single source of truth for the setup
+ * script, the verification and the fake of the tests.
+ */
+export const SUPABASE_SCHEMA: Readonly<Record<SupabaseTable, SupabaseTableDef>> = {
+  tasks: {
+    idColumn: 'id',
+    idType: 'bigint',
+    columns: [
+      { name: 'title', definition: "text not null default ''" },
+      { name: 'status', definition: "text not null default 'todo'" },
+      { name: 'parent', definition: 'bigint' },
+      { name: 'tags', definition: "text not null default ''" },
+      { name: 'created', definition: "text not null default ''" },
+      { name: 'updated', definition: "text not null default ''" },
+      { name: 'start', definition: "text not null default ''" },
+      { name: 'end', definition: "text not null default ''" },
+      { name: 'blocked_by', definition: "text not null default ''" },
+      { name: 'related', definition: "text not null default ''" },
+      { name: 'expanded', definition: 'boolean not null default false' },
+      { name: 'type', definition: "text not null default 'Feature'" },
+      { name: 'role', definition: "text not null default 'Programming'" },
+      { name: 'kanban_hidden', definition: 'boolean not null default false' },
+      { name: 'tree_gantt_hidden', definition: 'boolean not null default false' },
+      { name: 'kanban_order', definition: 'integer not null default 0' },
+      { name: 'tree_gantt_order', definition: 'integer not null default 0' },
+      { name: 'description', definition: "text not null default ''" },
+    ],
+  },
+  comments: {
+    idColumn: 'id',
+    idType: 'bigint',
+    columns: [
+      { name: 'task', definition: 'bigint not null' },
+      { name: 'created', definition: "text not null default ''" },
+      { name: 'updated', definition: "text not null default ''" },
+      { name: 'body', definition: "text not null default ''" },
+    ],
+  },
+  notes: {
+    idColumn: 'id',
+    idType: 'bigint',
+    columns: [
+      { name: 'title', definition: "text not null default ''" },
+      { name: 'created', definition: "text not null default ''" },
+      { name: 'updated', definition: "text not null default ''" },
+      { name: 'body', definition: "text not null default ''" },
+    ],
+  },
+  config: {
+    idColumn: 'key',
+    idType: 'text',
+    columns: [{ name: 'value', definition: "text not null default ''" }],
+  },
+  ids: {
+    idColumn: 'id',
+    idType: 'bigint',
+    columns: [],
+  },
+};
+
+/** Every column of a table, id column first. */
+export function supabaseColumns(table: SupabaseTable): readonly string[] {
+  const def = SUPABASE_SCHEMA[table];
+  return [def.idColumn, ...def.columns.map((column) => column.name)];
+}
+
+/**
+ * The queries a fresh Supabase project needs, shown when the database is
+ * not as expected.
+ *
+ * Idempotent DDL only: every table is created with just its id column and
+ * all other columns follow one by one with `if not exists`, so the block is
+ * safe on a new database and on one that already holds some tables. Nothing
+ * else is included: no grants and no policies, on the assumption of a new
+ * database without row level security.
+ */
+export const SUPABASE_SETUP_SQL: string = (() => {
+  const blocks: string[] = [
+    '-- Gnumarus Project Manager: Supabase setup.',
+    '-- Run this whole block once in the SQL editor of the Supabase project.',
+  ];
+  for (const table of SUPABASE_TABLES) {
+    const def = SUPABASE_SCHEMA[table];
+    blocks.push(
+      `create table if not exists public.${table} (${def.idColumn} ${def.idType} primary key);`,
+    );
+    for (const column of def.columns) {
+      blocks.push(
+        `alter table public.${table} add column if not exists ${column.name} ${column.definition};`,
+      );
+    }
+  }
+  return `${blocks.join('\n')}\n`;
+})();
 
 /** Where the Supabase URL is kept: ephemeral, like the bridge token. */
 export const SUPABASE_URL_KEY = 'gnumarus-project-manager.supabase-url';
 
 /** Where the Supabase API key is kept: ephemeral, like the bridge token. */
 export const SUPABASE_KEY_KEY = 'gnumarus-project-manager.supabase-key';
-
-/**
- * The queries a fresh Supabase project needs, shown when the database is
- * not as expected.
- *
- * Besides the table itself they grant the table to the keys the application
- * uses and open permissive row level security policies: without them a
- * default Supabase project rejects every request, even with a valid key.
- * Anyone holding the project URL and key can read and write this table.
- */
-export const SUPABASE_SETUP_SQL = `-- Gnumarus Project Manager: Supabase setup.
--- Run this whole block once in the SQL editor of the Supabase project.
-create table if not exists public.gnumarus_files (
-  path text primary key,
-  content text not null default ''
-);
-
--- The application talks to the database with the anon key (the service_role
--- key bypasses these, but the application works with either key).
-grant all on table public.gnumarus_files to anon, authenticated;
-
-alter table public.gnumarus_files enable row level security;
-
-drop policy if exists "gnumarus_files_all" on public.gnumarus_files;
-create policy "gnumarus_files_all"
-  on public.gnumarus_files
-  for all
-  to anon, authenticated
-  using (true)
-  with check (true);
-`;
 
 export interface SupabaseCredentials {
   readonly url: string;
@@ -62,30 +151,22 @@ export interface SupabaseClientOptions extends SupabaseCredentials {
   readonly fetchImpl?: typeof fetch | undefined;
 }
 
-export interface SupabaseFileRow {
-  readonly path: string;
-  readonly content: string;
-}
-
 /** Why the Supabase database cannot be used as is. */
 export type SupabaseSchemaIssue =
   /** The URL or the key is rejected: the user types new credentials. */
   | { readonly kind: 'invalid-credentials'; readonly detail: string }
   /** The project cannot be reached at all. */
   | { readonly kind: 'unreachable'; readonly detail: string }
-  /** The schema or the table does not exist. */
+  /** A table does not exist: the setup queries create it. */
   | { readonly kind: 'missing-table'; readonly detail: string }
-  /** The table exists but its columns do not match. */
+  /** A table exists but misses columns: the setup queries add them. */
   | { readonly kind: 'wrong-format'; readonly detail: string }
-  /** Reads work but writes are denied (usually missing RLS policies). */
-  | { readonly kind: 'write-denied'; readonly detail: string };
+  /** Reads work but a request is denied: the setup queries are shown. */
+  | { readonly kind: 'access-denied'; readonly detail: string };
 
 export type SupabaseSchemaCheck =
   | { readonly ok: true }
   | { readonly ok: false; readonly issue: SupabaseSchemaIssue };
-
-/** The probe row written and removed while testing the database. */
-const PROBE_PATH = '__gnumarus_probe__';
 
 /**
  * Normalizes a Supabase project URL: trims it and drops trailing slashes.
@@ -134,6 +215,31 @@ function isMissingTable(status: number, body: unknown): boolean {
     }
   }
   return true;
+}
+
+/** True when the answer rejects the credentials themselves. */
+function isInvalidCredentials(status: number, body: unknown): boolean {
+  if (status !== 401 && status !== 403) {
+    return false;
+  }
+  if (isRecord(body)) {
+    const message = body['message'];
+    if (typeof message === 'string' && /invalid( api)? key/iu.test(message)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export interface SupabaseSelect {
+  /** The columns to read. */
+  readonly select: readonly string[];
+  /** An equality filter, e.g. `{ column: 'id', value: 12 }`. */
+  readonly filter?: { readonly column: string; readonly value: string | number } | undefined;
+  /** The column the rows are ordered by. */
+  readonly order?: string | undefined;
+  readonly limit?: number | undefined;
+  readonly offset?: number | undefined;
 }
 
 export class SupabaseClient {
@@ -188,244 +294,164 @@ export class SupabaseClient {
     return body;
   }
 
-  /**
-   * Reads the table definition without any row: proves the table and both
-   * columns exist.
-   */
-  async probeTable(): Promise<void> {
-    const params = new URLSearchParams({ select: 'path,content', limit: '1' });
-    await this.request(`${SUPABASE_TABLE_PATH}?${params.toString()}`, { method: 'GET' });
-  }
-
-  /** The OpenAPI document of the project, `null` when it cannot be read. */
-  async readOpenApi(): Promise<unknown | null> {
-    try {
-      return await this.request('/rest/v1/', {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-      });
-    } catch {
-      return null;
-    }
-  }
-
-  /** The paths of every row, oldest first, in stable pages. */
-  async listPaths(): Promise<string[]> {
-    const paths: string[] = [];
+  /** Reads rows of a table, in stable pages. */
+  async selectRows(table: SupabaseTable, select: SupabaseSelect): Promise<SupabaseRow[]> {
+    const rows: SupabaseRow[] = [];
     const pageSize = 1000;
     for (let offset = 0; ; offset += pageSize) {
       const params = new URLSearchParams({
-        select: 'path',
-        order: 'path',
-        limit: String(pageSize),
-        offset: String(offset),
+        select: select.select.join(','),
+        limit: String(select.limit ?? pageSize),
+        offset: String(select.offset ?? offset),
       });
-      const body = await this.request(`${SUPABASE_TABLE_PATH}?${params.toString()}`, {
+      if (select.filter !== undefined) {
+        params.set(select.filter.column, `eq.${select.filter.value}`);
+      }
+      if (select.order !== undefined) {
+        params.set('order', select.order);
+      }
+      const body = await this.request(`/rest/v1/${table}?${params.toString()}`, {
         method: 'GET',
       });
       if (!Array.isArray(body) || body.length === 0) {
         break;
       }
       for (const row of body) {
-        if (isRecord(row) && typeof row['path'] === 'string') {
-          paths.push(row['path']);
+        if (isRecord(row)) {
+          const projected: SupabaseRow = {};
+          for (const [column, value] of Object.entries(row)) {
+            if (
+              typeof value === 'string' ||
+              typeof value === 'number' ||
+              typeof value === 'boolean' ||
+              value === null
+            ) {
+              projected[column] = value;
+            }
+          }
+          rows.push(projected);
         }
       }
-      if (body.length < pageSize) {
-        break;
-      }
-    }
-    return paths;
-  }
-
-  /** Every row of the table, in stable pages. */
-  async listRows(): Promise<SupabaseFileRow[]> {
-    const rows: SupabaseFileRow[] = [];
-    const pageSize = 1000;
-    for (let offset = 0; ; offset += pageSize) {
-      const params = new URLSearchParams({
-        select: 'path,content',
-        order: 'path',
-        limit: String(pageSize),
-        offset: String(offset),
-      });
-      const body = await this.request(`${SUPABASE_TABLE_PATH}?${params.toString()}`, {
-        method: 'GET',
-      });
-      if (!Array.isArray(body) || body.length === 0) {
-        break;
-      }
-      for (const row of body) {
-        if (isRecord(row) && typeof row['path'] === 'string' && typeof row['content'] === 'string') {
-          rows.push({ path: row['path'], content: row['content'] });
-        }
-      }
-      if (body.length < pageSize) {
+      if (body.length < (select.limit ?? pageSize)) {
         break;
       }
     }
     return rows;
   }
 
-  /** One row by path, `null` when it does not exist. */
-  async readRow(path: string): Promise<SupabaseFileRow | null> {
-    const params = new URLSearchParams({ select: 'path,content', path: `eq.${path}` });
-    const body = await this.request(`${SUPABASE_TABLE_PATH}?${params.toString()}`, {
-      method: 'GET',
-    });
-    if (!Array.isArray(body) || body.length === 0) {
-      return null;
-    }
-    const row: unknown = body[0];
-    if (isRecord(row) && typeof row['path'] === 'string' && typeof row['content'] === 'string') {
-      return { path: row['path'], content: row['content'] };
-    }
-    return null;
+  /**
+   * Reads the rows of a table without any row: proves the table and the
+   * columns exist.
+   */
+  async probeTable(table: SupabaseTable, columns: readonly string[]): Promise<void> {
+    await this.selectRows(table, { select: columns, limit: 1 });
   }
 
-  /** Inserts a row, failing with 409 when the path already exists. */
-  async insertRow(row: SupabaseFileRow): Promise<void> {
-    await this.request(SUPABASE_TABLE_PATH, {
+  /** Inserts rows, failing with 409 on a duplicated primary key. */
+  async insertRows(table: SupabaseTable, rows: readonly SupabaseRow[]): Promise<void> {
+    await this.request(`/rest/v1/${table}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify([row]),
+      body: JSON.stringify(rows),
     });
   }
 
-  /** Inserts the row or replaces the one with the same path. */
-  async upsertRow(row: SupabaseFileRow): Promise<void> {
-    await this.request(SUPABASE_TABLE_PATH, {
+  /** Inserts the rows or replaces the ones with the same primary key. */
+  async upsertRows(table: SupabaseTable, rows: readonly SupabaseRow[]): Promise<void> {
+    await this.request(`/rest/v1/${table}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Prefer: 'return=minimal,resolution=merge-duplicates',
       },
-      body: JSON.stringify([row]),
+      body: JSON.stringify(rows),
     });
   }
 
-  /** Deletes the row with the path; missing rows are not an error. */
-  async deleteRow(path: string): Promise<void> {
-    const params = new URLSearchParams({ path: `eq.${path}` });
-    await this.request(`${SUPABASE_TABLE_PATH}?${params.toString()}`, {
+  /** Deletes the rows matching an equality filter. */
+  async deleteRows(
+    table: SupabaseTable,
+    filter: { readonly column: string; readonly value: string | number },
+  ): Promise<void> {
+    const params = new URLSearchParams({ [filter.column]: `eq.${filter.value}` });
+    await this.request(`/rest/v1/${table}?${params.toString()}`, {
       method: 'DELETE',
       headers: { Prefer: 'return=minimal' },
     });
   }
 }
 
-/** The table definition inside an OpenAPI document, either spec version. */
-function findTableDefinition(openApi: unknown): Record<string, unknown> | null {
-  if (!isRecord(openApi)) {
-    return null;
-  }
-  const containers: unknown[] = [openApi['definitions']];
-  const components = openApi['components'];
-  if (isRecord(components)) {
-    containers.push(components['schemas']);
-  }
-  for (const container of containers) {
-    if (isRecord(container) && isRecord(container[SUPABASE_TABLE])) {
-      return container[SUPABASE_TABLE];
-    }
-  }
-  return null;
-}
-
-/** True when the definition matches `path`/`content` text columns. */
-function definitionMatches(definition: Record<string, unknown>): boolean {
-  const properties = definition['properties'];
-  if (!isRecord(properties)) {
-    return false;
-  }
-  for (const column of ['path', 'content']) {
-    const property = properties[column];
-    if (!isRecord(property) || property['type'] !== 'string') {
-      return false;
-    }
-  }
-  const required = definition['required'];
-  if (!Array.isArray(required)) {
-    return false;
-  }
-  return required.includes('path') && required.includes('content');
-}
-
 /**
  * Connects and tests whether the database is as expected.
  *
- * Reads the table definition (the probe plus the OpenAPI document, the
- * REST equivalent of asking for the DDL of every table) and finishes with
- * a write-read-delete round trip, so permission problems surface here and
- * not in the middle of the work.
+ * Probes every table with all of its columns (a missing table or a missing
+ * column shows the setup queries) and finishes with a write-read-delete
+ * round trip on the tasks table, so denied writes surface here and not in
+ * the middle of the work.
  */
 export async function verifySupabaseSchema(client: SupabaseClient): Promise<SupabaseSchemaCheck> {
-  try {
-    await client.probeTable();
-  } catch (error) {
-    if (!(error instanceof ApiError)) {
-      throw error;
-    }
-    if (error.status === 401 || error.status === 403) {
-      return { ok: false, issue: { kind: 'invalid-credentials', detail: error.message } };
-    }
-    if (error.status === 0) {
-      return { ok: false, issue: { kind: 'unreachable', detail: error.message } };
-    }
-    if (isMissingTable(error.status, error.body)) {
-      return { ok: false, issue: { kind: 'missing-table', detail: error.message } };
-    }
-    if (error.status >= 500) {
-      return { ok: false, issue: { kind: 'unreachable', detail: error.message } };
-    }
-    return { ok: false, issue: { kind: 'wrong-format', detail: error.message } };
-  }
-
-  const openApi = await client.readOpenApi();
-  if (openApi !== null) {
-    const definition = findTableDefinition(openApi);
-    if (definition === null || !definitionMatches(definition)) {
-      return {
-        ok: false,
-        issue: {
-          kind: 'wrong-format',
-          detail: `The table ${SUPABASE_TABLE} does not expose text path and content columns.`,
-        },
-      };
+  for (const table of SUPABASE_TABLES) {
+    try {
+      await client.probeTable(table, supabaseColumns(table));
+    } catch (error) {
+      if (!(error instanceof ApiError)) {
+        throw error;
+      }
+      if (isInvalidCredentials(error.status, error.body)) {
+        return { ok: false, issue: { kind: 'invalid-credentials', detail: error.message } };
+      }
+      if (error.status === 0 || error.status >= 500) {
+        return { ok: false, issue: { kind: 'unreachable', detail: error.message } };
+      }
+      if (isMissingTable(error.status, error.body)) {
+        return { ok: false, issue: { kind: 'missing-table', detail: error.message } };
+      }
+      if (error.status === 400) {
+        return { ok: false, issue: { kind: 'wrong-format', detail: error.message } };
+      }
+      return { ok: false, issue: { kind: 'access-denied', detail: error.message } };
     }
   }
 
   try {
-    await client.deleteRow(PROBE_PATH);
-    await client.insertRow({ path: PROBE_PATH, content: 'probe' });
-    const probe = await client.readRow(PROBE_PATH);
-    if (probe?.content !== 'probe') {
+    const probe = randomProbeId();
+    await client.insertRows('tasks', [{ id: probe, title: '__gnumarus_probe__' }]);
+    const back = await client.selectRows('tasks', {
+      select: ['id', 'title'],
+      filter: { column: 'id', value: probe },
+    });
+    if (back.length !== 1 || back[0]?.['title'] !== '__gnumarus_probe__') {
       return {
         ok: false,
-        issue: { kind: 'write-denied', detail: 'The probe row could not be read back.' },
+        issue: { kind: 'access-denied', detail: 'The probe row could not be read back.' },
       };
     }
-    await client.deleteRow(PROBE_PATH);
+    await client.deleteRows('tasks', { column: 'id', value: probe });
   } catch (error) {
-    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-      return {
-        ok: false,
-        issue: {
-          kind: 'write-denied',
-          detail: `${error.message} The key can read but not write: check the row level security policies.`,
-        },
-      };
-    }
     if (error instanceof ApiError && error.status === 0) {
       return { ok: false, issue: { kind: 'unreachable', detail: error.message } };
     }
     return {
       ok: false,
       issue: {
-        kind: 'write-denied',
+        kind: 'access-denied',
         detail: error instanceof Error ? error.message : String(error),
       },
     };
   }
   return { ok: true };
+}
+
+/** A probe id that cannot collide with a real record in practice. */
+function randomProbeId(): number {
+  const buffer = new Uint32Array(2);
+  try {
+    globalThis.crypto?.getRandomValues(buffer);
+  } catch {
+    buffer[0] = Math.floor(Math.random() * 4294967296);
+    buffer[1] = Math.floor(Math.random() * 4294967296);
+  }
+  const raw = (BigInt((buffer[0] ?? 0) >>> 10) << 32n) | BigInt(buffer[1] ?? 0);
+  const id = raw % BigInt(Number.MAX_SAFE_INTEGER);
+  return id === 0n ? 1 : Number(id);
 }
