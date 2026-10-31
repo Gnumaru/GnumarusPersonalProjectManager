@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { FileSystemProjectStore } from './fileSystemStore.js';
+import { isValidRecordId } from './ids.js';
 import { buildNote } from './note.js';
 import { buildTask, type TaskInput } from './task.js';
 import { fakeDirectoryHandle } from '../test-support/fakeDirectory.js';
@@ -26,24 +27,47 @@ describe('FileSystemProjectStore', () => {
   it('creates a task in a file of its own', async () => {
     const { store } = createStore();
 
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
+    expect(isValidRecordId(id)).toBe(true);
     await store.createTaskFile(
       store.taskPath(id),
       buildTask(input('The first task'), id, new Date()),
     );
 
     const paths = await store.listTaskPaths();
-    expect(paths).toEqual(['task_1.txt']);
+    expect(paths).toEqual([store.taskPath(id)]);
 
-    const task = await store.readTask('task_1.txt');
-    expect(task.id).toBe(1);
+    const task = await store.readTask(store.taskPath(id));
+    expect(task.id).toBe(id);
     expect(task.title).toBe('The first task');
-    expect(await store.nextTaskId()).toBe(2);
+  });
+
+  it('allocates nonzero ids that never repeat, whatever the kind of record', async () => {
+    const { store } = createStore();
+
+    const taskId = await store.allocateId();
+    await store.createTaskFile(
+      store.taskPath(taskId),
+      buildTask(input('A task'), taskId, new Date()),
+    );
+    const noteId = await store.allocateId();
+    const comment = await store.createComment(taskId, 'A comment');
+
+    for (const allocated of [taskId, noteId, comment.id]) {
+      expect(isValidRecordId(allocated)).toBe(true);
+    }
+    expect(new Set([taskId, noteId, comment.id]).size).toBe(3);
+
+    // The registry survives the round trip: deleted ids stay registered.
+    await store.deleteFile(store.taskPath(taskId));
+    const later = await store.allocateId();
+    expect(later).not.toBe(taskId);
+    expect(isValidRecordId(later)).toBe(true);
   });
 
   it('reads the metadata of every task', async () => {
     const { store } = createStore();
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(id),
       buildTask(input('A task'), id, new Date()),
@@ -53,7 +77,7 @@ describe('FileSystemProjectStore', () => {
     expect(summaries).toHaveLength(1);
     expect(summaries[0]?.title).toBe('A task');
     expect(summaries[0]?.status).toBe('todo');
-    expect(summaries[0]?.path).toBe('task_1.txt');
+    expect(summaries[0]?.path).toBe(store.taskPath(id));
   });
 
   it('finds the tasks of a subfolder', async () => {
@@ -67,7 +91,7 @@ describe('FileSystemProjectStore', () => {
 
   it('searches the content of the tasks', async () => {
     const { store } = createStore();
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(id),
       buildTask({ ...input('A task'), description: 'A needle in the haystack' }, id, new Date()),
@@ -80,12 +104,12 @@ describe('FileSystemProjectStore', () => {
 
   it('counts the children of every task', async () => {
     const { store } = createStore();
-    const parentId = await store.nextTaskId();
+    const parentId = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(parentId),
       buildTask(input('The parent'), parentId, new Date()),
     );
-    const childId = await store.nextTaskId();
+    const childId = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(childId),
       buildTask(input('The child'), childId, new Date(), parentId),
@@ -97,14 +121,14 @@ describe('FileSystemProjectStore', () => {
 
   it('creates, reads, edits and deletes the comments of a task', async () => {
     const { store } = createStore();
-    const taskId = await store.nextTaskId();
+    const taskId = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(taskId),
       buildTask(input('A task'), taskId, new Date()),
     );
 
     const comment = await store.createComment(taskId, 'A comment');
-    expect(comment.id).toBe(1);
+    expect(isValidRecordId(comment.id)).toBe(true);
     expect(comment.taskId).toBe(taskId);
 
     const comments = await store.listComments(taskId);
@@ -122,24 +146,23 @@ describe('FileSystemProjectStore', () => {
   it('creates a note, with its id inside the file', async () => {
     const { store } = createStore();
 
-    const id = await store.nextNoteId();
+    const id = await store.allocateId();
     await store.createNoteFile(
       store.notePath(id),
       buildNote({ title: 'A note', content: '# Hello' }, id, new Date()),
     );
 
-    expect(await store.listNotePaths()).toEqual(['note_1.txt']);
+    expect(await store.listNotePaths()).toEqual([store.notePath(id)]);
 
-    const note = await store.readNote('note_1.txt');
-    expect(note.id).toBe(1);
+    const note = await store.readNote(store.notePath(id));
+    expect(note.id).toBe(id);
     expect(note.title).toBe('A note');
     expect(note.content).toBe('# Hello');
-    expect(await store.nextNoteId()).toBe(2);
   });
 
   it('searches the notes by title, by content or by both', async () => {
     const { store } = createStore();
-    const id = await store.nextNoteId();
+    const id = await store.allocateId();
     await store.createNoteFile(
       store.notePath(id),
       buildNote({ title: 'Shopping list', content: 'Remember the milk' }, id, new Date()),
@@ -154,7 +177,7 @@ describe('FileSystemProjectStore', () => {
 
   it('edits and deletes a note', async () => {
     const { store } = createStore();
-    const id = await store.nextNoteId();
+    const id = await store.allocateId();
     const note = buildNote({ title: 'A note', content: 'body' }, id, new Date());
     await store.createNoteFile(store.notePath(id), note);
 
@@ -168,7 +191,7 @@ describe('FileSystemProjectStore', () => {
 
   it('refuses to create a file that already exists', async () => {
     const { store } = createStore();
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     const task = buildTask(input('A task'), id, new Date());
     await store.createTaskFile(store.taskPath(id), task);
 
@@ -177,16 +200,18 @@ describe('FileSystemProjectStore', () => {
 
   it('exports the files of the project and imports them back', async () => {
     const { store } = createStore();
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(id),
       buildTask(input('A task'), id, new Date()),
     );
 
     const files = await store.listFiles();
-    expect(files).toHaveLength(1);
-    expect(files[0]?.path).toBe('task_1.txt');
-    expect(files[0]?.content).toContain('title=A task');
+    // The task file plus the ids.txt registry.
+    expect(files.map((file) => file.path).sort()).toEqual(
+      [store.taskPath(id), 'ids.txt'].sort(),
+    );
+    expect(files.find((file) => file.path === store.taskPath(id))?.content).toContain('title=A task');
 
     await store.replaceAll([
       { path: 'note_1.txt', content: 'id=1\ntitle=An imported note\n----\nbody\n' },
@@ -199,18 +224,18 @@ describe('FileSystemProjectStore', () => {
 
   it('keeps the notes and the tasks apart', async () => {
     const { store } = createStore();
-    const taskId = await store.nextTaskId();
+    const taskId = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(taskId),
       buildTask(input('A task'), taskId, new Date()),
     );
-    const noteId = await store.nextNoteId();
+    const noteId = await store.allocateId();
     await store.createNoteFile(
       store.notePath(noteId),
       buildNote({ title: 'A note', content: 'body' }, noteId, new Date()),
     );
 
-    expect(await store.listTaskPaths()).toEqual(['task_1.txt']);
-    expect(await store.listNotePaths()).toEqual(['note_1.txt']);
+    expect(await store.listTaskPaths()).toEqual([store.taskPath(taskId)]);
+    expect(await store.listNotePaths()).toEqual([store.notePath(noteId)]);
   });
 });

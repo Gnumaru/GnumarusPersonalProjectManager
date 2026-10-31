@@ -40,6 +40,7 @@ import {
 import type { BrowserFileStorage } from './browserStorage.js';
 import type { NoteSummary, ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
 import { APP_CONFIG_FILE } from './appConfig.js';
+import { IDS_FILE, generateUniqueId, parseIdsFile, serializeIdsFile } from './ids.js';
 
 export class EmbeddedProjectStore implements ProjectStore {
   readonly kind: ProjectKind = 'embedded';
@@ -211,7 +212,7 @@ export class EmbeddedProjectStore implements ProjectStore {
   }
 
   async createComment(taskId: number, text: string): Promise<TaskComment> {
-    const id = await this.nextCommentId();
+    const id = await this.allocateId();
     const comment = buildComment(id, taskId, text, new Date());
     await this.write(this.commentPath(id), serializeComment(comment));
     return comment;
@@ -290,41 +291,58 @@ export class EmbeddedProjectStore implements ProjectStore {
     await this.write(path, serializeNote(note));
   }
 
-  async nextNoteId(): Promise<number> {
-    const ids: number[] = [];
-    for (const path of await this.listNotePaths()) {
-      const id = parseNoteIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
+  /**
+   * Allocates the id of a new record: a random nonzero integer used by
+   * nothing yet, whatever the kind of record.
+   *
+   * The used ids live in a single `ids.txt` registry file, so allocation
+   * reads that one file instead of scanning the whole project. The id is
+   * reserved in the registry before it is returned (reserve-then-create),
+   * and ids are never removed from it, not even when their record is
+   * deleted, so an id is never reused.
+   */
+  async allocateId(): Promise<number> {
+    const taken = await this.readTakenIds();
+    const id = generateUniqueId((candidate) => taken.has(candidate));
+    taken.add(id);
+    await this.write(IDS_FILE, serializeIdsFile(taken));
+    return id;
+  }
+
+  /** Every id used by the project, from the `ids.txt` registry file. */
+  private async readTakenIds(): Promise<Set<number>> {
+    const content = this.files.get(IDS_FILE);
+    if (content !== undefined) {
+      return parseIdsFile(content);
+    }
+    return this.bootstrapIdsFile();
+  }
+
+  /**
+   * Builds the `ids.txt` registry from the record files already stored.
+   *
+   * Runs once for projects created before the registry existed: every id
+   * encoded in a `task_*.txt`, `comment_*.txt` or `note_*.txt` file name is
+   * registered, so a later allocation never reuses one.
+   */
+  private async bootstrapIdsFile(): Promise<Set<number>> {
+    const taken = new Set<number>();
+    for (const path of this.files.keys()) {
+      const name = path.slice(path.lastIndexOf('/') + 1);
+      const id =
+        parseTaskIdFromFileName(name) ??
+        parseCommentIdFromFileName(name) ??
+        parseNoteIdFromFileName(name);
       if (id !== null) {
-        ids.push(id);
+        taken.add(id);
       }
     }
-    return ids.length === 0 ? 1 : Math.max(...ids) + 1;
+    await this.write(IDS_FILE, serializeIdsFile(taken));
+    return taken;
   }
 
   notePath(id: number): string {
     return noteFileName(id);
-  }
-
-  async nextTaskId(): Promise<number> {
-    const ids: number[] = [];
-    for (const path of this.pathsOf((name) => isTaskFileName(name.slice(name.lastIndexOf('/') + 1)))) {
-      const id = parseTaskIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
-      if (id !== null) {
-        ids.push(id);
-      }
-    }
-    return ids.length === 0 ? 1 : Math.max(...ids) + 1;
-  }
-
-  async nextCommentId(): Promise<number> {
-    const ids: number[] = [];
-    for (const path of this.pathsOf((name) => isCommentFileName(name.slice(name.lastIndexOf('/') + 1)))) {
-      const id = parseCommentIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
-      if (id !== null) {
-        ids.push(id);
-      }
-    }
-    return ids.length === 0 ? 1 : Math.max(...ids) + 1;
   }
 
   taskPath(id: number): string {
@@ -348,6 +366,27 @@ export class EmbeddedProjectStore implements ProjectStore {
     for (const file of files) {
       await this.write(file.path, file.content);
     }
+    // The import replaces the whole project: rebuild the registry from the
+    // imported files, keeping the previously registered ids (an id is never
+    // reused, even when its record is gone).
+    const taken = new Set<number>();
+    for (const file of files) {
+      const name = file.path.slice(file.path.lastIndexOf('/') + 1);
+      if (name === IDS_FILE) {
+        for (const id of parseIdsFile(file.content)) {
+          taken.add(id);
+        }
+        continue;
+      }
+      const id =
+        parseTaskIdFromFileName(name) ??
+        parseCommentIdFromFileName(name) ??
+        parseNoteIdFromFileName(name);
+      if (id !== null) {
+        taken.add(id);
+      }
+    }
+    await this.write(IDS_FILE, serializeIdsFile(taken));
   }
 
   /** Writes a file, both in the memory and in the storage. */

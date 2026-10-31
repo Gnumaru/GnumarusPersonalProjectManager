@@ -15,9 +15,9 @@
  * The text of the comment.
  * ```
  *
- * The `task` key holds the id of the task the comment belongs to. The ids of
- * the comments are incremental integers, unique in the project, exactly like
- * the ids of the tasks.
+ * The `task` key holds the id of the task the comment belongs to. The ids are
+ * random nonzero integers, unique across tasks, comments and notes: no id is
+ * ever used twice, whatever the kind of record.
  */
 
 import {
@@ -26,15 +26,16 @@ import {
   normalizeTaskTimestamp,
   parseMetadataBlock,
 } from './task.js';
+import { isValidRecordId } from './ids.js';
 
 export const COMMENT_FILE_PREFIX = 'comment_';
 export const COMMENT_FILE_SUFFIX = '.txt';
 
-const COMMENT_FILE_PATTERN = /^comment_(\d+)\.txt$/u;
+const COMMENT_FILE_PATTERN = /^comment_(-?\d+)\.txt$/u;
 
 /** A comment of a task. */
 export interface TaskComment {
-  /** Unique incremental integer, also encoded in the file name. */
+  /** Unique random nonzero integer, also encoded in the file name. */
   readonly id: number;
   /** The id of the task the comment belongs to. */
   readonly taskId: number;
@@ -63,7 +64,7 @@ export function parseCommentIdFromFileName(name: string): number | null {
     return null;
   }
   const id = Number.parseInt(match[1] ?? '', 10);
-  return Number.isSafeInteger(id) ? id : null;
+  return isValidRecordId(id) ? id : null;
 }
 
 /**
@@ -79,8 +80,8 @@ export function parseComment(content: string, idHint?: number): TaskComment {
   const rawTaskId = Number.parseInt(metadata.get('task') ?? '', 10);
 
   return {
-    id: Number.isSafeInteger(rawId) ? rawId : (idHint ?? 0),
-    taskId: Number.isSafeInteger(rawTaskId) ? rawTaskId : 0,
+    id: isValidRecordId(rawId) ? rawId : (idHint ?? 0),
+    taskId: isValidRecordId(rawTaskId) ? rawTaskId : 0,
     created: normalizeTaskTimestamp(metadata.get('created') ?? ''),
     updated: normalizeTaskTimestamp(metadata.get('updated') ?? ''),
     text: description,

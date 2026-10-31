@@ -3523,7 +3523,7 @@ export class App
       throw new Error('No project selected');
     }
     const resolvedParent = taskInput.parentId === undefined ? parentId : taskInput.parentId;
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     // A new task goes last: after its siblings in the tree/Gantt and at the
     // end of its status column on the Kanban board, mirroring a drop on a new
     // column. Without this, a fresh order of zero would sort into the middle
@@ -3678,7 +3678,7 @@ export class App
     if (store === null) {
       throw new Error('No project selected');
     }
-    const id = await store.nextNoteId();
+    const id = await store.allocateId();
     const note = buildNote(noteInput, id, new Date());
     await store.createNoteFile(store.notePath(id), note);
     showToast({ doc: this.doc, message: `Note #${note.id} created.`, kind: 'success' });

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vite-plus/test';
 import { ApiClient } from '../api/client.js';
 import { ServiceProjectStore } from './serviceStore.js';
+import { isValidRecordId } from './ids.js';
 import { buildNote } from './note.js';
 import {
   buildTask,
@@ -70,7 +71,7 @@ describeLive('ServiceProjectStore against the live service', () => {
   });
 
   it('creates a task file on disk', async () => {
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     const task = buildTask(input('Write the integration test', 'doing'), id, new Date());
     await store.createTaskFile(store.taskPath(id), task);
 
@@ -98,7 +99,7 @@ describeLive('ServiceProjectStore against the live service', () => {
   it('searches the tasks with a recursive grep', async () => {
     const found = await store.searchTaskPaths('integration');
     expect(found.length).toBe(1);
-    expect(found[0]?.endsWith('task_1.txt')).toBe(true);
+    expect(found[0]).toMatch(/^task_-?\d+\.txt$/u);
 
     const nothing = await store.searchTaskPaths('no-such-content-here');
     expect(nothing).toHaveLength(0);
@@ -110,7 +111,7 @@ describeLive('ServiceProjectStore against the live service', () => {
   });
 
   it('persists and reads back the expanded state of the tasks', async () => {
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     const path = store.taskPath(id);
     const absolute = `${testDirectory}/task_${id}.txt`;
     await store.createTaskFile(path, buildTask(input('The expanded one'), id, new Date()));
@@ -134,7 +135,13 @@ describeLive('ServiceProjectStore against the live service', () => {
     expect(after.find((task) => task.id === id)?.expanded).toBe(false);
   });
   it('updates a task keeping its id', async () => {
-    const id = 1;
+    const summaries = await store.listTasks();
+    const target = summaries.find((summary) => summary.title === 'Write the integration test');
+    expect(target).toBeDefined();
+    if (target === undefined) {
+      return;
+    }
+    const id = target.id;
     const path = store.taskPath(id);
     const current = await store.readTask(path);
     const updated: Task = { ...current, title: 'Updated title', status: 'done' };
@@ -143,7 +150,7 @@ describeLive('ServiceProjectStore against the live service', () => {
     const file = await api.readFile(`${testDirectory}/task_${id}.txt`);
     expect(file.content).toContain('title=Updated title');
     expect(file.content).toContain('status=done');
-    expect(file.content).toContain('id=1');
+    expect(file.content).toContain(`id=${id}`);
 
     const reloaded = await store.readTask(path);
     expect(reloaded.id).toBe(id);
@@ -151,7 +158,7 @@ describeLive('ServiceProjectStore against the live service', () => {
   });
 
   it('deletes a task file', async () => {
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     const task = buildTask(input('Doomed task'), id, new Date());
     await store.createTaskFile(store.taskPath(id), task);
 
@@ -160,29 +167,32 @@ describeLive('ServiceProjectStore against the live service', () => {
     expect(paths.some((path) => path.endsWith(`task_${id}.txt`))).toBe(false);
   });
 
-  it('allocates the next free id', async () => {
-    const next = await store.nextTaskId();
-    expect(next).toBeGreaterThan(1);
+  it('allocates random nonzero ids that never repeat', async () => {
+    const first = await store.allocateId();
+    const second = await store.allocateId();
+    expect(isValidRecordId(first)).toBe(true);
+    expect(isValidRecordId(second)).toBe(true);
+    expect(second).not.toBe(first);
   });
 
   it('reads the metadata of every task', async () => {
     const summaries = await store.listTasks();
     expect(summaries.length).toBeGreaterThan(0);
-    const first = summaries.find((summary) => summary.id === 1);
+    const first = summaries.find((summary) => summary.title === 'Updated title');
     expect(first?.title).toBe('Updated title');
     expect(first?.status).toBe('done');
     // The paths are relative to the folder of the project.
-    expect(first?.path).toBe('task_1.txt');
+    expect(first?.path).toMatch(/^task_-?\d+\.txt$/u);
     // A task of a subfolder is read as well.
     const nested = summaries.find((summary) => summary.path === 'nested/task_99.txt');
     expect(nested?.title).toBe('Nested');
   });
 
   it('counts the children of every task', async () => {
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     const parent = buildTask(input('Counted parent'), id, new Date());
     await store.createTaskFile(store.taskPath(id), parent);
-    const childId = await store.nextTaskId();
+    const childId = await store.allocateId();
     const child = buildTask(input('Counted child'), childId, new Date(), id);
     await store.createTaskFile(store.taskPath(childId), child);
 
@@ -278,7 +288,7 @@ describeLive('ServiceProjectStore against the live service', () => {
   });
 
   it('creates a note file on disk, with its id inside the file', async () => {
-    const id = await store.nextNoteId();
+    const id = await store.allocateId();
     const note = buildNote({ title: 'A note of the integration test', content: '# Hello' }, id, new Date());
     await store.createNoteFile(store.notePath(id), note);
 
@@ -297,13 +307,13 @@ describeLive('ServiceProjectStore against the live service', () => {
   it('lists the note files', async () => {
     const paths = await store.listNotePaths();
     expect(paths.length).toBeGreaterThan(0);
-    expect(paths.some((path) => path.endsWith('note_1.txt'))).toBe(true);
+    expect(paths.some((path) => /^note_-?\d+\.txt$/u.test(path))).toBe(true);
   });
 
   it('searches the notes by title', async () => {
     const found = await store.searchNotePaths('integration', 'title');
     expect(found.length).toBe(1);
-    expect(found[0]?.endsWith('note_1.txt')).toBe(true);
+    expect(found[0]).toMatch(/^note_-?\d+\.txt$/u);
 
     const byContent = await store.searchNotePaths('integration', 'content');
     expect(byContent).toHaveLength(0);
@@ -313,7 +323,7 @@ describeLive('ServiceProjectStore against the live service', () => {
   });
 
   it('searches a note whose title holds a colon', async () => {
-    const id = await store.nextNoteId();
+    const id = await store.allocateId();
     await store.createNoteFile(
       store.notePath(id),
       buildNote({ title: 'Shopping: the list', content: 'body' }, id, new Date()),
@@ -324,7 +334,7 @@ describeLive('ServiceProjectStore against the live service', () => {
     expect(found[0]?.endsWith(`note_${id}.txt`)).toBe(true);
   });
 
-  it('searches the notes by content', async () => {    const id = await store.nextNoteId();
+  it('searches the notes by content', async () => {    const id = await store.allocateId();
     await store.createNoteFile(
       store.notePath(id),
       buildNote({ title: 'A title', content: 'the body holds a needle' }, id, new Date()),
@@ -340,7 +350,7 @@ describeLive('ServiceProjectStore against the live service', () => {
   });
 
   it('edits and deletes a note', async () => {
-    const id = await store.nextNoteId();
+    const id = await store.allocateId();
     const note = buildNote({ title: 'Doomed note', content: 'body' }, id, new Date());
     await store.createNoteFile(store.notePath(id), note);
 

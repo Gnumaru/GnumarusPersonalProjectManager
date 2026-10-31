@@ -1,5 +1,37 @@
 # Checklist
 
+## Batch 40 - Random globally-unique nonzero ids with ids.txt registry
+
+### Change
+
+- [x] New `src/core/ids.ts`: range, `isValidRecordId`, crypto random
+      candidate, collision-retry generation, `ids.txt` parse/serialize
+- [x] Filename patterns accept negatives, reject zero; `parseIdList` and
+      config id parsing accept negatives, reject zero
+- [x] Single `allocateId()` replaces `nextTaskId/nextCommentId/nextNoteId`
+      on all stores; reserve-then-create against append-only `ids.txt`
+      (service via atomic shell append, file-system via direct write,
+      embedded in browser storage); bootstrap from existing files;
+      rebuild on import
+- [x] Callers and tests updated; e2e script discovers created files
+      instead of predicting sequential names
+
+### Tests
+
+- [x] `src/core/ids.test.ts` - validity, bounds, both signs, retry,
+      exhaustion, registry round trip
+- [x] `src/core/task.test.ts`, `note.test.ts`, `comment.test.ts`,
+      `appConfig.test.ts` - negatives accepted, zero rejected
+- [x] Store tests - `allocateId` validity, cross-kind uniqueness,
+      deleted ids stay registered, dynamic file paths
+- [x] `src/ui/app.test.ts` - created files found by content, order-free
+      row selection, OPFS discovery
+- [x] `node --check scripts/e2e-browser.mjs`
+- [x] `npm run typecheck`, `npm test` (493 tests, 3 consecutive green runs),
+      `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 39 - Numbered parent chain and left-aligned long names
 
 ### Change

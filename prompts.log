@@ -174,11 +174,14 @@ a cadeia de parents no modal que visualiza a tarefa deve ser exibida como lista 
 ====
 faça com que seja uma lista numerada. alem disso, quando o nome é grande demais (quando a concatenacao do id com o nome passa de 50 caracteres) a string inteira está sendo visualmente truncada e nao esta alinhando a esquerda, ela parece como se estivesse centralizada
 ====
+o id, a chave primaria de todas as coisas que usam id (exemplo: task, comment, note) deve deixar de ser um inteiro sequencial. ele deve ser um inteiro aleatorio entre Number.MIN_SAFE_INTEGER e Number.MAX_SAFE_INTEGER que nunca se repete independente do tipo de registro/arquivo em questao. numeros negativos sao ids validos mas zero deve ser um id invalido. antes de gerar um registro novo o sistema ira consultar se ja existe qualquer coisa que utilizando aquele id. enquanto o id existir a geracao aleatoria é repetida até achar um id que ainda nao exista. cada backend pode ter alguma estrutura otimizada de suporte a geracao desses ids de maneira performatica. por exemplo no backend file system access api e gnumarusosbridge podemos ter um unico arquivo ids.txt contendo todos os ids ja utilizados. ao tentar gerar um novo id, ao inves de fazer um grep no diretorio inteiro podemos apenas fazer um grep neste arquivo unico (no caso do gnumarusosbridge) ou ler ele diretamente (no caso do file system access api) para saber se o id ja existe.
+====
+
 ====
 ====
 ====
 ====
-====
+
 ====
 ====
 ====

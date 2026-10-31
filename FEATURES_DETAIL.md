@@ -32,10 +32,14 @@ It can have as many lines as needed.
 
 Rules:
 
-* `id` - unique incremental integer, **also encoded in the file name**. The id
-  inside the file is the one the application uses: the name is only a fallback
-  for the files written before the key existed. The same rule holds for the
-  comments (`comment_<id>.txt`) and for the notes (`note_<id>.txt`).
+* `id` - unique random nonzero integer, **also encoded in the file name**.
+  The id is drawn from `[Number.MIN_SAFE_INTEGER,
+  Number.MAX_SAFE_INTEGER]`, never repeats whatever the kind of record
+  (tasks, comments and notes share one id space), negatives are valid and
+  zero is invalid. The id inside the file is the one the application uses:
+  the name is only a fallback for the files written before the key existed.
+  The same rule holds for the comments (`comment_<id>.txt`) and for the
+  notes (`note_<id>.txt`).
 * `title` - mandatory, single line (new lines are replaced by spaces on write).
 * `status` - one of `planning`, `next`, `todo`, `doing`, `paused`, `done`,
   `canceled`. Anything else falls back to `todo`. The badge of the task shows
@@ -124,6 +128,26 @@ are handled; a `----` line inside the description is kept as part of the text.
 The functions `parseTask` and `serializeTask` are pure and are covered by unit
 tests, including a round trip test.
 
+### The ids.txt registry
+
+**Files:** `src/core/ids.ts`, `src/core/serviceStore.ts`,
+`src/core/embeddedStore.ts`, `src/core/fileSystemStore.ts`
+
+The service and file-system backends track every used id in a single
+`ids.txt` file at the root of the project (one decimal integer per line),
+so allocating an id reads that one file instead of scanning the whole
+directory. Allocation is reserve-then-create: the id is appended to the
+registry (one atomic shell append on the service, one file write in the
+File System Access API) before the record file is created, so a failure
+afterwards can only orphan a reservation, never duplicate an id. The
+registry is append-only: ids are never removed, not even when their record
+is deleted, so an id is never reused. Projects created before the registry
+get it bootstrapped from the record files on disk on the first allocation,
+and an import (`replaceAll`) rebuilds it from the imported files while
+keeping the previously registered ids. The embedded backend keeps the same
+registry in its browser storage, which is also its fastest structure: the
+used ids are read without any extra round trip.
+
 ---
 
 ## 2. Listing, pagination and memory usage
@@ -199,7 +223,7 @@ find . -type f -name 'task_*.txt' -not -path '*/.git/*' ... -print
 
 | Action | What happens |
 | ------ | ------------ |
-| Create | The next free id is computed from the highest existing `task_<id>.txt`, the file is written with `POST /api/file`. If the file already exists the id is increased and the write is retried. A child task also receives the `parent=<id>` key. |
+| Create | A random nonzero id is allocated (`allocateId`): it is checked against everything that already uses an id, and the generation is repeated while it exists. The id is reserved in the `ids.txt` registry before the file is written with `POST /api/file`, so a failure can only orphan a reservation, never duplicate an id. If the file already exists the allocation is retried with a new id. A child task also receives the `parent=<id>` key. |
 | Edit | The file is read, the user input is applied (id, parent and creation time are kept), the update timestamp is refreshed and the file is overwritten with `PUT /api/file`. |
 | View | A read only dialog shows the status, the tags, the timestamps, the description and the children of the task. |
 | Delete | The file is removed with `DELETE /api/file` after an explicit confirmation ("Delete this task permanently? Yes, delete / Keep it"). |
@@ -758,10 +782,9 @@ updated=20261021024529365
 The text of the comment.
 ```
 
-The `task` key holds the id of the task the comment belongs to. The ids of the
-comments are **incremental integers**, unique in the project, exactly like the
-ids of the tasks: the next comment takes the number of the highest one plus
-one.
+The `task` key holds the id of the task the comment belongs to. The ids are
+random nonzero integers from the single shared id space: a comment never
+reuses the id of a task, a note or another comment.
 
 ### In the editor of the task
 
@@ -801,8 +824,8 @@ updated=20261022100000000
 - eggs
 ```
 
-The ids of the notes are **incremental integers**, unique in the project,
-exactly like the ids of the tasks and the ids of the comments.
+The ids of the notes are random nonzero integers from the single shared id
+space, exactly like the ids of the tasks and the ids of the comments.
 
 ### The markdown of the body
 

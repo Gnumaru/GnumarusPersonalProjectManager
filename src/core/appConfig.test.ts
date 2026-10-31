@@ -42,10 +42,12 @@ describe('parseGlobalConfig', () => {
     const config = parseGlobalConfig('focus_tree=2\nfocus_gantt=5\n');
     expect(config.focusTree).toBe(2);
     expect(config.focusGantt).toBe(5);
+    expect(parseGlobalConfig('focus_tree=-7\n').focusTree).toBe(-7);
+    expect(parseGlobalConfig('focus_gantt=-3\n').focusGantt).toBe(-3);
     expect(parseGlobalConfig('').focusTree).toBeNull();
     expect(parseGlobalConfig('focus_tree=0\n').focusTree).toBeNull();
     expect(parseGlobalConfig('focus_tree=abc\n').focusTree).toBeNull();
-    expect(parseGlobalConfig('focus_gantt=-3\n').focusGantt).toBeNull();
+    expect(parseGlobalConfig('focus_gantt=0\n').focusGantt).toBeNull();
   });
 
   it('ignores unknown keys, unknown statuses and non-true values', () => {

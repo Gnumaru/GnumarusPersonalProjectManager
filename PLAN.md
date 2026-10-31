@@ -8,6 +8,15 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 40 replaces sequential integer ids with random nonzero
+  ids in `[Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]`, globally
+  unique across tasks, comments and notes. Allocation checks for collisions
+  and retries until free; service and file-system backends track used ids
+  in a single `ids.txt` registry (reserve-then-create, append-only, never
+  reused even after deletion) on every backend; the embedded backend keeps
+  the same registry in its browser storage. Negative ids are valid, zero is
+  invalid everywhere.
+- Verification: 493 unit tests pass.
 - Batch 39 renders the parent chain as a numbered list and fixes
   the alignment of long ancestor names: the global centered button style
   made clipped names look centered, so chain buttons become left-aligned
@@ -144,7 +153,9 @@ Free text description of the task.
 * The dates are written in the compact format `YYYYMMDDHHNNSSIII` (local time,
   no timezone). A task also carries the dates of its start and of its end.
 * `tags` is a whitespace separated list (a tag can never contain whitespace).
-* File name is `task_<id>.txt`, `<id>` being a unique incremental integer.
+* File name is `task_<id>.txt`, `<id>` being a unique random nonzero integer
+  shared with comments and notes (negatives valid, zero invalid), tracked in
+  `ids.txt`.
 
 ### Talking to the bridge
 

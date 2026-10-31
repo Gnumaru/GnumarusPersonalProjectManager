@@ -262,8 +262,7 @@ function ctrlClick(element: Element | null | undefined, dom: JSDOM): void {
 }
 
 /** Drags a card of the board onto a column, as the mouse would do. */
-function dragCard(harness: Harness, taskId: number, status: string): void {
-  const source = harness.root.querySelector<HTMLElement>(
+function dragCard(harness: Harness, taskId: number, status: string): void {  const source = harness.root.querySelector<HTMLElement>(
     `.kanban-card[data-task-id="${taskId}"] .kanban-card-title`,
   );
   const target = harness.root.querySelector<HTMLElement>(`.kanban-column[data-status="${status}"]`);
@@ -284,6 +283,57 @@ function dragCard(harness: Harness, taskId: number, status: string): void {
 function dragTask(harness: Harness, draggedId: number, targetId: number): void {
   const target = harness.root.querySelector<HTMLElement>(`.tree-row[data-task-id="${targetId}"]`);
   dragTaskTo(harness, draggedId, target);
+}
+
+/**
+ * The file of a task created at a random id, found by a unique title marker.
+ *
+ * Fails the test when no task file holds the marker.
+ */
+function taskFileWithTitle(harness: Harness, marker: string): string {
+  const found = [...harness.bridge.files.entries()].find(
+    ([path, content]) => /\/task_-?\d+\.txt$/.test(path) && content.includes(marker),
+  );
+  expect(found).not.toBeUndefined();
+  return found?.[0] ?? '';
+}
+
+/** The id encoded in a task file path. */
+function taskIdOfFile(path: string): number {
+  const match = /task_(-?\d+)\.txt$/.exec(path);
+  expect(match).not.toBeNull();
+  return Number.parseInt(match?.[1] ?? '', 10);
+}
+
+/**
+ * The file of a comment created at a random id, found by its text.
+ *
+ * Fails the test when no comment file holds the text.
+ */
+function commentFileWithText(harness: Harness, text: string): string {
+  const found = [...harness.bridge.files.entries()].find(
+    ([path, content]) => /\/comment_-?\d+\.txt$/.test(path) && content.includes(text),
+  );
+  expect(found).not.toBeUndefined();
+  return found?.[0] ?? '';
+}
+
+/** True when a comment file is left on the fake disk. */
+function hasCommentFile(harness: Harness): boolean {
+  return [...harness.bridge.files.keys()].some((path) => /\/comment_-?\d+\.txt$/.test(path));
+}
+
+/**
+ * The file of a note created at a random id, found by a unique title marker.
+ *
+ * Fails the test when no note file holds the marker.
+ */
+function noteFileWithTitle(harness: Harness, marker: string): string {
+  const found = [...harness.bridge.files.entries()].find(
+    ([path, content]) => /\/note_-?\d+\.txt$/.test(path) && content.includes(marker),
+  );
+  expect(found).not.toBeUndefined();
+  return found?.[0] ?? '';
 }
 
 /** Drags a row of the tree onto the given element, as the mouse would do. */
@@ -603,8 +653,10 @@ describe('App', () => {
     click(buttonByText(harness.doc, 'Add comment'));
     await flush();
 
-    const commentFile = harness.bridge.files.get('/home/user/projects/comment_1.txt');
-    expect(commentFile).toContain('id=1');
+    const commentPath = commentFileWithText(harness, 'The first comment');
+    const commentId = Number.parseInt(/comment_(-?\d+)\.txt$/.exec(commentPath)?.[1] ?? '', 10);
+    const commentFile = harness.bridge.files.get(commentPath);
+    expect(commentFile).toContain(`id=${commentId}`);
     expect(commentFile).toContain('task=1');
     expect(commentFile).toContain('The first comment');
 
@@ -625,7 +677,9 @@ describe('App', () => {
     click(buttonByText(harness.doc, 'Save'));
     await flush();
 
-    const editedFile = harness.bridge.files.get('/home/user/projects/comment_1.txt');
+    const editedFile = harness.bridge.files.get(
+      commentFileWithText(harness, 'The edited comment'),
+    );
     expect(editedFile).toContain('The edited comment');
     expect(
       harness.doc.querySelector('.task-comment-text')?.textContent,
@@ -635,7 +689,7 @@ describe('App', () => {
     click(buttonByText(harness.doc, 'Delete'));
     await flush();
 
-    expect(harness.bridge.files.has('/home/user/projects/comment_1.txt')).toBe(false);
+    expect(hasCommentFile(harness)).toBe(false);
     expect(harness.doc.querySelectorAll('.task-comment')).toHaveLength(0);
 
     harness.app.dispose();
@@ -665,9 +719,9 @@ describe('App', () => {
     );
     await flush();
 
-    expect(harness.bridge.files.get('/home/user/projects/comment_1.txt')).toContain(
-      'Comment through the keyboard',
-    );
+    expect(
+      harness.bridge.files.get(commentFileWithText(harness, 'Comment through the keyboard')),
+    ).toContain('Comment through the keyboard');
 
     // Ctrl+Enter in the edit box saves the change.
     click(buttonByText(harness.doc, 'Edit'));
@@ -687,9 +741,9 @@ describe('App', () => {
     );
     await flush();
 
-    expect(harness.bridge.files.get('/home/user/projects/comment_1.txt')).toContain(
-      'Edited through the keyboard',
-    );
+    expect(
+      harness.bridge.files.get(commentFileWithText(harness, 'Edited through the keyboard')),
+    ).toContain('Edited through the keyboard');
 
     harness.app.dispose();
   });
@@ -745,14 +799,17 @@ describe('App', () => {
     click(buttonByText(harness.doc, 'Create task'));
     await flush();
 
-    const created = harness.bridge.files.get('/home/user/projects/task_4.txt');
+    const created = harness.bridge.files.get(taskFileWithTitle(harness, 'title=Brand new task'));
     expect(created).toBeDefined();
     expect(created).toContain('title=Brand new task');
     expect(created).toContain('tags=fresh urgent');
     expect(harness.root.querySelectorAll('.task-table tbody tr')).toHaveLength(4);
 
-    // Edit
-    const editButtons = harness.root.querySelectorAll<HTMLButtonElement>('.row-action');
+    // Edit the fixture task: its row is found by id, wherever the new
+    // random-id task sorts.
+    const editButtons = harness.root.querySelectorAll<HTMLButtonElement>(
+      'tr[data-task-id="1"] .row-action',
+    );
     click(editButtons[1]);
     await flush();
     const editTitle = harness.doc.querySelector<HTMLInputElement>('#task-title');
@@ -768,8 +825,10 @@ describe('App', () => {
     expect(edited).toContain('title=Edited task');
     expect(edited).toContain('id=1');
 
-    // Delete
-    const deleteButtons = harness.root.querySelectorAll<HTMLButtonElement>('.row-action');
+    // Delete the fixture task again, found by id.
+    const deleteButtons = harness.root.querySelectorAll<HTMLButtonElement>(
+      'tr[data-task-id="1"] .row-action',
+    );
     click(deleteButtons[3]);
     await flush();
     click(buttonByText(harness.doc, 'Delete'));
@@ -820,7 +879,7 @@ describe('App', () => {
     click(buttonByText(harness.doc, 'Create task'));
     await flush();
 
-    const created = harness.bridge.files.get('/home/user/projects/task_4.txt');
+    const created = harness.bridge.files.get(taskFileWithTitle(harness, 'title=Dated task'));
     expect(created).toContain('title=Dated task');
     expect(created).toContain(`start=${midnightValue(opened)}`);
     expect(created).toContain(`end=${midnightValue(tomorrow)}`);
@@ -848,13 +907,15 @@ describe('App', () => {
     click(buttonByText(harness.doc, 'Create task'));
     await flush();
 
-    const created = harness.bridge.files.get('/home/user/projects/task_4.txt');
+    const createdPath = taskFileWithTitle(harness, 'title=A child task');
+    const created = harness.bridge.files.get(createdPath);
     expect(created).toBeDefined();
     expect(created).toContain('title=A child task');
     expect(created).toContain('parent=1');
 
     // The listing shows the parent of the new task.
-    const childRow = harness.root.querySelector('tr[data-task-id="4"]');
+    const childId = taskIdOfFile(createdPath);
+    const childRow = harness.root.querySelector(`tr[data-task-id="${childId}"]`);
     expect(childRow?.querySelector('.parent-link')?.textContent).toBe('#1');
     expect(childRow?.classList.contains('task-row-child')).toBe(true);
 
@@ -889,14 +950,15 @@ describe('App', () => {
 
     const children = harness.doc.querySelectorAll('.child-item');
     expect(children).toHaveLength(1);
-    expect(children[0]?.querySelector('.child-id')?.textContent).toBe('#4');
+    const onlyChildId = taskIdOfFile(taskFileWithTitle(harness, 'The only child'));
+    expect(children[0]?.querySelector('.child-id')?.textContent).toBe(`#${onlyChildId}`);
     expect(children[0]?.querySelector('.child-title')?.textContent).toBe('The only child');
 
     // Clicking the child opens it.
     click(harness.doc.querySelector<HTMLButtonElement>('.child-title'));
     await flush();
     const openedTitle = harness.doc.querySelector('.modal-title')?.textContent;
-    expect(openedTitle).toContain('Task #4 - The only child');
+    expect(openedTitle).toContain(`Task #${onlyChildId} - The only child`);
     harness.app.dispose();
   });
 });
@@ -1433,7 +1495,9 @@ describe('App and the tree view', () => {
         .querySelector<HTMLButtonElement>('.tree-row[data-task-id="1"] .tree-twisty')
         ?.classList.contains('is-expanded'),
     ).toBe(true);
-    expect(harness.bridge.files.has('/home/user/projects/task_6.txt')).toBe(true);
+    expect(harness.bridge.files.get(taskFileWithTitle(harness, 'The new child'))).toContain(
+      'title=The new child',
+    );
     harness.app.dispose();
   });
 
@@ -1453,13 +1517,14 @@ describe('App and the tree view', () => {
     click(buttonByText(harness.doc, 'Create task'));
     await flush();
 
+    const freshId = taskIdOfFile(taskFileWithTitle(harness, 'The fresh parent'));
     // A task without a child cannot be expanded.
     expect(
-      treeRow(harness, 6)?.querySelector<HTMLButtonElement>('.tree-twisty')?.disabled,
+      treeRow(harness, freshId)?.querySelector<HTMLButtonElement>('.tree-twisty')?.disabled,
     ).toBe(true);
 
     // Its first child is added: the branch opens by itself and shows it.
-    click(treeAction(harness, 6, 5));
+    click(treeAction(harness, freshId, 5));
     await flush();
     const childInput = harness.doc.querySelector<HTMLInputElement>('#task-title');
     expect(childInput).not.toBeNull();
@@ -1476,7 +1541,7 @@ describe('App and the tree view', () => {
     expect(rows[3]?.querySelector('.tree-title')?.textContent).toBe('Its first child');
     expect(rows[3]?.dataset['depth']).toBe('1');
     expect(
-      treeRow(harness, 6)?.querySelector<HTMLButtonElement>('.tree-twisty')?.classList.contains('is-expanded'),
+      treeRow(harness, freshId)?.querySelector<HTMLButtonElement>('.tree-twisty')?.classList.contains('is-expanded'),
     ).toBe(true);
     harness.app.dispose();
   });
@@ -1502,11 +1567,13 @@ describe('App and the tree view', () => {
 
     // The file carries the sibling position, so the child sorts last even
     // though its siblings already hold distinct orders.
-    expect(harness.bridge.files.get('/home/user/projects/task_6.txt')).toContain(
-      'tree_gantt_order=2',
-    );
+    const appendedPath = taskFileWithTitle(harness, 'Appended child');
+    expect(harness.bridge.files.get(appendedPath)).toContain('tree_gantt_order=2');
+    const appendedId = taskIdOfFile(appendedPath);
     const rows = treeRows(harness);
-    expect(rows.map((row) => row.getAttribute('data-task-id'))).toEqual(['1', '2', '3', '6', '5']);
+    expect(rows.map((row) => row.getAttribute('data-task-id'))).toEqual(
+      ['1', '2', '3', String(appendedId), '5'],
+    );
     expect(rows[3]?.querySelector('.tree-title')?.textContent).toBe('Appended child');
 
     harness.app.dispose();
@@ -2467,15 +2534,15 @@ describe('App and the board', () => {
     await flush();
 
     // The file carries the column position, so the card sorts last.
-    expect(harness.bridge.files.get('/home/user/projects/task_3.txt')).toContain(
-      'kanban_order=2',
-    );
+    const appendedPath = taskFileWithTitle(harness, 'Appended card');
+    expect(harness.bridge.files.get(appendedPath)).toContain('kanban_order=2');
+    const appendedId = String(taskIdOfFile(appendedPath));
     const todoCards = [
       ...harness.root.querySelectorAll(
         '.kanban-column[data-status="todo"] .kanban-card',
       ),
     ].map((card) => card.getAttribute('data-task-id'));
-    expect(todoCards).toEqual(['1', '2', '3']);
+    expect(todoCards).toEqual(['1', '2', appendedId]);
 
     harness.app.dispose();
   });
@@ -2664,7 +2731,9 @@ describe('App and the Gantt chart', () => {
     click(buttonByText(harness.doc, 'Create task'));
     await flush();
 
-    expect(harness.bridge.files.get('/home/user/projects/task_4.txt')).toContain('parent=1');
+    expect(
+      harness.bridge.files.get(taskFileWithTitle(harness, 'Child created from the chart')),
+    ).toContain('parent=1');
     expect(ganttNames(harness)).toContain('Child created from the chart');
 
     harness.app.dispose();
@@ -3138,8 +3207,10 @@ describe('the notes', () => {
     click(buttonByText(harness.doc, 'Create note'));
     await flush();
 
-    const file = harness.bridge.files.get('/home/user/projects/note_1.txt');
-    expect(file).toContain('id=1');
+    const notePath = noteFileWithTitle(harness, 'title=The new note');
+    const noteId = Number.parseInt(/note_(-?\d+)\.txt$/.exec(notePath)?.[1] ?? '', 10);
+    const file = harness.bridge.files.get(notePath);
+    expect(file).toContain(`id=${noteId}`);
     expect(file).toContain('title=The new note');
     expect(file).toContain('----');
     expect(file).toContain('# The body');
@@ -3292,9 +3363,20 @@ describe('the embedded project', () => {
     await flush();
 
     // The file of the task lives at the root of the storage of the browser.
-    const root = harness.opfs as unknown as { read: (path: string) => string | null };
-    const content = root.read('task_1.txt');
-    expect(content).toContain('id=1');
+    const root = harness.opfs as unknown as {
+      read: (path: string) => string | null;
+      entries: () => AsyncGenerator<[string, unknown]>;
+    };
+    let taskPath: string | null = null;
+    for await (const [name] of root.entries()) {
+      if (/^task_-?\d+\.txt$/.test(name)) {
+        taskPath = name;
+      }
+    }
+    expect(taskPath).not.toBeNull();
+    const content = taskPath === null ? null : root.read(taskPath);
+    const embeddedId = taskPath === null ? '' : (/task_(-?\d+)\.txt$/.exec(taskPath)?.[1] ?? '');
+    expect(content).toContain(`id=${embeddedId}`);
     expect(content).toContain('title=A task of the embedded project');
     harness.app.dispose();
   });

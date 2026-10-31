@@ -51,8 +51,8 @@ list or as a tree.
 | One text file per task (`task_<id>.txt`) | Done | `src/core/task.ts` |
 | `key=value` metadata block ended by `----` | Done | `src/core/task.ts` |
 | Description as free text after the separator | Done | `src/core/task.ts` |
-| Unique incremental task id | Done | `src/core/projectStore.ts` |
-| Automatic id allocation, collision safe | Done | `src/core/projectStore.ts` |
+| Random nonzero task id, unique across tasks, comments and notes | Done | `src/core/ids.ts`, `src/core/projectStore.ts` |
+| Automatic id allocation, collision safe (`allocateId`, `ids.txt` registry) | Done | `src/core/ids.ts`, `src/core/serviceStore.ts`, `src/core/embeddedStore.ts`, `src/core/fileSystemStore.ts` |
 | `parent=<id>` key written and read for the child tasks | Done | `src/core/task.ts` |
 | **`blocked_by=...`: the tasks that block a task** | Done | `src/core/task.ts` |
 | **`related=...`: the tasks that are related to a task** | Done | `src/core/task.ts` |

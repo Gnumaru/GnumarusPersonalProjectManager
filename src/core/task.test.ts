@@ -47,6 +47,7 @@ describe('task file names', () => {
   it('recognizes task file names', () => {
     expect(isTaskFileName('task_1.txt')).toBe(true);
     expect(isTaskFileName('task_42.txt')).toBe(true);
+    expect(isTaskFileName('task_-42.txt')).toBe(true);
     expect(isTaskFileName('task_.txt')).toBe(false);
     expect(isTaskFileName('task_1.md')).toBe(false);
     expect(isTaskFileName('notes.txt')).toBe(false);
@@ -56,6 +57,8 @@ describe('task file names', () => {
   it('extracts the id from the file name', () => {
     expect(parseTaskIdFromFileName('task_9.txt')).toBe(9);
     expect(parseTaskIdFromFileName('task_1234.txt')).toBe(1234);
+    expect(parseTaskIdFromFileName('task_-42.txt')).toBe(-42);
+    expect(parseTaskIdFromFileName('task_0.txt')).toBeNull();
     expect(parseTaskIdFromFileName('task_x.txt')).toBeNull();
     expect(parseTaskIdFromFileName('readme.txt')).toBeNull();
   });
@@ -191,7 +194,8 @@ describe('the blocking and the related tasks', () => {
     expect(parseIdList('3,5, 7')).toEqual([3, 5, 7]);
     expect(parseIdList('')).toEqual([]);
     expect(parseIdList('3, 3, 5')).toEqual([3, 5]);
-    expect(parseIdList('0,-2,abc')).toEqual([]);
+    expect(parseIdList('0,abc')).toEqual([]);
+    expect(parseIdList('-2, 0, 5')).toEqual([-2, 5]);
   });
 
   it('reads the relations of a task', () => {

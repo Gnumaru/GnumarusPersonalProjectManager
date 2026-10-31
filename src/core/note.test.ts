@@ -19,6 +19,7 @@ describe('the note file names', () => {
 
   it('recognizes the names', () => {
     expect(isNoteFileName('note_7.txt')).toBe(true);
+    expect(isNoteFileName('note_-7.txt')).toBe(true);
     expect(isNoteFileName('task_7.txt')).toBe(false);
     expect(isNoteFileName('comment_7.txt')).toBe(false);
     expect(isNoteFileName('note_.txt')).toBe(false);
@@ -26,6 +27,8 @@ describe('the note file names', () => {
 
   it('extracts the id from the name', () => {
     expect(parseNoteIdFromFileName('note_12.txt')).toBe(12);
+    expect(parseNoteIdFromFileName('note_-12.txt')).toBe(-12);
+    expect(parseNoteIdFromFileName('note_0.txt')).toBeNull();
     expect(parseNoteIdFromFileName('note_x.txt')).toBeNull();
   });
 });

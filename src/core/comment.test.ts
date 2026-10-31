@@ -17,12 +17,15 @@ describe('the comment file names', () => {
 
   it('recognizes the names', () => {
     expect(isCommentFileName('comment_7.txt')).toBe(true);
+    expect(isCommentFileName('comment_-7.txt')).toBe(true);
     expect(isCommentFileName('task_7.txt')).toBe(false);
     expect(isCommentFileName('comment_.txt')).toBe(false);
   });
 
   it('extracts the id from the name', () => {
     expect(parseCommentIdFromFileName('comment_12.txt')).toBe(12);
+    expect(parseCommentIdFromFileName('comment_-12.txt')).toBe(-12);
+    expect(parseCommentIdFromFileName('comment_0.txt')).toBeNull();
     expect(parseCommentIdFromFileName('comment_x.txt')).toBeNull();
   });
 });

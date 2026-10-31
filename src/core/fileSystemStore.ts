@@ -41,6 +41,7 @@ import {
 } from './note.js';
 import type { NoteSummary, ProjectFile, ProjectKind, ProjectStore, TaskSummary } from './projectStore.js';
 import { APP_CONFIG_FILE } from './appConfig.js';
+import { IDS_FILE, generateUniqueId, parseIdsFile, serializeIdsFile } from './ids.js';
 import type { DirectoryHandle } from './fileSystemAccess.js';
 
 /**
@@ -165,7 +166,7 @@ export class FileSystemProjectStore implements ProjectStore {
   }
 
   async createComment(taskId: number, text: string): Promise<TaskComment> {
-    const id = await this.nextCommentId();
+    const id = await this.allocateId();
     const comment = buildComment(id, taskId, text, new Date());
     await this.writeFile(this.commentPath(id), serializeComment(comment));
     return comment;
@@ -241,16 +242,58 @@ export class FileSystemProjectStore implements ProjectStore {
 
   // ----------------------------------------------------------------- ids --
 
-  async nextTaskId(): Promise<number> {
-    return this.nextId(await this.listTaskPathsInternal(), parseTaskIdFromFileName);
+  /**
+   * Allocates the id of a new record: a random nonzero integer used by
+   * nothing yet, whatever the kind of record.
+   *
+   * The used ids live in a single `ids.txt` registry file, so allocation
+   * reads that one file instead of scanning the whole directory. The id is
+   * reserved in the registry before it is returned (reserve-then-create),
+   * so a failure afterwards can only orphan a reservation, never duplicate
+   * an id.
+   */
+  async allocateId(): Promise<number> {
+    const taken = await this.readTakenIds();
+    const id = generateUniqueId((candidate) => taken.has(candidate));
+    taken.add(id);
+    await this.writeFile(IDS_FILE, serializeIdsFile(taken));
+    return id;
   }
 
-  async nextCommentId(): Promise<number> {
-    return this.nextId(await this.listCommentPathsInternal(), parseCommentIdFromFileName);
+  /** Every id used by the project, from the `ids.txt` registry file. */
+  private async readTakenIds(): Promise<Set<number>> {
+    const content = await this.readFile(IDS_FILE);
+    if (content !== null) {
+      return parseIdsFile(content);
+    }
+    return this.bootstrapIdsFile();
   }
 
-  async nextNoteId(): Promise<number> {
-    return this.nextId(await this.listNotePathsInternal(), parseNoteIdFromFileName);
+  /**
+   * Builds the `ids.txt` registry from the record files already on disk.
+   *
+   * Runs once for projects created before the registry existed: every id
+   * encoded in a `task_*.txt`, `comment_*.txt` or `note_*.txt` file name is
+   * registered, so a later allocation never reuses one.
+   */
+  private async bootstrapIdsFile(): Promise<Set<number>> {
+    const taken = new Set<number>();
+    for (const path of await this.listAllPaths()) {
+      const name = nameOf(path);
+      const id =
+        isTaskFileName(name)
+          ? parseTaskIdFromFileName(name)
+          : isCommentFileName(name)
+            ? parseCommentIdFromFileName(name)
+            : isNoteFileName(name)
+              ? parseNoteIdFromFileName(name)
+              : null;
+      if (id !== null) {
+        taken.add(id);
+      }
+    }
+    await this.writeFile(IDS_FILE, serializeIdsFile(taken));
+    return taken;
   }
 
   taskPath(id: number): string {
@@ -283,6 +326,27 @@ export class FileSystemProjectStore implements ProjectStore {
     for (const file of files) {
       await this.writeFile(file.path, file.content);
     }
+    // The import replaces the whole project: rebuild the registry from the
+    // imported files, keeping the previously registered ids (an id is never
+    // reused, even when its record is gone).
+    const taken = new Set<number>();
+    for (const file of files) {
+      const name = nameOf(file.path);
+      if (name === IDS_FILE) {
+        for (const id of parseIdsFile(file.content)) {
+          taken.add(id);
+        }
+        continue;
+      }
+      const id =
+        parseTaskIdFromFileName(name) ??
+        parseCommentIdFromFileName(name) ??
+        parseNoteIdFromFileName(name);
+      if (id !== null) {
+        taken.add(id);
+      }
+    }
+    await this.writeFile(IDS_FILE, serializeIdsFile(taken));
   }
 
   // ------------------------------------------------------------ internals --
@@ -486,21 +550,6 @@ export class FileSystemProjectStore implements ProjectStore {
       treeGanttOrder: task.treeGanttOrder ?? 0,
       path,
     };
-  }
-
-  /** The id that the next file of that kind will take. */
-  private async nextId(
-    paths: readonly string[],
-    parseId: (name: string) => number | null,
-  ): Promise<number> {
-    const ids: number[] = [];
-    for (const path of paths) {
-      const id = parseId(nameOf(path));
-      if (id !== null) {
-        ids.push(id);
-      }
-    }
-    return ids.length === 0 ? 1 : Math.max(...ids) + 1;
   }
 }
 

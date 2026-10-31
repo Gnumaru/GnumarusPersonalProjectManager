@@ -148,17 +148,17 @@ export interface ProjectStore {
   /** Creates a note file, failing when the file already exists. */
   createNoteFile(path: string, note: Note): Promise<void>;
 
-  /** The id that the next note will take. */
-  nextNoteId(): Promise<number>;
+  /**
+   * Allocates the id of a new record (task, comment or note).
+   *
+   * The id is a random nonzero integer, unique across every kind of record:
+   * it is checked against everything that already uses an id, and the random
+   * generation is repeated while it exists.
+   */
+  allocateId(): Promise<number>;
 
   /** The path of the file of a note, relative to the project folder. */
   notePath(id: number): string;
-
-  /** The id that the next task will take. */
-  nextTaskId(): Promise<number>;
-
-  /** The id that the next comment will take. */
-  nextCommentId(): Promise<number>;
 
   /** The path of the file of a task, relative to the project folder. */
   taskPath(id: number): string;

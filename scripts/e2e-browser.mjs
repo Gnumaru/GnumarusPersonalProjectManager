@@ -144,6 +144,30 @@ async function shell(command) {
   });
 }
 
+/** The names of the files at the top level of the task folder. */
+async function directoryFileNames() {
+  const listing = await apiRequest(`/api/dir?path=${encodeURIComponent(taskDirectory)}`);
+  return (listing.entries ?? [])
+    .filter((entry) => entry.type !== 'dir')
+    .map((entry) => entry.name);
+}
+
+/**
+ * The file created since `before`: ids are random now, so a created file is
+ * found by diffing the folder instead of predicting its name.
+ */
+async function findCreatedFile(before, pattern) {
+  const fresh = (await directoryFileNames()).filter(
+    (name) => !before.includes(name) && pattern.test(name),
+  );
+  return fresh.length === 1 ? `${taskDirectory}/${fresh[0]}` : null;
+}
+
+/** The id encoded in the path of a task file. */
+function idOfTaskFile(path) {
+  return /task_(-?\d+)\.txt$/.exec(path)?.[1] ?? null;
+}
+
 async function writeFileEnsured(path, content) {
   try {
     await apiRequest(`/api/file?path=${encodeURIComponent(path)}`, {
@@ -453,6 +477,7 @@ async function runChecks() {
     return true;
   })()`);
   await delay(400);
+  const filesBeforeCreate = await directoryFileNames();
   await evaluate(`(() => {
     const fields = [...document.querySelectorAll('.id-list')];
     const blocked = fields[1].querySelector('.id-list-input');
@@ -469,10 +494,13 @@ async function runChecks() {
   })()`);
   await delay(1500);
 
-  const createdPath = `${taskDirectory}/task_13.txt`;
+  const createdId = createdPath === null ? null : idOfTaskFile(createdPath);
+  check(createdId !== null, 'the id of the new task is a valid nonzero id');
   let createdContent = null;
   try {
-    createdContent = await apiRequest(`/api/file?path=${encodeURIComponent(createdPath)}`);
+    if (createdPath !== null) {
+      createdContent = await apiRequest(`/api/file?path=${encodeURIComponent(createdPath)}`);
+    }
   } catch {
     createdContent = null;
   }
@@ -509,9 +537,9 @@ async function runChecks() {
   // --- edit -----------------------------------------------------------------
 
   await evaluate(`document.querySelector('[data-page-action="last"]').click()`);
-  await waitFor(`document.querySelector('tr[data-task-id="13"]') !== null`);
+  await waitFor(`document.querySelector('tr[data-task-id="${createdId}"]') !== null`);
   await evaluate(`(() => {
-    const row = document.querySelector('tr[data-task-id="13"]');
+    const row = document.querySelector('tr[data-task-id="${createdId}"]');
     row.querySelectorAll('.row-action')[1].click();
     return true;
   })()`);
@@ -521,6 +549,7 @@ async function runChecks() {
     return true;
   })()`);
   // A comment is added to the task.
+  const commentFilesBefore = await directoryFileNames();
   await evaluate(`(() => {
     const editor = document.querySelector('.task-comment-new');
     editor.value = 'A comment written by the browser test.';
@@ -545,13 +574,15 @@ async function runChecks() {
     editedContent.content.includes('title=Edited by the browser test'),
     'the edited title was written to the file',
   );
-  check(editedContent.content.includes('id=13'), 'the id of the task was preserved');
+  check(editedContent.content.includes(`id=${createdId}`), 'the id of the task was preserved');
 
-  const commentContent = await apiRequest(
-    `/api/file?path=${encodeURIComponent(`${taskDirectory}/comment_1.txt`)}`,
-  );
+  const commentPath = await findCreatedFile(commentFilesBefore, /^comment_-?\d+\.txt$/);
+  check(commentPath !== null, 'the comment file was created on disk');
+  const commentContent = commentPath === null
+    ? { content: '' }
+    : await apiRequest(`/api/file?path=${encodeURIComponent(commentPath)}`);
   check(
-    commentContent.content.includes('task=13'),
+    commentContent.content.includes(`task=${createdId}`),
     'the comment is written in a file of its own',
     commentContent.content,
   );
@@ -564,7 +595,7 @@ async function runChecks() {
   // --- delete ---------------------------------------------------------------
 
   await evaluate(`(() => {
-    const row = document.querySelector('tr[data-task-id="13"]');
+    const row = document.querySelector('tr[data-task-id="${createdId}"]');
     row.querySelectorAll('.row-action')[3].click();
     return true;
   })()`);
@@ -613,6 +644,7 @@ async function runChecks() {
     document.querySelector('#task-description').value = 'Created from the parent task.';
     return true;
   })()`);
+  const filesBeforeChild = await directoryFileNames();
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Create task');
     button.click();
@@ -620,8 +652,13 @@ async function runChecks() {
   })()`);
   await delay(1500);
 
-  const childPath = `${taskDirectory}/task_13.txt`;
-  const childContent = await apiRequest(`/api/file?path=${encodeURIComponent(childPath)}`);
+  const childPath = await findCreatedFile(filesBeforeChild, /^task_-?\d+\.txt$/);
+  check(childPath !== null, 'the child task file was created on disk');
+  const childId = childPath === null ? null : idOfTaskFile(childPath);
+  check(childId !== null, 'the id of the child task is a valid nonzero id');
+  const childContent = childPath === null
+    ? { content: '' }
+    : await apiRequest(`/api/file?path=${encodeURIComponent(childPath)}`);
   check(
     childContent.content.includes('title=Child of the first task'),
     'the child task file was created with its title',
@@ -632,7 +669,7 @@ async function runChecks() {
   await waitFor(`document.querySelector('.page-current')?.textContent === '2'`);
   const parentLink = await evaluate(`(() => {
     const rows = [...document.querySelectorAll('.task-table tbody tr')];
-    const row = rows.find((candidate) => candidate.dataset['taskId'] === '13');
+    const row = rows.find((candidate) => candidate.dataset['taskId'] === '${childId}');
     return row?.querySelector('.parent-link')?.textContent ?? '';
   })()`);
   check(parentLink === '#1', 'the listing shows the parent of the child task', parentLink);
@@ -664,6 +701,8 @@ async function runChecks() {
   // --- tree view ------------------------------------------------------------
 
   // A grand child, to check the recursive expansion of a branch.
+  // The seeded grandchild keeps a fixed fixture id, registered below so the
+  // registry stays complete and no allocation ever reuses it.
   const grandChildPath = `${taskDirectory}/task_14.txt`;
   await apiRequest(`/api/file?path=${encodeURIComponent(grandChildPath)}`, {
     method: 'POST',
@@ -672,7 +711,7 @@ async function runChecks() {
         'id=14',
         'title=Grand child of the first task',
         'status=todo',
-        'parent=13',
+        `parent=${childId}`,
         'tags=browser sample',
         'created=2026-10-01T10:00:00.000Z',
         'updated=2026-10-01T10:00:00.000Z',
@@ -682,6 +721,12 @@ async function runChecks() {
       encoding: 'text',
     }),
   });
+  try {
+    await apiRequest(`/api/file?path=${encodeURIComponent(`${taskDirectory}/ids.txt`)}`);
+    await shell(`printf '%s\\n' '14' >> '${taskDirectory}/ids.txt'`);
+  } catch {
+    // No registry yet: the next bootstrap registers every file on disk.
+  }
 
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Tree');
@@ -694,7 +739,7 @@ async function runChecks() {
     `[...document.querySelectorAll('.tree-row')].map((node) => node.dataset['taskId']).join('|')`,
   );
   check(
-    treeRoots === '1|13|2|3|4|5|6|7|8|9|10|11|12',
+    treeRoots === `1|${childId}|2|3|4|5|6|7|8|9|10|11|12`,
     'the branch of the parent of a child task is opened when the child is created',
     treeRoots,
   );
@@ -712,10 +757,10 @@ async function runChecks() {
   })()`);
   await waitFor(
     `document.querySelectorAll('.tree-row').length === 12 &&
-      document.querySelector('.tree-row[data-task-id="13"]') === null`,
+      document.querySelector('.tree-row[data-task-id="${childId}"]') === null`,
   );
   const childHidden = await evaluate(
-    `document.querySelector('.tree-row[data-task-id="13"]') === null`,
+    `document.querySelector('.tree-row[data-task-id="${childId}"]') === null`,
   );
   check(childHidden === true, 'a simple click collapses the branch of the parent');
 
@@ -743,9 +788,9 @@ async function runChecks() {
     row.querySelector('.tree-twisty').click();
     return true;
   })()`);
-  await waitFor(`document.querySelector('.tree-row[data-task-id="13"]') !== null`);
+  await waitFor(`document.querySelector('.tree-row[data-task-id="${childId}"]') !== null`);
   const childDepth = await evaluate(
-    `document.querySelector('.tree-row[data-task-id="13"]')?.dataset['depth'] ?? ''`,
+    `document.querySelector('.tree-row[data-task-id="${childId}"]')?.dataset['depth'] ?? ''`,
   );
   check(childDepth === '1', 'the child task is shown under its parent', childDepth);
 
@@ -818,7 +863,7 @@ async function runChecks() {
   const focusedIds = await evaluate(
     `[...document.querySelectorAll('.tree-row')].map((node) => node.dataset['taskId']).join('|')`,
   );
-  check(focusedIds === '1|13|14', 'the focused task is the root of the tree', focusedIds);
+  check(focusedIds === `1|${childId}|14`, 'the focused task is the root of the tree', focusedIds);
 
   const breadcrumb = await evaluate(
     `[...document.querySelectorAll('.tree-crumb')].map((node) => node.textContent).join('|')`,
@@ -842,9 +887,9 @@ async function runChecks() {
     }
     return true;
   })()`);
-  await waitFor(`document.querySelector('.tree-row[data-task-id="13"]') !== null`);
+  await waitFor(`document.querySelector('.tree-row[data-task-id="${childId}"]') !== null`);
   await evaluate(`(() => {
-    const twisty = document.querySelector('.tree-row[data-task-id="13"]')?.querySelector('.tree-twisty');
+    const twisty = document.querySelector('.tree-row[data-task-id="${childId}"]')?.querySelector('.tree-twisty');
     if (twisty && !twisty.classList.contains('is-expanded')) {
       twisty.click();
     }
@@ -1298,7 +1343,7 @@ async function runChecks() {
   // The indentation matches the one of the tree view: 4.5 pixels per level.
   const ganttIndents = await evaluate(`(() => ({
     root: document.querySelector('.gantt-row[data-task-id="1"] .gantt-indent')?.style.width ?? '',
-    child: document.querySelector('.gantt-row[data-task-id="13"] .gantt-indent')?.style.width ?? '',
+    child: document.querySelector('.gantt-row[data-task-id="${childId}"] .gantt-indent')?.style.width ?? '',
   }))()`);
   check(
     ganttIndents.root === '0px' && ganttIndents.child === '4.5px',
@@ -1466,10 +1511,10 @@ async function runChecks() {
 
   await evaluate(`document.querySelector('[data-page-action="last"]').click()`);
   await waitFor(`document.querySelector('.page-current')?.textContent === '2'`);
-  await waitFor(`document.querySelector('tr[data-task-id="13"]') !== null`);
+  await waitFor(`document.querySelector('tr[data-task-id="${childId}"]') !== null`);
   await evaluate(`(() => {
     const rows = [...document.querySelectorAll('.task-table tbody tr')];
-    const row = rows.find((candidate) => candidate.dataset['taskId'] === '13');
+    const row = rows.find((candidate) => candidate.dataset['taskId'] === '${childId}');
     row.querySelectorAll('.row-action')[3].click();
     return true;
   })()`);
@@ -1674,6 +1719,7 @@ async function checkNotes() {
   check(heading === 'The heading', 'the preview shows the note as markdown', String(heading));
   await capture('note-preview');
 
+  const noteFilesBefore = await directoryFileNames();
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Create note');
     button.click();
@@ -1690,11 +1736,15 @@ async function checkNotes() {
   check(created === true, 'the note is created and listed');
 
   // The file of the note is on the disk, with its id inside.
-  const noteFile = await apiRequest(
-    `/api/file?path=${encodeURIComponent(`${taskDirectory}/note_13.txt`)}`,
-  );
+  const notePath = await findCreatedFile(noteFilesBefore, /^note_-?\d+\.txt$/);
+  check(notePath !== null, 'the file of the note was created on disk');
+  const noteId = notePath === null ? null : (/note_(-?\d+)\.txt$/.exec(notePath)?.[1] ?? null);
+  check(noteId !== null, 'the id of the note is a valid nonzero id');
+  const noteFile = notePath === null
+    ? { content: '' }
+    : await apiRequest(`/api/file?path=${encodeURIComponent(notePath)}`);
   check(
-    String(noteFile.content ?? '').includes('id=13') &&
+    String(noteFile.content ?? '').includes(`id=${noteId}`) &&
       String(noteFile.content ?? '').includes('title=A note of the browser test'),
     'the file of the note holds its id and its title',
   );
@@ -1893,9 +1943,19 @@ async function checkEmbeddedProject() {
   );
 
   // The file of the task lives in the storage of the browser.
-  const storedFile = await evaluate(`(async () => {
+  const storedName = await evaluate(`(async () => {
     const root = await navigator.storage.getDirectory();
-    const handle = await root.getFileHandle('task_1.txt');
+    const names = [];
+    for await (const [name] of root.entries()) {
+      if (/^task_-?\\d+\\.txt$/.test(name)) {
+        names.push(name);
+      }
+    }
+    return names.sort()[0] ?? null;
+  })()`);
+  const storedFile = storedName === null ? null : await evaluate(`(async () => {
+    const root = await navigator.storage.getDirectory();
+    const handle = await root.getFileHandle(${JSON.stringify(storedName)});
     const file = await handle.getFile();
     return await file.text();
   })()`);
@@ -1938,11 +1998,11 @@ async function checkEmbeddedProject() {
   if (archive !== null) {
     const entries = listZipEntries(archive);
     check(
-      entries.includes('task_1.txt'),
+      storedName !== null && entries.includes(storedName),
       'the archive holds the file of the task',
       entries.join(', '),
     );
-    const content = readZipEntry(archive, 'task_1.txt');
+    const content = storedName === null ? null : readZipEntry(archive, storedName);
     check(
       content !== null && content.includes('title=A task of the embedded project'),
       'the file of the archive holds the same content as the file of the browser',
@@ -2090,7 +2150,7 @@ async function checkEmbeddedColdStart() {
     return null;
   })()`);
   check(
-    typeof stored === 'string' && /^task_\d+\.txt$/u.test(stored),
+    typeof stored === 'string' && /^task_-?\d+\.txt$/u.test(stored),
     'the file of the task is at the root of the Origin Private File System',
     String(stored),
   );

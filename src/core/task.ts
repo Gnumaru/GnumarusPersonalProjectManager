@@ -33,10 +33,12 @@
  * change the `updated` timestamp: it is not a change of the task content.
  */
 
+import { isValidRecordId } from './ids.js';
+
 export const METADATA_SEPARATOR = '----';
 export const TASK_FILE_PREFIX = 'task_';
 export const TASK_FILE_SUFFIX = '.txt';
-export const TASK_FILE_PATTERN = /^task_(\d+)\.txt$/;
+export const TASK_FILE_PATTERN = /^task_(-?\d+)\.txt$/;
 
 export const TASK_STATUSES = [
   'planning',
@@ -160,7 +162,7 @@ export function isTaskRole(value: string): value is TaskRole {
 }
 
 export interface Task {
-  /** Unique incremental integer, also encoded in the file name. */
+  /** Unique random nonzero integer, also encoded in the file name. */
   readonly id: number;
   readonly title: string;
   readonly status: TaskStatus;
@@ -397,7 +399,7 @@ export function parseTaskIdFromFileName(name: string): number | null {
     return null;
   }
   const id = Number.parseInt(match[1] ?? '', 10);
-  return Number.isSafeInteger(id) ? id : null;
+  return isValidRecordId(id) ? id : null;
 }
 
 /**
@@ -435,7 +437,7 @@ function parseInteger(value: string | undefined): number | null {
     return null;
   }
   const parsed = Number.parseInt(trimmed, 10);
-  return Number.isSafeInteger(parsed) ? parsed : null;
+  return isValidRecordId(parsed) ? parsed : null;
 }
 
 /** Reads an order key, clamped to a non-negative integer. */
@@ -512,7 +514,8 @@ export function parseMetadataBlock(content: string): MetadataBlock {
 /**
  * Parses a list of task ids separated by commas.
  *
- * The invalid ids and the duplicates are left out.
+ * Negative ids are valid, zero is not. The invalid ids and the duplicates
+ * are left out.
  */
 export function parseIdList(value: string): number[] {
   const ids: number[] = [];
@@ -523,7 +526,7 @@ export function parseIdList(value: string): number[] {
       continue;
     }
     const id = Number.parseInt(trimmed, 10);
-    if (!Number.isSafeInteger(id) || id <= 0 || seen.has(id)) {
+    if (!isValidRecordId(id) || seen.has(id)) {
       continue;
     }
     seen.add(id);

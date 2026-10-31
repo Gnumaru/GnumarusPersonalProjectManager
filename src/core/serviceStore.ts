@@ -18,6 +18,12 @@ import {
   type TaskComment,
 } from './comment.js';
 import {
+  IDS_FILE,
+  generateUniqueId,
+  parseIdsFile,
+  serializeIdsFile,
+} from './ids.js';
+import {
   isTaskRole,
   isTaskStatus,
   isTaskType,
@@ -69,6 +75,10 @@ export const FIND_TASK_FILES_COMMAND =
 /** Command used to list the comment files of the project. */
 export const FIND_COMMENT_FILES_COMMAND =
   "find . -type f -name 'comment_*.txt' -not -path '*/.git/*' -not -path '*/.svn/*' -not -path '*/.hg/*' -print";
+
+/** Command used to collect every record id for the first `ids.txt` registry. */
+export const FIND_RECORD_FILES_COMMAND =
+  "find . -type f \\( -name 'task_*.txt' -o -name 'comment_*.txt' -o -name 'note_*.txt' \\) -not -path '*/.git/*' -not -path '*/.svn/*' -not -path '*/.hg/*' -print";
 
 /** Command used to list the note files of the project. */
 export const FIND_NOTE_FILES_COMMAND =
@@ -472,7 +482,7 @@ export class ServiceProjectStore implements ProjectStore {
   }
 
   async createComment(taskId: number, text: string): Promise<TaskComment> {
-    let id = await this.nextCommentId();
+    let id = await this.allocateId();
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const comment = buildComment(id, taskId, text, new Date());
       try {
@@ -480,7 +490,7 @@ export class ServiceProjectStore implements ProjectStore {
         return comment;
       } catch (error) {
         if (error instanceof ApiError && error.status === 409) {
-          id += 1;
+          id = await this.allocateId();
           continue;
         }
         throw error;
@@ -611,44 +621,106 @@ export class ServiceProjectStore implements ProjectStore {
     await this.api.createFile(this.absolute(path), serializeNote(note));
   }
 
-  async nextNoteId(): Promise<number> {
-    const paths = await this.listNotePathsInternal();
-    const ids: number[] = [];
-    for (const path of paths) {
-      const id = parseNoteIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
-      if (id !== null) {
-        ids.push(id);
+  /**
+   * Allocates the id of a new record: a random nonzero integer used by
+   * nothing yet, whatever the kind of record.
+   *
+   * The used ids live in a single `ids.txt` registry file, so allocation
+   * reads that one file instead of scanning the whole directory. The id is
+   * reserved in the registry before it is returned (reserve-then-create),
+   * so a failure afterwards can only orphan a reservation, never duplicate
+   * an id.
+   */
+  async allocateId(): Promise<number> {
+    const taken = await this.readTakenIds();
+    const id = generateUniqueId((candidate) => taken.has(candidate));
+    await this.reserveId(id);
+    return id;
+  }
+
+  /** Every id used by the project, from the `ids.txt` registry file. */
+  private async readTakenIds(): Promise<Set<number>> {
+    let content: string | null = null;
+    try {
+      content = (await this.api.readFile(this.absolute(IDS_FILE))).content;
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 404) {
+        throw error;
       }
     }
-    return ids.length === 0 ? 1 : Math.max(...ids) + 1;
+    if (content === null) {
+      return this.bootstrapIdsFile();
+    }
+    return parseIdsFile(content);
+  }
+
+  /**
+   * Builds the `ids.txt` registry from the record files already on disk.
+   *
+   * Runs once for projects created before the registry existed: every id
+   * encoded in a `task_*.txt`, `comment_*.txt` or `note_*.txt` file name is
+   * registered, so a later allocation never reuses one.
+   */
+  private async bootstrapIdsFile(): Promise<Set<number>> {
+    const result = await this.api.execShell({
+      command: FIND_RECORD_FILES_COMMAND,
+      cwd: this.projectDir,
+      timeout: 60,
+    });
+    if (result.returncode !== 0 && result.returncode !== 1) {
+      throw new Error(
+        `Unable to list the records of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
+      );
+    }
+    const taken = new Set<number>();
+    for (const line of result.stdout.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) {
+        continue;
+      }
+      const name = trimmed.slice(trimmed.lastIndexOf('/') + 1);
+      const id =
+        parseTaskIdFromFileName(name) ??
+        parseCommentIdFromFileName(name) ??
+        parseNoteIdFromFileName(name);
+      if (id !== null) {
+        taken.add(id);
+      }
+    }
+    await this.writeIdsFile(taken);
+    return taken;
+  }
+
+  /** Reserves an id in the registry with a single atomic append. */
+  private async reserveId(id: number): Promise<void> {
+    await this.api.execShell({
+      command: `printf '%s\\n' '${id}' >> ${IDS_FILE}`,
+      cwd: this.projectDir,
+      timeout: 10,
+    });
+  }
+
+  /** Writes the whole registry file, creating or replacing it. */
+  private async writeIdsFile(ids: ReadonlySet<number>): Promise<void> {
+    const content = serializeIdsFile(ids);
+    try {
+      await this.api.createFile(this.absolute(IDS_FILE), content);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        // A concurrent bootstrap won the creation: merge and overwrite.
+        const current = await this.readTakenIds();
+        for (const id of ids) {
+          current.add(id);
+        }
+        await this.api.overwriteFile(this.absolute(IDS_FILE), serializeIdsFile(current));
+        return;
+      }
+      throw error;
+    }
   }
 
   notePath(id: number): string {
     return noteFileName(id);
-  }
-
-  async nextTaskId(): Promise<number> {
-    const paths = await this.listTaskPathsInternal();
-    const ids: number[] = [];
-    for (const path of paths) {
-      const id = parseTaskIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
-      if (id !== null) {
-        ids.push(id);
-      }
-    }
-    return ids.length === 0 ? 1 : Math.max(...ids) + 1;
-  }
-
-  async nextCommentId(): Promise<number> {
-    const paths = await this.listCommentPaths();
-    const ids: number[] = [];
-    for (const path of paths) {
-      const id = parseCommentIdFromFileName(path.slice(path.lastIndexOf('/') + 1));
-      if (id !== null) {
-        ids.push(id);
-      }
-    }
-    return ids.length === 0 ? 1 : Math.max(...ids) + 1;
   }
 
   taskPath(id: number): string {
@@ -683,6 +755,27 @@ export class ServiceProjectStore implements ProjectStore {
     for (const file of files) {
       await this.api.createFile(this.absolute(file.path), file.content);
     }
+    // The import replaces the whole project: rebuild the registry from the
+    // imported files, keeping the previously registered ids (an id is never
+    // reused, even when its record is gone).
+    const taken = new Set<number>();
+    for (const file of files) {
+      if (file.path === IDS_FILE || file.path.endsWith(`/${IDS_FILE}`)) {
+        for (const id of parseIdsFile(file.content)) {
+          taken.add(id);
+        }
+        continue;
+      }
+      const name = file.path.slice(file.path.lastIndexOf('/') + 1);
+      const id =
+        parseTaskIdFromFileName(name) ??
+        parseCommentIdFromFileName(name) ??
+        parseNoteIdFromFileName(name);
+      if (id !== null) {
+        taken.add(id);
+      }
+    }
+    await this.writeIdsFile(taken);
   }
 
   // ------------------------------------------------------------- internals --
@@ -697,21 +790,6 @@ export class ServiceProjectStore implements ProjectStore {
     if (result.returncode !== 0) {
       throw new Error(
         `Unable to list the tasks of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
-      );
-    }
-    return parseServicePaths(result.stdout, this.projectDir);
-  }
-
-  /** The absolute paths of the comment files. */
-  private async listCommentPaths(): Promise<string[]> {
-    const result = await this.api.execShell({
-      command: FIND_COMMENT_FILES_COMMAND,
-      cwd: this.projectDir,
-      timeout: 30,
-    });
-    if (result.returncode !== 0 && result.returncode !== 1) {
-      throw new Error(
-        `Unable to list the comments of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
       );
     }
     return parseServicePaths(result.stdout, this.projectDir);

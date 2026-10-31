@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import type { BrowserFileStorage } from './browserStorage.js';
 import { EmbeddedProjectStore } from './embeddedStore.js';
+import { isValidRecordId } from './ids.js';
 import { buildNote } from './note.js';
 import { buildTask, type TaskInput } from './task.js';
 
@@ -63,17 +64,41 @@ describe('EmbeddedProjectStore', () => {
   it('creates a task in a file of its own', async () => {
     const { store, storage } = await createStore();
 
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
+    expect(isValidRecordId(id)).toBe(true);
     const task = buildTask(input('The first task'), id, new Date());
     await store.createTaskFile(store.taskPath(id), task);
 
-    expect(storage.files.get('task_1.txt')).toContain('title=The first task');
-    expect(await store.nextTaskId()).toBe(2);
+    expect(storage.files.get(store.taskPath(id))).toContain('title=The first task');
+    expect(storage.files.get(store.taskPath(id))).toContain(`id=${id}`);
+  });
+
+  it('allocates nonzero ids that never repeat, whatever the kind of record', async () => {
+    const { store } = await createStore();
+
+    const taskId = await store.allocateId();
+    await store.createTaskFile(
+      store.taskPath(taskId),
+      buildTask(input('A task'), taskId, new Date()),
+    );
+    const noteId = await store.allocateId();
+    const comment = await store.createComment(taskId, 'A comment');
+
+    for (const id of [taskId, noteId, comment.id]) {
+      expect(isValidRecordId(id)).toBe(true);
+    }
+    expect(new Set([taskId, noteId, comment.id]).size).toBe(3);
+
+    // Deleted ids stay registered: removing the task must not free its id.
+    await store.deleteFile(store.taskPath(taskId));
+    const later = await store.allocateId();
+    expect(later).not.toBe(taskId);
+    expect(isValidRecordId(later)).toBe(true);
   });
 
   it('lists the tasks with their metadata', async () => {
     const { store } = await createStore();
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(id),
       buildTask(input('A task', 'doing'), id, new Date()),
@@ -84,12 +109,12 @@ describe('EmbeddedProjectStore', () => {
     expect(summaries).toHaveLength(1);
     expect(summaries[0]?.title).toBe('A task');
     expect(summaries[0]?.status).toBe('doing');
-    expect(summaries[0]?.path).toBe('task_1.txt');
+    expect(summaries[0]?.path).toBe(store.taskPath(id));
   });
 
   it('searches the content of the tasks', async () => {
     const { store } = await createStore();
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(id),
       buildTask({ ...input('A task'), description: 'A needle in the haystack' }, id, new Date()),
@@ -102,12 +127,12 @@ describe('EmbeddedProjectStore', () => {
 
   it('counts the children of every task', async () => {
     const { store } = await createStore();
-    const parentId = await store.nextTaskId();
+    const parentId = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(parentId),
       buildTask(input('The parent'), parentId, new Date()),
     );
-    const childId = await store.nextTaskId();
+    const childId = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(childId),
       buildTask(input('The child'), childId, new Date(), parentId),
@@ -119,15 +144,15 @@ describe('EmbeddedProjectStore', () => {
 
   it('creates, reads, edits and deletes the comments of a task', async () => {
     const { store, storage } = await createStore();
-    const taskId = await store.nextTaskId();
+    const taskId = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(taskId),
       buildTask(input('A task'), taskId, new Date()),
     );
 
     const comment = await store.createComment(taskId, 'A comment');
-    expect(storage.files.get('comment_1.txt')).toContain('task=1');
-    expect(storage.files.get('comment_1.txt')).toContain('A comment');
+    expect(storage.files.get(store.commentPath(comment.id))).toContain(`task=${taskId}`);
+    expect(storage.files.get(store.commentPath(comment.id))).toContain('A comment');
 
     const comments = await store.listComments(taskId);
     expect(comments).toHaveLength(1);
@@ -142,7 +167,7 @@ describe('EmbeddedProjectStore', () => {
 
   it('replaces the whole project when an archive is imported', async () => {
     const { store, storage } = await createStore();
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(id),
       buildTask(input('The old task'), id, new Date()),
@@ -152,14 +177,16 @@ describe('EmbeddedProjectStore', () => {
       { path: 'task_1.txt', content: 'id=1\ntitle=The imported task\n----\nbody\n' },
     ]);
 
-    expect(storage.files.size).toBe(1);
+    // The imported task plus the rebuilt ids.txt registry.
+    expect(storage.files.size).toBe(2);
+    expect(storage.files.get('ids.txt')).toContain('1');
     const summaries = await store.listTasks();
     expect(summaries[0]?.title).toBe('The imported task');
   });
 
   it('exports the files of the project', async () => {
     const { store } = await createStore();
-    const id = await store.nextTaskId();
+    const id = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(id),
       buildTask(input('A task'), id, new Date()),
@@ -167,43 +194,42 @@ describe('EmbeddedProjectStore', () => {
 
     const files = await store.listFiles();
 
-    expect(files).toHaveLength(1);
-    expect(files[0]?.path).toBe('task_1.txt');
-    expect(files[0]?.content).toContain('title=A task');
+    // The task file plus the ids.txt registry.
+    expect(files.map((file) => file.path).sort()).toEqual([store.taskPath(id), 'ids.txt'].sort());
+    expect(files.find((file) => file.path === store.taskPath(id))?.content).toContain('title=A task');
   });
 
   it('creates a note in a file of its own, with its id inside the file', async () => {
     const { store, storage } = await createStore();
 
-    const id = await store.nextNoteId();
+    const id = await store.allocateId();
     const note = buildNote({ title: 'The first note', content: '# Hello' }, id, new Date());
     await store.createNoteFile(store.notePath(id), note);
 
-    expect(storage.files.get('note_1.txt')).toContain('id=1');
-    expect(storage.files.get('note_1.txt')).toContain('title=The first note');
-    expect(storage.files.get('note_1.txt')).toContain('# Hello');
-    expect(await store.nextNoteId()).toBe(2);
+    expect(storage.files.get(store.notePath(id))).toContain(`id=${id}`);
+    expect(storage.files.get(store.notePath(id))).toContain('title=The first note');
+    expect(storage.files.get(store.notePath(id))).toContain('# Hello');
   });
 
   it('lists and reads the notes', async () => {
     const { store } = await createStore();
-    const id = await store.nextNoteId();
+    const id = await store.allocateId();
     await store.createNoteFile(
       store.notePath(id),
       buildNote({ title: 'A note', content: 'The body' }, id, new Date()),
     );
 
-    expect(await store.listNotePaths()).toEqual(['note_1.txt']);
+    expect(await store.listNotePaths()).toEqual([store.notePath(id)]);
 
-    const note = await store.readNote('note_1.txt');
-    expect(note.id).toBe(1);
+    const note = await store.readNote(store.notePath(id));
+    expect(note.id).toBe(id);
     expect(note.title).toBe('A note');
     expect(note.content).toBe('The body');
   });
 
   it('searches the notes by title, by content or by both', async () => {
     const { store } = await createStore();
-    const id = await store.nextNoteId();
+    const id = await store.allocateId();
     await store.createNoteFile(
       store.notePath(id),
       buildNote({ title: 'Shopping list', content: 'Remember the milk' }, id, new Date()),
@@ -220,7 +246,7 @@ describe('EmbeddedProjectStore', () => {
 
   it('edits and deletes a note', async () => {
     const { store } = await createStore();
-    const id = await store.nextNoteId();
+    const id = await store.allocateId();
     const note = buildNote({ title: 'A note', content: 'body' }, id, new Date());
     await store.createNoteFile(store.notePath(id), note);
 
@@ -234,18 +260,18 @@ describe('EmbeddedProjectStore', () => {
 
   it('keeps the notes and the tasks apart', async () => {
     const { store } = await createStore();
-    const taskId = await store.nextTaskId();
+    const taskId = await store.allocateId();
     await store.createTaskFile(
       store.taskPath(taskId),
       buildTask(input('A task'), taskId, new Date()),
     );
-    const noteId = await store.nextNoteId();
+    const noteId = await store.allocateId();
     await store.createNoteFile(
       store.notePath(noteId),
       buildNote({ title: 'A note', content: 'body' }, noteId, new Date()),
     );
 
-    expect(await store.listTaskPaths()).toEqual(['task_1.txt']);
-    expect(await store.listNotePaths()).toEqual(['note_1.txt']);
+    expect(await store.listTaskPaths()).toEqual([store.taskPath(taskId)]);
+    expect(await store.listNotePaths()).toEqual([store.notePath(noteId)]);
   });
 });

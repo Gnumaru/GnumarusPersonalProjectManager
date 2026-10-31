@@ -21,8 +21,8 @@
  * displayed as rendered markdown.
  *
  * The notes do not involve the tasks: a note has no parent, no status and no
- * tag. The ids of the notes are incremental integers, unique in the project,
- * exactly like the ids of the tasks and the ids of the comments.
+ * tag. The ids are random nonzero integers, unique across tasks, comments
+ * and notes: no id is ever used twice, whatever the kind of record.
  */
 
 import {
@@ -32,15 +32,16 @@ import {
   parseMetadataBlock,
   sanitizeMetadataValue,
 } from './task.js';
+import { isValidRecordId } from './ids.js';
 
 export const NOTE_FILE_PREFIX = 'note_';
 export const NOTE_FILE_SUFFIX = '.txt';
 
-const NOTE_FILE_PATTERN = /^note_(\d+)\.txt$/u;
+const NOTE_FILE_PATTERN = /^note_(-?\d+)\.txt$/u;
 
 /** A note of the project. */
 export interface Note {
-  /** Unique incremental integer, also encoded in the file name. */
+  /** Unique random nonzero integer, also encoded in the file name. */
   readonly id: number;
   /** The title of the note. */
   readonly title: string;
@@ -92,7 +93,7 @@ export function parseNoteIdFromFileName(name: string): number | null {
     return null;
   }
   const id = Number.parseInt(match[1] ?? '', 10);
-  return Number.isSafeInteger(id) ? id : null;
+  return isValidRecordId(id) ? id : null;
 }
 
 /**
@@ -107,7 +108,7 @@ export function parseNote(content: string, idHint?: number): Note {
   const rawId = Number.parseInt(metadata.get('id') ?? '', 10);
 
   return {
-    id: Number.isSafeInteger(rawId) ? rawId : (idHint ?? 0),
+    id: isValidRecordId(rawId) ? rawId : (idHint ?? 0),
     title: metadata.get('title') ?? '',
     created: normalizeTaskTimestamp(metadata.get('created') ?? ''),
     updated: normalizeTaskTimestamp(metadata.get('updated') ?? ''),
