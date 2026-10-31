@@ -1940,6 +1940,44 @@ button[hidden] {
   color: var(--text-muted);
 }
 
+.supabase-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.supabase-form .dialog-footer-buttons {
+  justify-content: flex-start;
+  margin-top: 6px;
+}
+
+.supabase-status {
+  margin: 0;
+  font-size: 13px;
+  color: var(--success);
+}
+
+.supabase-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.supabase-setup[hidden] {
+  display: none;
+}
+
+.supabase-setup-sql {
+  font-family: var(--mono);
+  font-size: 12px;
+  min-height: 230px;
+  white-space: pre;
+}
+
 /* -------------------------------------------------------------- modals -- */
 
 .modal-backdrop {

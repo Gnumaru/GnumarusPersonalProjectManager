@@ -160,7 +160,7 @@ export function parseConfig(content: string): AppConfig {
 
 /** True when the value is one of the kinds of storage. */
 export function isProjectKind(value: unknown): value is ProjectKind {
-  return value === 'service' || value === 'embedded' || value === 'filesystem';
+  return value === 'service' || value === 'embedded' || value === 'filesystem' || value === 'supabase';
 }
 
 /** Serializes the configuration as pretty printed JSON. */
@@ -214,8 +214,8 @@ export function writeMode(mode: ProjectKind, storage?: ConfigStorage | null): vo
 /**
  * Reads the configuration file, returning the defaults when it is missing.
  *
- * The projects that live in the browser keep their configuration in the local
- * storage of the browser.
+ * Every mode except the service keeps its configuration in the local storage
+ * of the browser.
  */
 export async function loadConfig(
   api: ApiClient,

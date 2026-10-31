@@ -7,15 +7,17 @@
  * * in an **embedded project**, in the browser (the Origin Private File
  *   System);
  * * in a folder of the disk, through the **File System Access API** (the
- *   Chromium based browsers only).
+ *   Chromium based browsers only);
+ * * in a **Supabase** database, reached with its project URL and API key.
  *
  * An embedded project can be downloaded as a ZIP archive (the files are exactly
  * the ones that would be on the disk) and a ZIP archive can be imported, which
  * replaces the whole embedded project.
  */
 
+import { SUPABASE_SETUP_SQL, SupabaseClient, normalizeSupabaseUrl, verifySupabaseSchema } from '../api/supabase.js';
 import type { ProjectKind } from '../core/projectStore.js';
-import { el } from './dom.js';
+import { el, input } from './dom.js';
 import { createIcon } from './icons.js';
 import { Modal } from './modal.js';
 
@@ -35,6 +37,14 @@ export interface ProjectDialogOptions {
   readonly opfsAvailable?: boolean;
   /** True when the browser offers the File System Access API. */
   readonly fileSystemAvailable?: boolean;
+  /** The Supabase project URL kept in the browser, if any. */
+  readonly supabaseUrl?: string | null;
+  /** The Supabase API key kept in the browser, if any. */
+  readonly supabaseKey?: string | null;
+  /** The `fetch` used to talk to Supabase; defaults to the global one. */
+  readonly supabaseFetch?: typeof fetch | undefined;
+  /** The user chooses Supabase with tested credentials. */
+  readonly onUseSupabase?: ((url: string, key: string) => void) | undefined;
   /** The user chooses the service. */
   readonly onUseService: () => void;
   /** The user chooses the embedded project. */
@@ -54,10 +64,24 @@ export class ProjectDialog {
   private readonly options: ProjectDialogOptions;
   private readonly modal: Modal;
   private readonly fileInput: HTMLInputElement;
+  /** Whether the Supabase credential form is shown. */
+  private supabaseExpanded: boolean;
+  private supabaseUrlValue: string;
+  private supabaseKeyValue: string;
+  private supabaseUrlInput: HTMLInputElement | null = null;
+  private supabaseKeyInput: HTMLInputElement | null = null;
+  private supabaseError: HTMLElement | null = null;
+  private supabaseSetup: HTMLElement | null = null;
+  private supabaseSetupDetail: HTMLElement | null = null;
+  private supabaseSetupSql: HTMLTextAreaElement | null = null;
+  private supabaseStatus: HTMLElement | null = null;
 
   constructor(options: ProjectDialogOptions) {
     this.doc = options.doc;
     this.options = options;
+    this.supabaseExpanded = options.mode === 'supabase';
+    this.supabaseUrlValue = options.supabaseUrl ?? '';
+    this.supabaseKeyValue = options.supabaseKey ?? '';
 
     this.modal = new Modal({ doc: options.doc, title: 'The project', className: 'project-dialog' });
 
@@ -138,6 +162,17 @@ export class ProjectDialog {
       !fileSystemAvailable,
     );
 
+    const supabaseButton = this.choiceButton(
+      'Supabase (PostgreSQL in the cloud)',
+      'The files of the project live in a Supabase database, reached with its project URL and API key. The database is tested before it is used.',
+      options.mode === 'supabase',
+      () => {
+        this.supabaseExpanded = true;
+        this.modal.setBody([this.buildBody()]);
+      },
+      false,
+    );
+
     const body: HTMLElement[] = [
       el(doc, 'p', {
         class: 'dialog-help',
@@ -147,8 +182,13 @@ export class ProjectDialog {
         serviceButton,
         embeddedButton,
         fileSystemButton,
+        supabaseButton,
       ]),
     ];
+
+    if (this.supabaseExpanded) {
+      body.push(this.buildSupabaseSection());
+    }
 
     if (options.mode === 'service') {
       body.push(
@@ -230,6 +270,196 @@ export class ProjectDialog {
     );
 
     return el(doc, 'div', { class: 'project-dialog-body' }, body);
+  }
+
+  /** The Supabase credential form with the connection test. */
+  private buildSupabaseSection(): HTMLElement {
+    const doc = this.doc;
+
+    this.supabaseUrlInput = input(doc, {
+      class: 'field-input',
+      id: 'supabase-url',
+      value: this.supabaseUrlValue,
+      placeholder: 'https://xyz.supabase.co',
+      onKeyDown: (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          void this.connectSupabase();
+        }
+      },
+    });
+    this.supabaseUrlInput.addEventListener('input', () => {
+      this.supabaseUrlValue = this.supabaseUrlInput?.value ?? '';
+    });
+    this.supabaseKeyInput = input(doc, {
+      class: 'field-input',
+      id: 'supabase-key',
+      type: 'password',
+      value: this.supabaseKeyValue,
+      placeholder: 'The anon or service_role API key',
+      onKeyDown: (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          void this.connectSupabase();
+        }
+      },
+    });
+    this.supabaseKeyInput.addEventListener('input', () => {
+      this.supabaseKeyValue = this.supabaseKeyInput?.value ?? '';
+    });
+
+    this.supabaseError = el(doc, 'div', { class: 'form-error' });
+    this.supabaseStatus = el(doc, 'p', { class: 'supabase-status', attrs: { hidden: 'hidden' } });
+
+    this.supabaseSetupDetail = el(doc, 'p', { class: 'dialog-help' });
+    this.supabaseSetupSql = doc.createElement('textarea');
+    this.supabaseSetupSql.className = 'field-input supabase-setup-sql';
+    this.supabaseSetupSql.readOnly = true;
+    this.supabaseSetupSql.value = SUPABASE_SETUP_SQL;
+    this.supabaseSetupSql.setAttribute('aria-label', 'Queries to create the Supabase tables');
+    const selectAll = el(doc, 'button', {
+      class: 'secondary small',
+      text: 'Select all',
+      attrs: { type: 'button' },
+      on: {
+        click: () => {
+          this.supabaseSetupSql?.focus();
+          this.supabaseSetupSql?.select();
+        },
+      },
+    });
+    this.supabaseSetup = el(
+      doc,
+      'div',
+      { class: 'supabase-setup', attrs: { hidden: 'hidden' } },
+      [
+        el(doc, 'span', { class: 'field-label', text: 'Create the tables' }),
+        this.supabaseSetupDetail,
+        this.supabaseSetupSql,
+        selectAll,
+      ],
+    );
+
+    const connect = el(doc, 'button', {
+      class: 'primary',
+      text: 'Connect',
+      attrs: { type: 'button' },
+      on: {
+        click: () => {
+          void this.connectSupabase();
+        },
+      },
+    });
+
+    return el(doc, 'div', { class: 'supabase-form' }, [
+      el(doc, 'span', { class: 'field-label', text: 'Supabase' }),
+      el(doc, 'p', {
+        class: 'dialog-help',
+        text: 'Type the project URL and the API key of the Supabase project. The database is tested before it is used.',
+      }),
+      el(doc, 'label', { class: 'field', attrs: { for: 'supabase-url' } }, [
+        el(doc, 'span', { class: 'field-label', text: 'Project URL' }),
+        this.supabaseUrlInput,
+      ]),
+      el(doc, 'label', { class: 'field', attrs: { for: 'supabase-key' } }, [
+        el(doc, 'span', { class: 'field-label', text: 'API key' }),
+        this.supabaseKeyInput,
+      ]),
+      this.supabaseError,
+      this.supabaseStatus,
+      this.supabaseSetup,
+      el(doc, 'div', { class: 'dialog-footer-buttons' }, [connect]),
+    ]);
+  }
+
+  /** Tests the Supabase database and uses it when it is as expected. */
+  private async connectSupabase(): Promise<void> {
+    const url = this.supabaseUrlInput?.value.trim() ?? this.supabaseUrlValue.trim();
+    const key = (this.supabaseKeyInput?.value ?? this.supabaseKeyValue).trim();
+    this.supabaseUrlValue = url;
+    this.supabaseKeyValue = key;
+    if (this.supabaseError !== null) {
+      this.supabaseError.textContent = '';
+    }
+    this.hideSupabaseSetup();
+    if (this.supabaseStatus !== null) {
+      this.supabaseStatus.setAttribute('hidden', 'hidden');
+    }
+    if (url.length === 0 || key.length === 0) {
+      if (this.supabaseError !== null) {
+        this.supabaseError.textContent = 'The project URL and the API key are both needed.';
+      }
+      return;
+    }
+    let normalized: string;
+    try {
+      normalized = normalizeSupabaseUrl(url);
+    } catch (error) {
+      if (this.supabaseError !== null) {
+        this.supabaseError.textContent = error instanceof Error ? error.message : String(error);
+      }
+      return;
+    }
+    const client = new SupabaseClient({
+      url: normalized,
+      key,
+      fetchImpl: this.options.supabaseFetch,
+    });
+    const check = await verifySupabaseSchema(client).catch((error: unknown) => ({
+      ok: false as const,
+      issue: {
+        kind: 'unreachable' as const,
+        detail: error instanceof Error ? error.message : String(error),
+      },
+    }));
+    if (check.ok) {
+      if (this.supabaseStatus !== null) {
+        this.supabaseStatus.textContent = 'The database is as expected: the Supabase project is used now.';
+        this.supabaseStatus.removeAttribute('hidden');
+      }
+      this.options.onUseSupabase?.(normalized, key);
+      return;
+    }
+    if (check.issue.kind === 'invalid-credentials') {
+      if (this.supabaseError !== null) {
+        this.supabaseError.textContent = `The Supabase credentials were rejected (${check.issue.detail}). Check the URL and the key and try again.`;
+      }
+      return;
+    }
+    if (check.issue.kind === 'missing-table' || check.issue.kind === 'wrong-format') {
+      if (this.supabaseError !== null) {
+        this.supabaseError.textContent = check.issue.detail;
+      }
+      this.showSupabaseSetup(
+        'Run these queries once in the SQL editor of the Supabase project, then press Connect again.',
+      );
+      return;
+    }
+    if (check.issue.kind === 'write-denied') {
+      if (this.supabaseError !== null) {
+        this.supabaseError.textContent = check.issue.detail;
+      }
+      this.showSupabaseSetup(
+        'The key can read but not write. Run these queries (they carry the row level security policies the key needs), then press Connect again.',
+      );
+      return;
+    }
+    if (this.supabaseError !== null) {
+      this.supabaseError.textContent = check.issue.detail;
+    }
+  }
+
+  /** Shows the queries that create the Supabase tables. */
+  private showSupabaseSetup(detail: string): void {
+    if (this.supabaseSetupDetail !== null) {
+      this.supabaseSetupDetail.textContent = detail;
+    }
+    this.supabaseSetup?.removeAttribute('hidden');
+  }
+
+  /** Hides the queries that create the Supabase tables. */
+  private hideSupabaseSetup(): void {
+    this.supabaseSetup?.setAttribute('hidden', 'hidden');
   }
 
   /** One of the choices of the storage. */

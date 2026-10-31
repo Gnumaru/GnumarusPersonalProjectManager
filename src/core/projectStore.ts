@@ -22,7 +22,7 @@ import type { Note, NoteSearchScope } from './note.js';
 import type { Task, TaskStatus, TaskType, TaskRole } from './task.js';
 
 /** The kind of storage a project uses. */
-export type ProjectKind = 'service' | 'embedded' | 'filesystem';
+export type ProjectKind = 'service' | 'embedded' | 'filesystem' | 'supabase';
 
 /**
  * The metadata of a task, without its description.

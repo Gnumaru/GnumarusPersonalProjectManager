@@ -1,5 +1,40 @@
 # Checklist
 
+## Batch 41 - Supabase storage backend
+
+### Change
+
+- [x] `src/api/supabase.ts`: URL/key client over plain fetch (no new
+      dependencies), schema verification (auth/table/columns/OpenAPI
+      types/write probe), canonical `SUPABASE_SETUP_SQL` with CREATE TABLE
+      + grants + RLS policies
+- [x] `src/core/supabaseStore.ts`: `ProjectStore` over one
+      `public.gnumarus_files` table (list/read/write/delete, search,
+      counts, `allocateId` via `ids.txt` row, `replaceAll` rebuild)
+- [x] Mode plumbing: `supabase` kind, credentials in localStorage,
+      `openStore`/empty-state/401 handling in `src/ui/app.ts`, 4th choice
+      + credential form + CREATE TABLE display in
+      `src/ui/projectDialog.ts` (appended last, e2e indices stable)
+- [x] Form styles in `src/styles.css`
+
+### Tests
+
+- [x] `src/api/supabase.test.ts`: URL normalization, auth headers,
+      verify outcomes (ok, invalid credentials, missing table, wrong
+      format twice, denied writes, unreachable), CRUD shapes, paging,
+      setup SQL contents (mocked fetch, no network)
+- [x] `src/test-support/fakePostgrest.ts` + `src/core/supabaseStore.test.ts`:
+      full store suite against the in-memory PostgREST fake
+- [x] `src/core/config.test.ts`: supabase mode round trip
+- [x] `src/ui/app.test.ts`: Supabase smoke (create + list), rejected and
+      missing credentials, dialog form (re-ask, setup SQL, success),
+      four dialog choices
+- [x] e2e `project-choice` length assertions updated (3 -> 4);
+      `node --check scripts/e2e-browser.mjs`
+- [x] `npm run typecheck`, `npm test` (527 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 40 - Random globally-unique nonzero ids with ids.txt registry
 
 ### Change

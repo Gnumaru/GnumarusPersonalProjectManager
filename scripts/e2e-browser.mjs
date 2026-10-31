@@ -1874,7 +1874,7 @@ async function checkEmbeddedProject() {
     button.click();
     return true;
   })()`);
-  await waitFor(`document.querySelectorAll('.project-choice').length === 3`);
+  await waitFor(`document.querySelectorAll('.project-choice').length === 4`);
   const choices = await evaluate(
     `[...document.querySelectorAll('.project-choice-title')].map((node) => node.textContent).join(' | ')`,
   );
@@ -1977,7 +1977,7 @@ async function checkEmbeddedProject() {
     button.click();
     return true;
   })()`);
-  await waitFor(`document.querySelectorAll('.project-choice').length === 3`);
+  await waitFor(`document.querySelectorAll('.project-choice').length === 4`);
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Download the project');
     button.click();
@@ -2064,7 +2064,7 @@ async function checkEmbeddedProject() {
     button.click();
     return true;
   })()`);
-  await waitFor(`document.querySelectorAll('.project-choice').length === 3`);
+  await waitFor(`document.querySelectorAll('.project-choice').length === 4`);
   await evaluate(`(() => {
     const choices = [...document.querySelectorAll('.project-choice')];
     choices[0].click();

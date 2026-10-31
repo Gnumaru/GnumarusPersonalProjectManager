@@ -942,25 +942,27 @@ informational: it does not change the sorting or the filtering of the tasks.
 
 ## 6. The project of the user
 
-**Files:** `src/core/projectStore.ts`, `src/core/serviceStore.ts`, `src/core/embeddedStore.ts`, `src/core/browserStorage.ts`, `src/core/fileSystemAccess.ts`, `src/core/fileSystemStore.ts`, `src/core/zip.ts`, `src/ui/projectDialog.ts`
+**Files:** `src/core/projectStore.ts`, `src/core/serviceStore.ts`, `src/core/embeddedStore.ts`, `src/core/browserStorage.ts`, `src/core/fileSystemAccess.ts`, `src/core/fileSystemStore.ts`, `src/core/supabaseStore.ts`, `src/api/supabase.ts`, `src/core/zip.ts`, `src/ui/projectDialog.ts`
 
-The files of the project can live in three places:
+The files of the project can live in four places:
 
 * **the Gnumarus OS Bridge service**: the files are on the disk of the machine;
 * an **embedded project**: the files are kept in the browser;
 * a **folder of the disk, reached with the File System Access API**: the files
-  are read and written directly by the browser.
+  are read and written directly by the browser;
+* a **Supabase database**: every file is one row of a single table.
 
 The dialog of the project (the button **Project…** of the top bar) chooses
 between them, and offers the export and the import of a ZIP archive.
 
-### The three choices
+### The four choices
 
 | Choice | Where the files live | Needs |
 | ------ | -------------------- | ----- |
 | The Gnumarus OS Bridge service | the disk, through the service | the service |
 | An embedded project, in this browser | the OPFS of the browser | the Origin Private File System |
 | File System Access API (Chromium based browsers only) | a folder of the disk, chosen by the user | `window.showDirectoryPicker` |
+| Supabase (PostgreSQL in the cloud) | one `public.gnumarus_files` table | the project URL and an API key |
 
 A choice the browser does not offer is **disabled**: the description says why.
 The test environment (jsdom) offers neither API, so only the service is
@@ -1000,17 +1002,48 @@ No dependency was added.
 
 The shell of the service (`find`, `grep`) is not available in the browser, so
 the application never talks to the storage directly: it goes through the
-`ProjectStore` interface, which has two implementations.
+`ProjectStore` interface, which has four implementations.
 
-| | `ServiceProjectStore` | `EmbeddedProjectStore` |
-|---|---|---|
-| The files | on the disk, through the service | in the browser |
-| The listing | `find` | the paths of the storage |
-| The search | `grep` | the content of the files, in JavaScript |
-| The hierarchy | `grep` on the `parent=` keys | the metadata of the files, in JavaScript |
+| | `ServiceProjectStore` | `EmbeddedProjectStore` / `FileSystemProjectStore` | `SupabaseProjectStore` |
+|---|---|---|---|
+| The files | on the disk, through the service | in the browser / in a folder of the disk | one `public.gnumarus_files` table |
+| The listing | `find` | the paths of the storage | the paths of the rows |
+| The search | `grep` | the content of the files, in JavaScript | the content of the rows, in JavaScript |
+| The hierarchy | `grep` on the `parent=` keys | the metadata of the files, in JavaScript | the metadata of the rows, in JavaScript |
 
-The paths are always **relative** to the project folder, so the two
-implementations agree on the names of the files.
+The paths are always **relative** to the project folder, so every
+implementation agrees on the names of the files.
+
+### Supabase
+
+The user types the **project URL** (`https://xyz.supabase.co`) and an **API
+key** (the anon or the `service_role` key) in the project dialog. Both are
+kept in the local storage of the browser, like the bridge token, under
+`gnumarus-project-manager.supabase-url` and
+`gnumarus-project-manager.supabase-key`. No dependency was added: the
+application talks to the PostgREST API of the project with plain `fetch`.
+
+Pressing **Connect** tests whether the database is as expected:
+
+1. a probe reads the table without any row, proving the table and both
+   columns exist (the REST equivalent of asking for the DDL of every
+   table);
+2. the OpenAPI document of the project is read and the definition of the
+   table is checked for text `path` and `content` columns;
+3. a probe row is written, read back and deleted, so permission problems
+   surface here and not in the middle of the work.
+
+Rejected credentials keep the dialog open with a warning and ask for new
+ones. A missing schema or table, wrong columns or denied writes show the
+queries that create the database (`SUPABASE_SETUP_SQL` in
+`src/api/supabase.ts`): one `public.gnumarus_files` table (`path` primary
+key, `content` text), the grants the keys need and permissive row level
+security policies, without which a default Supabase project rejects every
+request. Anyone holding the project URL and key can read and write this
+table.
+
+The Supabase project never needs the bridge service, and a `401` answer
+reopens the project dialog instead of the bridge token dialog.
 
 ### The storage of the browser
 
@@ -1164,7 +1197,9 @@ be entered with a double click.
 | `src/core/taskTree.test.ts` | The tree of the tasks: roots, children, orphan tasks, cycles, focus, expansion, search and subtree of a task. |
 | `src/core/config.test.ts` | Configuration parsing and serialization, the kind of storage and its default. |
 | `src/api/client.test.ts` | Tagged values, headers, error handling, shell calls, authentication policy of the service (mocked `fetch`). |
+| `src/api/supabase.test.ts` | URL normalization, auth headers, schema verification outcomes, CRUD shapes, paging, setup SQL (mocked `fetch`, no network). |
 | `src/core/serviceStore.test.ts` | The store of the service against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
+| `src/core/supabaseStore.test.ts` | The Supabase project against an in memory fake of PostgREST: the tasks, the notes, the comments, the search, the counts, the id registry, the export and the import. |
 | `src/core/zip.test.ts` | The ZIP archives: the checksum, the round trip, the empty archive, the damaged file and the unicode characters. |
 | `src/core/embeddedStore.test.ts` | The embedded project: the creation of a task, the metadata, the search, the children, the comments, the export and the import. |
 | `src/core/browserStorage.test.ts` | The storage of the browser: the storages the browser offers, the detection of the OPFS and the files it keeps at its root. |
@@ -1173,7 +1208,7 @@ be entered with a double click.
 | `src/core/note.test.ts` | The note file format: the names, the parsing, the serialization, the round trip, the search scopes and the summary of the body. |
 | `src/core/markdown.test.ts` | The markdown parser: the headings, the paragraphs, the lists, the quotes, the code blocks, the rules and the inline marks. |
 | `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons) and the pagination bar (jsdom). |
-| `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token, the tree view, the board and the Gantt chart (the focus breadcrumb, the reset of the focus, the creation of a child from the chart, the margin weeks from the displayed rows and the month-spanning collapse). |
+| `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token, the tree view, the board and the Gantt chart (the focus breadcrumb, the reset of the focus, the creation of a child from the chart, the margin weeks from the displayed rows and the month-spanning collapse), the four storage choices and the Supabase project (creation, credentials, dialog). |
 | `src/ui/kanbanBoard.test.ts` | The board: the columns and their order, the cards, their tags and their actions. |
 | `src/ui/kanbanDrag.test.ts` | The drag and drop of the cards of the board between the columns. |
 | `src/core/gantt.test.ts` | The schedule of the Gantt chart: the days, the weeks, the months, the columns, the bars and the padded schedule with one margin week around the tasks. |
@@ -1183,7 +1218,7 @@ be entered with a double click.
 | `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
 | `src/ui/markdownView.test.ts` | The rendering of the markdown: the blocks, the inline marks, the safe URLs and the fact that the text of a note is never injected as markup. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
-| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. It also drives the **notes** (the listing, the pagination, the jump to a page, the search scopes, the preview and the creation), the **Gantt chart** (the wider wrapping names, the shared row heights, the sticky names, the 9px indentation, the row actions, the focus breadcrumb, the margin weeks around the tasks and the chart rows spanning the whole chart), the **three choices** of the dialog of the project and the **embedded project**: the switch, the creation of a task, the export of the ZIP archive, its import and the **cold start** (the application opened on the embedded project asks for no folder and creates a task). |
+| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. It also drives the **notes** (the listing, the pagination, the jump to a page, the search scopes, the preview and the creation), the **Gantt chart** (the wider wrapping names, the shared row heights, the sticky names, the 9px indentation, the row actions, the focus breadcrumb, the margin weeks around the tasks and the chart rows spanning the whole chart), the **four choices** of the dialog of the project and the **embedded project**: the switch, the creation of a task, the export of the ZIP archive, its import and the **cold start** (the application opened on the embedded project asks for no folder and creates a task). |
 
 Commands:
 

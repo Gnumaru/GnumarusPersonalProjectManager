@@ -8,6 +8,13 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 41 adds a Supabase storage backend next to the service,
+  embedded and file-system ones: `supabaseUrl` + `supabaseKey` credentials,
+  connection test with DDL verification of the single
+  `public.gnumarus_files` table (missing/wrong table shows the CREATE TABLE
+  + RLS setup queries, invalid credentials re-ask), all over plain fetch
+  with no new dependencies.
+- Verification: 527 unit tests pass.
 - Batch 40 replaces sequential integer ids with random nonzero
   ids in `[Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]`, globally
   unique across tasks, comments and notes. Allocation checks for collisions
@@ -105,11 +112,13 @@ plain text file on the local disk, accessed exclusively through the
 Browser (SPA, no framework, strict TypeScript)
   |
   |-- src/api/client.ts        REST client for the GnumarusOSBridge API (token aware)
+  |-- src/api/supabase.ts      Supabase client over plain fetch (URL + key, schema check)
   |-- src/core/task.ts         task file format: parse / serialize
   |-- src/core/note.ts         note file format: parse / serialize
   |-- src/core/markdown.ts     markdown parser (pure)
   |-- src/core/projectStore.ts the storage facade: the interface the application uses
   |-- src/core/serviceStore.ts the implementation over the service (find, grep, read, write)
+  |-- src/core/supabaseStore.ts the implementation over Supabase (one files table)
   |-- src/core/embeddedStore.ts the implementation over the storage of the browser
   |-- src/core/browserStorage.ts the OPFS, with an IndexedDB fallback
   |-- src/core/fileSystemAccess.ts the File System Access API of the browser

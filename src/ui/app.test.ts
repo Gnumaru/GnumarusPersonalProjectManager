@@ -4,7 +4,9 @@ import { ApiClient } from '../api/client.js';
 import { FakeBridge } from '../test-support/fakeBridge.js';
 import { fakeDirectoryHandle } from '../test-support/fakeDirectory.js';
 import { createDirectoryHandleStorage, type DirectoryHandleStorage } from '../core/fileSystemAccess.js';
+import { FakePostgrest } from '../test-support/fakePostgrest.js';
 import { App, shortenPath, type TokenStorage } from './app.js';
+import { ProjectDialog } from './projectDialog.js';
 
 class MemoryStorage implements TokenStorage {
   private readonly values = new Map<string, string>();
@@ -63,7 +65,7 @@ interface HarnessOptions {
    * `default` means that nothing is stored: the browser chooses, as it does
    * when the user opens the application for the first time.
    */
-  readonly mode?: 'service' | 'embedded' | 'filesystem' | 'default';
+  readonly mode?: 'service' | 'embedded' | 'filesystem' | 'supabase' | 'default';
   /** True when the browser offers the File System Access API (default: `true`). */
   readonly fileSystemAvailable?: boolean;
   /**
@@ -74,6 +76,12 @@ interface HarnessOptions {
   readonly folderKnown?: boolean;
   /** Content of `config.txt`, seeded on the fake disk before startup. */
   readonly configTxt?: string;
+  /** The `fetch` the application uses to talk to Supabase. */
+  readonly supabaseFetch?: typeof fetch;
+  /** The Supabase project URL kept in the browser. */
+  readonly supabaseUrl?: string;
+  /** The Supabase API key kept in the browser. */
+  readonly supabaseKey?: string;
 }
 
 function taskContent(
@@ -178,6 +186,12 @@ export async function createHarness(taskCount = 25, options: HarnessOptions = {}
   if (mode !== 'default') {
     storage.setItem('gnumarus-project-manager.mode', mode);
   }
+  if (options.supabaseUrl !== undefined) {
+    storage.setItem('gnumarus-project-manager.supabase-url', options.supabaseUrl);
+  }
+  if (options.supabaseKey !== undefined) {
+    storage.setItem('gnumarus-project-manager.supabase-key', options.supabaseKey);
+  }
 
   // The folder of the project, with the files of the project.
   const handleStorage = createDirectoryHandleStorage();
@@ -226,7 +240,7 @@ export async function createHarness(taskCount = 25, options: HarnessOptions = {}
     await handleStorage.write(directory);
   }
 
-  const app = new App({ doc, root, api, storage, handleStorage });
+  const app = new App({ doc, root, api, storage, handleStorage, supabaseFetch: options.supabaseFetch });
   await app.start();
 
   return { app, bridge, doc, root, dom, handleStorage, opfs: opfsRoot };
@@ -3535,20 +3549,22 @@ describe('the File System Access API', () => {
     harness.app.dispose();
   });
 
-  it('offers the three choices in the dialog of the project', async () => {
+  it('offers the four choices in the dialog of the project', async () => {
     const harness = await createHarness(0);
 
     click(buttonByText(harness.doc, 'Project…'));
     await flush();
 
     const choices = harness.doc.querySelectorAll('.project-choice');
-    expect(choices).toHaveLength(3);
+    expect(choices).toHaveLength(4);
     expect(choices[0]?.textContent).toContain('Gnumarus OS Bridge');
     expect(choices[1]?.textContent).toContain('embedded project');
     expect(choices[2]?.textContent).toContain('File System Access API');
+    expect(choices[3]?.textContent).toContain('Supabase');
     // The test environment offers both APIs: every choice is possible.
     expect(choices[1]?.hasAttribute('disabled')).toBe(false);
     expect(choices[2]?.hasAttribute('disabled')).toBe(false);
+    expect(choices[3]?.hasAttribute('disabled')).toBe(false);
     harness.app.dispose();
   });
 
@@ -3559,9 +3575,11 @@ describe('the File System Access API', () => {
     await flush();
 
     const choices = harness.doc.querySelectorAll('.project-choice');
-    expect(choices).toHaveLength(3);
+    expect(choices).toHaveLength(4);
     expect(choices[2]?.hasAttribute('disabled')).toBe(true);
     expect(choices[2]?.textContent).toContain('does not offer the File System Access API');
+    // Supabase needs no browser API: it stays available.
+    expect(choices[3]?.hasAttribute('disabled')).toBe(false);
     harness.app.dispose();
   });
 });
@@ -3585,3 +3603,203 @@ export async function selectFolder(harness: Harness): Promise<void> {
   click(buttonByText(harness.doc, 'Use this folder'));
   await flush();
 }
+
+describe('the Supabase project', () => {
+  const supabaseUrl = 'https://xyz.supabase.co';
+  const supabaseKey = 'supabase-key';
+
+  it('creates and lists tasks through the Supabase backend', async () => {
+    const backend = new FakePostgrest({ key: supabaseKey });
+    const harness = await createHarness(0, {
+      mode: 'supabase',
+      supabaseUrl,
+      supabaseKey,
+      supabaseFetch: backend.fetch,
+    });
+
+    expect(harness.root.querySelector('.project-path')?.textContent).toContain('xyz.supabase.co');
+
+    click(buttonByText(harness.doc, 'New task'));
+    await flush();
+    const title = harness.doc.querySelector<HTMLInputElement>('#task-title');
+    expect(title).not.toBeNull();
+    if (title === null) {
+      harness.app.dispose();
+      return;
+    }
+    title.value = 'A Supabase task';
+    click(buttonByText(harness.doc, 'Create task'));
+    await flush();
+
+    const titles = [...harness.root.querySelectorAll('.task-title-button')].map(
+      (node) => node.textContent,
+    );
+    expect(titles).toContain('A Supabase task');
+    const rows = [...backend.rows.keys()].filter((path) => path.startsWith('task_'));
+    expect(rows).toHaveLength(1);
+    expect(backend.rows.has('ids.txt')).toBe(true);
+
+    harness.app.dispose();
+  });
+
+  it('asks for credentials when they are rejected', async () => {
+    const backend = new FakePostgrest({ key: 'another-key' });
+    const harness = await createHarness(0, {
+      mode: 'supabase',
+      supabaseUrl,
+      supabaseKey,
+      supabaseFetch: backend.fetch,
+    });
+
+    expect(harness.root.querySelector('.empty-title')?.textContent).toContain(
+      'not reachable',
+    );
+    expect(harness.root.querySelector('.empty-state button')?.textContent).toBe('Open the project');
+
+    harness.app.dispose();
+  });
+
+  it('asks for credentials when none are stored', async () => {
+    const backend = new FakePostgrest({ key: supabaseKey });
+    const harness = await createHarness(0, {
+      mode: 'supabase',
+      supabaseFetch: backend.fetch,
+    });
+
+    expect(harness.root.querySelector('.empty-title')?.textContent).toContain('credentials');
+    expect(backend.requests).toHaveLength(0);
+
+    harness.app.dispose();
+  });
+
+  it('asks for new credentials when the database rejects them', async () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost/' });
+    const doc = dom.window.document;
+    const backend = new FakePostgrest({ key: 'another-key' });
+    const used: { url: string; key: string }[] = [];
+    const dialog = new ProjectDialog({
+      doc,
+      mode: 'service',
+      projectDir: null,
+      supabaseFetch: backend.fetch,
+      onUseService: () => undefined,
+      onUseEmbedded: () => undefined,
+      onUseFileSystem: () => undefined,
+      onChooseFolder: () => undefined,
+      onDownload: () => undefined,
+      onImport: () => undefined,
+      onUseSupabase: (url, key) => {
+        used.push({ url, key });
+      },
+    });
+    dialog.open();
+
+    // The Supabase choice is the fourth one and opens the credential form.
+    doc.querySelectorAll('.project-choice')[3]?.dispatchEvent(
+      new dom.window.MouseEvent('click', { bubbles: true }),
+    );
+    expect(doc.querySelector('#supabase-url')).not.toBeNull();
+    expect(doc.querySelector('#supabase-key')).not.toBeNull();
+
+    const url = doc.querySelector<HTMLInputElement>('#supabase-url');
+    const key = doc.querySelector<HTMLInputElement>('#supabase-key');
+    expect(url).not.toBeNull();
+    expect(key).not.toBeNull();
+    if (url === null || key === null) {
+      return;
+    }
+    url.value = supabaseUrl;
+    key.value = supabaseKey;
+    url.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    key.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    click(buttonByText(doc, 'Connect'));
+    await flush();
+
+    expect(doc.querySelector('.form-error')?.textContent).toContain('rejected');
+    expect(used).toHaveLength(0);
+  });
+
+  it('shows the setup queries when the table is missing', async () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost/' });
+    const doc = dom.window.document;
+    const backend = new FakePostgrest({ key: supabaseKey, missingTable: true });
+    const used: { url: string; key: string }[] = [];
+    const dialog = new ProjectDialog({
+      doc,
+      mode: 'service',
+      projectDir: null,
+      supabaseFetch: backend.fetch,
+      onUseService: () => undefined,
+      onUseEmbedded: () => undefined,
+      onUseFileSystem: () => undefined,
+      onChooseFolder: () => undefined,
+      onDownload: () => undefined,
+      onImport: () => undefined,
+      onUseSupabase: (url, key) => {
+        used.push({ url, key });
+      },
+    });
+    dialog.open();
+
+    doc.querySelectorAll('.project-choice')[3]?.dispatchEvent(
+      new dom.window.MouseEvent('click', { bubbles: true }),
+    );
+    const url = doc.querySelector<HTMLInputElement>('#supabase-url');
+    const key = doc.querySelector<HTMLInputElement>('#supabase-key');
+    if (url === null || key === null) {
+      return;
+    }
+    url.value = supabaseUrl;
+    key.value = supabaseKey;
+    url.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    key.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    click(buttonByText(doc, 'Connect'));
+    await flush();
+
+    expect(doc.querySelector('.supabase-setup')?.hasAttribute('hidden')).toBe(false);
+    expect(doc.querySelector<HTMLTextAreaElement>('.supabase-setup-sql')?.value).toContain(
+      'create table',
+    );
+    expect(used).toHaveLength(0);
+  });
+
+  it('uses the project when the database is as expected', async () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost/' });
+    const doc = dom.window.document;
+    const backend = new FakePostgrest({ key: supabaseKey });
+    const used: { url: string; key: string }[] = [];
+    const dialog = new ProjectDialog({
+      doc,
+      mode: 'service',
+      projectDir: null,
+      supabaseFetch: backend.fetch,
+      onUseService: () => undefined,
+      onUseEmbedded: () => undefined,
+      onUseFileSystem: () => undefined,
+      onChooseFolder: () => undefined,
+      onDownload: () => undefined,
+      onImport: () => undefined,
+      onUseSupabase: (url, key) => {
+        used.push({ url, key });
+      },
+    });
+    dialog.open();
+
+    doc.querySelectorAll('.project-choice')[3]?.dispatchEvent(
+      new dom.window.MouseEvent('click', { bubbles: true }),
+    );
+    const url = doc.querySelector<HTMLInputElement>('#supabase-url');
+    const key = doc.querySelector<HTMLInputElement>('#supabase-key');
+    if (url === null || key === null) {
+      return;
+    }
+    url.value = supabaseUrl;
+    key.value = supabaseKey;
+    url.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    key.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    click(buttonByText(doc, 'Connect'));
+    await flush();
+
+    expect(used).toEqual([{ url: supabaseUrl, key: supabaseKey }]);
+  });
+});

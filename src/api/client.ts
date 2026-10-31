@@ -53,11 +53,14 @@ export interface FileContent {
 
 export class ApiError extends Error {
   readonly status: number;
+  /** The parsed answer body, when it is JSON. */
+  readonly body: unknown;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, body: unknown = null) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.body = body;
   }
 }
 

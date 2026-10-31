@@ -69,10 +69,11 @@ describe('clampNotePageSize', () => {
 });
 
 describe('the kind of storage', () => {
-  it('knows the three kinds', () => {
+  it('knows the four kinds', () => {
     expect(isProjectKind('service')).toBe(true);
     expect(isProjectKind('embedded')).toBe(true);
     expect(isProjectKind('filesystem')).toBe(true);
+    expect(isProjectKind('supabase')).toBe(true);
     expect(isProjectKind('other')).toBe(false);
   });
 
@@ -85,6 +86,9 @@ describe('the kind of storage', () => {
 
     writeMode('embedded', storage);
     expect(readMode(storage)).toBe('embedded');
+
+    writeMode('supabase', storage);
+    expect(readMode(storage)).toBe('supabase');
   });
 
   it('chooses the default when the browser knows nothing', () => {

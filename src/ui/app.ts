@@ -12,6 +12,12 @@
 
 import { ApiClient, ApiError, ApiUnavailableError } from '../api/client.js';
 import {
+  SUPABASE_KEY_KEY,
+  SUPABASE_URL_KEY,
+  SupabaseClient,
+  type SupabaseCredentials,
+} from '../api/supabase.js';
+import {
   loadConfig,
   readMode,
   saveConfig,
@@ -24,6 +30,7 @@ import { DEFAULT_PAGE_SIZE, computePageInfo, type PageInfo } from '../core/pagin
 import { createBrowserFileStorage, supportsOpfs } from '../core/browserStorage.js';
 import { EmbeddedProjectStore } from '../core/embeddedStore.js';
 import { ServiceProjectStore } from '../core/serviceStore.js';
+import { SupabaseProjectStore } from '../core/supabaseStore.js';
 import { FileSystemProjectStore } from '../core/fileSystemStore.js';
 import {
   checkPermission,
@@ -152,6 +159,8 @@ export interface AppOptions {
   readonly tokenStorageKey?: string;
   /** Where the handle of the folder of the project is kept. */
   readonly handleStorage?: DirectoryHandleStorage;
+  /** The `fetch` used to talk to Supabase; defaults to the global one. */
+  readonly supabaseFetch?: typeof fetch | undefined;
 }
 
 const SERVICE_CHECK_INTERVAL_MS = 5000;
@@ -194,6 +203,10 @@ export class App
   private fileSystemPermission: PermissionState = 'prompt';
   /** The name of the folder of the project. */
   private fileSystemDirectoryName: string | null = null;
+  /** The `fetch` used to talk to Supabase. */
+  private readonly supabaseFetch: typeof fetch | undefined;
+  /** Why the Supabase project cannot be used, `null` when unknown. */
+  private supabaseError: string | null = null;
 
   private token: string | null = null;
   /**
@@ -327,6 +340,7 @@ export class App
     this.storage = options.storage;
     this.tokenStorageKey = options.tokenStorageKey ?? TOKEN_STORAGE_KEY;
     this.handleStorage = options.handleStorage ?? createDirectoryHandleStorage();
+    this.supabaseFetch = options.supabaseFetch;
   }
 
   /** The window of the page, `null` when there is none. */
@@ -379,6 +393,10 @@ export class App
     const config = this.config;
     if (config.mode === 'filesystem') {
       await this.openFileSystemStore();
+      return;
+    }
+    if (config.mode === 'supabase') {
+      await this.openSupabaseStore();
       return;
     }
     if (config.mode === 'embedded') {
@@ -439,6 +457,66 @@ export class App
       return;
     }
     this.store = new FileSystemProjectStore(handle);
+  }
+
+  /**
+   * Reads the Supabase credentials kept in the browser, `null` when the user
+   * has not typed them yet.
+   */
+  private readSupabaseCredentials(): SupabaseCredentials | null {
+    if (this.storage === undefined) {
+      return null;
+    }
+    try {
+      const url = this.storage.getItem(SUPABASE_URL_KEY);
+      const key = this.storage.getItem(SUPABASE_KEY_KEY);
+      if (url === null || url.trim().length === 0 || key === null || key.length === 0) {
+        return null;
+      }
+      return { url: url.trim(), key };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Keeps the Supabase credentials in the browser, like the bridge token. */
+  private storeSupabaseCredentials(credentials: SupabaseCredentials): void {
+    try {
+      this.storage?.setItem(SUPABASE_URL_KEY, credentials.url);
+      this.storage?.setItem(SUPABASE_KEY_KEY, credentials.key);
+    } catch {
+      // The browser refuses to persist them: they are still used for this session.
+    }
+  }
+
+  /**
+   * Opens the project that lives in a Supabase database.
+   *
+   * Without credentials the application waits for the user; with rejected or
+   * unreachable ones it reports why and waits as well.
+   */
+  private async openSupabaseStore(): Promise<void> {
+    const credentials = this.readSupabaseCredentials();
+    if (credentials === null) {
+      this.supabaseError = null;
+      this.store = null;
+      return;
+    }
+    const client = new SupabaseClient({ ...credentials, fetchImpl: this.supabaseFetch });
+    try {
+      await client.probeTable();
+    } catch (error) {
+      this.supabaseError = error instanceof Error ? error.message : String(error);
+      this.store = null;
+      showToast({
+        doc: this.doc,
+        message: `Unable to use the Supabase project: ${this.supabaseError}`,
+        kind: 'error',
+      });
+      return;
+    }
+    this.supabaseError = null;
+    this.store = new SupabaseProjectStore(client);
   }
 
   // ---------------------------------------------------------------- layout --
@@ -764,13 +842,15 @@ export class App
     const tokenIsUseless = this.authRequired === false || this.config.mode !== 'service';
     this.tokenButton.toggleAttribute('hidden', tokenIsUseless);
     this.servicePillElement.title =
-      this.config.mode !== 'service'
-        ? 'The project lives in the browser: the service is not used.'
-        : this.authRequired === false
-          ? 'The service accepts every request without an API token.'
-          : this.authRequired === true
-            ? 'The service requires an API token.'
-            : 'The authentication policy of the service is unknown.';
+      this.config.mode === 'supabase'
+        ? 'The project lives in a Supabase database: the bridge service is not used.'
+        : this.config.mode !== 'service'
+          ? 'The project lives in the browser: the service is not used.'
+          : this.authRequired === false
+            ? 'The service accepts every request without an API token.'
+            : this.authRequired === true
+              ? 'The service requires an API token.'
+              : 'The authentication policy of the service is unknown.';
   }
 
   private startServiceWatch(): void {
@@ -896,6 +976,17 @@ export class App
       this.chooseFolderButton.setAttribute('hidden', 'hidden');
       return;
     }
+    if (this.config.mode === 'supabase') {
+      const host = supabaseHost(this.readSupabaseCredentials()?.url ?? null);
+      this.projectPathElement.textContent =
+        host === null ? 'Supabase project' : `Supabase project (${host})`;
+      this.projectPathElement.title =
+        host === null
+          ? 'The files of the project are kept in a Supabase database.'
+          : `The files of the project are kept in the Supabase project at ${host}.`;
+      this.chooseFolderButton.setAttribute('hidden', 'hidden');
+      return;
+    }
     this.chooseFolderButton.removeAttribute('hidden');
     if (this.config.mode === 'filesystem') {
       const name = this.fileSystemDirectoryName;
@@ -927,6 +1018,9 @@ export class App
       directoryName: this.fileSystemDirectoryName,
       opfsAvailable: supportsOpfs(this.window()),
       fileSystemAvailable: supportsFileSystemAccess(this.window()),
+      supabaseUrl: this.readSupabaseCredentials()?.url ?? null,
+      supabaseKey: this.readSupabaseCredentials()?.key ?? null,
+      supabaseFetch: this.supabaseFetch,
       onUseService: () => {
         void this.switchToService();
       },
@@ -935,6 +1029,9 @@ export class App
       },
       onUseFileSystem: () => {
         void this.switchToFileSystem();
+      },
+      onUseSupabase: (url, key) => {
+        void this.switchToSupabase(url, key);
       },
       onChooseFolder: () => {
         void this.openFolderPicker();
@@ -1011,6 +1108,24 @@ export class App
     // when it comes back.
     this.config = { ...this.config, mode: 'filesystem' };
     await this.persistConfig();
+    await this.openStore();
+    this.updateProjectPath();
+    await this.refresh();
+  }
+
+  /**
+   * Works on a project that lives in a Supabase database.
+   *
+   * The credentials were already tested by the project dialog before this
+   * runs; the other projects are kept as they are, so the user finds them
+   * again when coming back.
+   */
+  private async switchToSupabase(url: string, key: string): Promise<void> {
+    this.storeSupabaseCredentials({ url, key });
+    writeMode('supabase', this.storage);
+    this.config = { ...this.config, mode: 'supabase' };
+    await this.persistConfig();
+    this.supabaseError = null;
     await this.openStore();
     this.updateProjectPath();
     await this.refresh();
@@ -1709,6 +1824,12 @@ export class App
       return;
     }
     if (error instanceof ApiError && error.status === 401) {
+      // A 401 from Supabase means its own credentials: the bridge token
+      // dialog would be useless.
+      if (this.config.mode === 'supabase') {
+        void this.handleSupabaseUnauthorized(error);
+        return;
+      }
       void this.handleUnauthorized();
       return;
     }
@@ -1717,6 +1838,23 @@ export class App
       message: error instanceof Error ? error.message : String(error),
       kind: 'error',
     });
+  }
+
+  /**
+   * Reacts to a rejected Supabase request: warns and asks for credentials
+   * again through the project dialog.
+   */
+  private async handleSupabaseUnauthorized(error: ApiError): Promise<void> {
+    this.supabaseError = error.message;
+    this.store = null;
+    this.updateProjectPath();
+    this.renderCurrentView();
+    showToast({
+      doc: this.doc,
+      message: `Supabase rejected the request: ${error.message}`,
+      kind: 'error',
+    });
+    this.openProjectDialog();
   }
 
   /**
@@ -2661,6 +2799,20 @@ export class App
   /** Shows the message of the empty state, when there is nothing to show. */
   private updateEmptyState(isEmpty: boolean): void {
     const notes = this.viewMode === 'notes';
+    if (this.config.mode === 'supabase' && this.store === null) {
+      this.showEmptyState(
+        this.supabaseError === null
+          ? 'Enter the Supabase credentials of your project'
+          : 'The Supabase project is not reachable',
+        this.supabaseError ??
+          'The files of the project live in a Supabase database, reached with its project URL and API key.',
+        'Open the project',
+        () => {
+          this.openProjectDialog();
+        },
+      );
+      return;
+    }
     if (this.config.mode === 'filesystem' && this.store === null) {
       if (this.fileSystemHandle === null) {
         this.showEmptyState(
@@ -2772,6 +2924,8 @@ export class App
       message = 'Choose the folder of the project first.';
     } else if (this.config.mode === 'embedded') {
       message = 'The storage of the browser is not available.';
+    } else if (this.config.mode === 'supabase') {
+      message = 'Enter the Supabase credentials of the project first.';
     } else {
       message = 'Choose a project folder first.';
     }
@@ -3853,4 +4007,16 @@ export function shortenPath(path: string, maximumLength: number): string {
     return path;
   }
   return `…${path.slice(path.length - maximumLength + 1)}`;
+}
+
+/** The host of a Supabase project URL, `null` when it is not a URL. */
+export function supabaseHost(url: string | null): string | null {
+  if (url === null) {
+    return null;
+  }
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
 }
