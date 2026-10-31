@@ -3762,8 +3762,7 @@ describe('the Supabase project', () => {
     expect(used).toHaveLength(0);
   });
 
-  it('uses the project when the database is as expected', async () => {
-    const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost/' });
+  it('uses the project when the database is as expected', async () => {    const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost/' });
     const doc = dom.window.document;
     const backend = new FakePostgrest({ key: supabaseKey });
     const used: { url: string; key: string }[] = [];
@@ -3800,5 +3799,55 @@ describe('the Supabase project', () => {
     await flush();
 
     expect(used).toEqual([{ url: supabaseUrl, key: supabaseKey }]);
+  });
+});
+
+describe('the highlight of the project dialog', () => {
+  function activeChoice(doc: Document): string | null {
+    const active = doc.querySelector('.project-choice.is-active .project-choice-title');
+    return active?.textContent ?? null;
+  }
+
+  it('moves the highlight when setMode changes the backend', async () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost/' });
+    const doc = dom.window.document;
+    const dialog = new ProjectDialog({
+      doc,
+      mode: 'service',
+      projectDir: null,
+      onUseService: () => undefined,
+      onUseEmbedded: () => undefined,
+      onUseFileSystem: () => undefined,
+      onChooseFolder: () => undefined,
+      onDownload: () => undefined,
+      onImport: () => undefined,
+    });
+    dialog.open();
+
+    expect(activeChoice(doc)).toContain('Gnumarus OS Bridge');
+    dialog.setMode('embedded');
+    expect(activeChoice(doc)).toContain('embedded project');
+    expect(
+      [...doc.querySelectorAll('.project-choice.is-active')],
+    ).toHaveLength(1);
+  });
+
+  it('moves the highlight when the user switches backends', async () => {
+    const harness = await createHarness(0);
+    click(buttonByText(harness.doc, 'Project…'));
+    await flush();
+
+    const choices = harness.doc.querySelectorAll('.project-choice');
+    expect(choices[0]?.classList.contains('is-active')).toBe(true);
+
+    click(choices[1] ?? null);
+    await flush();
+
+    const after = harness.doc.querySelectorAll('.project-choice');
+    expect(after[0]?.classList.contains('is-active')).toBe(false);
+    expect(after[1]?.classList.contains('is-active')).toBe(true);
+    expect(after[1]?.textContent).toContain('embedded project');
+
+    harness.app.dispose();
   });
 });

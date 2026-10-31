@@ -8,6 +8,10 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 44 refreshes the focused backend choice in the project
+  dialog after a switch: the highlight followed the mode from opening time
+  and never moved.
+- Verification: 534 unit tests pass.
 - Batch 43 fixes the Supabase setup script (`end` is a reserved
   word: every identifier is quoted) and stores dates as `timestamp`
   (nullable, NULL for unknown) with dual-format conversion, so old text

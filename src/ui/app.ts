@@ -1026,15 +1026,19 @@ export class App
       supabaseKey: this.readSupabaseCredentials()?.key ?? null,
       supabaseFetch: this.supabaseFetch,
       onUseService: () => {
+        dialog.setMode('service');
         void this.switchToService();
       },
       onUseEmbedded: () => {
+        dialog.setMode('embedded');
         void this.switchToEmbedded();
       },
       onUseFileSystem: () => {
+        dialog.setMode('filesystem');
         void this.switchToFileSystem();
       },
       onUseSupabase: (url, key) => {
+        dialog.setMode('supabase');
         void this.switchToSupabase(url, key);
       },
       onChooseFolder: () => {

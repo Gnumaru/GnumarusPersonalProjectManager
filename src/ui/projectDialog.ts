@@ -64,6 +64,8 @@ export class ProjectDialog {
   private readonly options: ProjectDialogOptions;
   private readonly modal: Modal;
   private readonly fileInput: HTMLInputElement;
+  /** The mode highlighted as active; follows backend switches. */
+  private currentMode: ProjectDialogMode;
   /** Whether the Supabase credential form is shown. */
   private supabaseExpanded: boolean;
   private supabaseUrlValue: string;
@@ -79,6 +81,7 @@ export class ProjectDialog {
   constructor(options: ProjectDialogOptions) {
     this.doc = options.doc;
     this.options = options;
+    this.currentMode = options.mode;
     this.supabaseExpanded = options.mode === 'supabase';
     this.supabaseUrlValue = options.supabaseUrl ?? '';
     this.supabaseKeyValue = options.supabaseKey ?? '';
@@ -119,6 +122,17 @@ export class ProjectDialog {
     this.modal.open();
   }
 
+  /**
+   * Moves the highlight to the new active backend.
+   *
+   * The choices are built once when the dialog opens; without this a switch
+   * would work but the previous choice would stay focused.
+   */
+  setMode(mode: ProjectDialogMode): void {
+    this.currentMode = mode;
+    this.modal.setBody([this.buildBody()]);
+  }
+
   private buildBody(): HTMLElement {
     const doc = this.doc;
     const options = this.options;
@@ -126,7 +140,7 @@ export class ProjectDialog {
     const serviceButton = this.choiceButton(
       'The Gnumarus OS Bridge service',
       'The files of the project live on the disk of the machine, reached through the low level service.',
-      options.mode === 'service',
+      this.currentMode === 'service',
       () => {
         options.onUseService();
       },
@@ -139,7 +153,7 @@ export class ProjectDialog {
       opfsAvailable
         ? `The files of the project are kept in the browser (${options.storageName ?? 'the storage of the browser'}). Only one embedded project can live in a browser: importing an archive replaces it completely.`
         : 'This browser does not offer the Origin Private File System, so the project cannot be kept in the browser.',
-      options.mode === 'embedded',
+      this.currentMode === 'embedded',
       () => {
         options.onUseEmbedded();
       },
@@ -155,7 +169,7 @@ export class ProjectDialog {
         : directoryName === null
           ? 'The files of the project live in a folder of the disk, chosen by you with the picker of the browser. The application works without the low level service.'
           : `The files of the project live in the folder "${directoryName}" of the disk, reached with the File System Access API.`,
-      options.mode === 'filesystem',
+      this.currentMode === 'filesystem',
       () => {
         options.onUseFileSystem?.();
       },
@@ -165,7 +179,7 @@ export class ProjectDialog {
     const supabaseButton = this.choiceButton(
       'Supabase (PostgreSQL in the cloud)',
       'The files of the project live in a Supabase database, reached with its project URL and API key. The database is tested before it is used.',
-      options.mode === 'supabase',
+      this.currentMode === 'supabase',
       () => {
         this.supabaseExpanded = true;
         this.modal.setBody([this.buildBody()]);
@@ -190,7 +204,7 @@ export class ProjectDialog {
       body.push(this.buildSupabaseSection());
     }
 
-    if (options.mode === 'service') {
+    if (this.currentMode === 'service') {
       body.push(
         el(doc, 'div', { class: 'project-folder' }, [
           el(doc, 'span', { class: 'field-label', text: 'Folder' }),
@@ -212,7 +226,7 @@ export class ProjectDialog {
       );
     }
 
-    if (options.mode === 'filesystem') {
+    if (this.currentMode === 'filesystem') {
       body.push(
         el(doc, 'div', { class: 'project-folder' }, [
           el(doc, 'span', { class: 'field-label', text: 'Folder' }),

@@ -1,5 +1,23 @@
 # Checklist
 
+## Batch 44 - Project dialog follows the backend switch
+
+### Change
+
+- [x] `ProjectDialog.setMode` rebuilds the choices with the new highlight
+      (`src/ui/projectDialog.ts`)
+- [x] Every backend choice of `openProjectDialog` refreshes the dialog
+      (`src/ui/app.ts`)
+
+### Tests
+
+- [x] `src/ui/app.test.ts` - `setMode` moves the single highlight;
+      switching backends in the app moves it (fails without the fix)
+- [x] `npm run typecheck`, `npm test` (534 tests, 3 consecutive green runs),
+      `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 43 - Quoted identifiers and timestamp columns in Supabase
 
 ### Change
