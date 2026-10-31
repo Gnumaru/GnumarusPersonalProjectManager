@@ -20,6 +20,7 @@ function createHarness(): Harness {
     const column = doc.createElement('section');
     column.className = 'kanban-column';
     column.dataset['status'] = status;
+    column.dataset['group'] = status;
     const card = doc.createElement('article');
     card.className = 'kanban-card';
     card.dataset['taskId'] = '7';
@@ -69,6 +70,20 @@ describe('KanbanDragController', () => {
     mouse(harness, 'mouseup', columnOf(harness, 'doing'), 60, 60);
 
     expect(harness.onDrop).toHaveBeenCalledWith(7, 'doing');
+  });
+
+  it('drops a card on a type column through its generic group', () => {
+    const harness = createHarness();
+    const column = columnOf(harness, 'doing');
+    column.dataset['group'] = 'Bug';
+    delete column.dataset['status'];
+    const card = harness.doc.querySelector<HTMLElement>('.kanban-card') as HTMLElement;
+
+    mouse(harness, 'mousedown', card, 10, 10);
+    mouse(harness, 'mousemove', column, 60, 60);
+    mouse(harness, 'mouseup', column, 60, 60);
+
+    expect(harness.onDrop).toHaveBeenCalledWith(7, 'Bug');
   });
 
   it('does nothing when the pointer does not move', () => {

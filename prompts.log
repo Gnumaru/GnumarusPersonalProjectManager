@@ -160,6 +160,7 @@ na modal de edicao de tarefas no dropdown de status é possível deixar cada opc
 ====
 o highlight do mouseover nas opcoes dos dropdowns faz o usuario esquecer qual é a cor do item atualmente destacado. ao inves de ser a mesma cor de highlith pra todos, é possível que o highlight seja a mesm cor do item, porém um tom mais forte da mesma cor?
 ====
+na view de kanban deve ser exibido um dropdown com as opcoes 'status', 'type' e 'role'. o valor padrao é 'status'. ao mudar o valor do dropdown as colunas do kanban vao mudar. ao inves de exibir uma coluna por status de tarefa (todo, doing, done etc) exibira uma coluna pra cada valor possivel da coisa escolhida no dropdown (como 'bug', 'improvement' e 'feature' no caso de 'type'). as tarefas continuam sendo exibidas segundo as mesmas regras de antes. apenas tarefas folha (sem filhas) sao exibidas, elas são escondidas ou exibidas segundo os metadados que escondem e exibem as tarefas, e elas sao posicionadas e coloridas em suas respectivas colunas.
 ====
 ====
 ====

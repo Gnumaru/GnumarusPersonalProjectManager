@@ -1,5 +1,40 @@
 # Checklist
 
+## Batch 34 - Kanban group-by dropdown (status / type / role)
+
+### Change
+
+- [x] `KanbanGroupBy` (`status`/`type`/`role`), `kanbanGroups`,
+      `kanbanGroupOf`, `kanbanGroupLabel`, `withType`/`withRole` in
+      `src/core/task.ts`; `type`/`role` on `TaskCard` and `TaskSummary`
+- [x] `type=`/`role=` read in `READ_METADATA_COMMAND`
+      (`src/core/serviceStore.ts`), `embeddedStore`, `fileSystemStore`, fake
+      bridge
+- [x] `showHiddenByType`/`showHiddenByRole` in `src/core/appConfig.ts`
+      (`kanban_show_hidden_type_*`, `kanban_show_hidden_role_*`,
+      case-insensitive read)
+- [x] Group-by dropdown in the toolbar, generic columns/visibility/drag
+      in `src/ui/kanbanBoard.ts` + `src/ui/kanbanDrag.ts`
+- [x] `kanbanGroupBy` state, type/role cards, column-aware reorder and
+      drop (`changeTaskType`/`changeTaskRole`), per-group visibility
+      (`src/ui/app.ts`)
+- [x] `data-type`/`data-role` column and card colors plus toolbar
+      dropdown (`src/styles.css`)
+
+### Tests
+
+- [x] `src/core/task.test.ts` - groupings, labels, group of a card,
+      `withType`/`withRole`
+- [x] `src/core/appConfig.test.ts` - type/role toggles round trip
+- [x] `src/ui/kanbanBoard.test.ts` - type/role columns, placement, hidden
+      rules, column toggles, toolbar dropdown
+- [x] `src/ui/kanbanDrag.test.ts` - generic group drop
+- [x] `src/ui/app.test.ts` - dropdown default, grouping by type/role,
+      leaf-only cards, type drop, type hidden toggle persistence
+- [x] `npm run typecheck`, `npm test` (468 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 33 - Stronger same-colour highlight in the colored editor dropdowns
 
 ### Change

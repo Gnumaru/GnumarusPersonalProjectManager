@@ -457,21 +457,42 @@ default of the tree.
 
 **Files:** `src/core/task.ts`, `src/core/projectStore.ts`, `src/ui/kanbanBoard.ts`, `src/ui/kanbanDrag.ts`, `src/ui/app.ts`
 
-The third display mode is a **board**: one column per status, with the cards
-of the tasks that have **no child**. A task that has children is represented by
-its children, the board shows the leaves of the tree.
+The third display mode is a **board**: one column per group value, with the
+cards of the tasks that have **no child**. A task that has children is
+represented by its children, the board shows the leaves of the tree.
 
-The columns are always in the same order (`BOARD_STATUSES`):
+### Grouping by status, type or role
 
-```
-PLANNING | TODO | NEXT | PAUSED | DOING | DONE | CANCELED
-```
+The toolbar of the board holds a **Group by** dropdown with the options
+`status` (the default), `type` and `role`. Changing it rebuilds the columns:
+
+| Grouping | Columns, in order |
+| -------- | ----------------- |
+| `status` | `PLANNING \| TODO \| NEXT \| PAUSED \| DOING \| DONE \| CANCELED` (`BOARD_STATUSES`) |
+| `type` | `BUG \| IMPROVEMENT \| FEATURE` (`TASK_TYPES`) |
+| `role` | `GRAPHICS \| AUDIO \| PROGRAMMING \| DESIGN \| ASSEMBLY \| MANAGEMENT \| TEST \| RESEARCH` (`TASK_ROLES`) |
+
+Every other rule stays the same: only the leaves are shown, the search keeps
+only the matching leaves, hidden cards follow `kanban_hidden` with one
+show-hidden checkbox per column plus the global one, and every card is
+**positioned and colored in its own column**. Type columns reuse the colours
+of the type dropdown of the editor (Bug red, Improvement amber, Feature
+green) and role columns share its 8-colour palette; the cards take the colour
+of their column, one shade darker, and are repainted as soon as they move.
+
+### Changing the grouped value
+
+A card is **dragged from one column to another one**: the grouped key of its
+file is rewritten (`status=`, `type=` or `role=`, depending on the active
+grouping) and the card moves to the end of its new column. The column under
+the pointer is highlighted, the dragged card is dimmed and a chip with the
+name of the task follows the pointer. The up/down buttons move the card
+inside its own column under every grouping.
 
 Each column carries the number of cards it holds. The column itself is
-**colored by its status from top to bottom**: the background is the soft
-variant of the status colour, the border, the separator of the header and the
-name of the status carry the full colour. (The previous coloured dot of the
-header was removed: the whole column carries the colour now.) A card shows the
+**colored by its value from top to bottom**: the background is the soft
+variant of the colour, the border, the separator of the header and the
+name carry the full colour. (The previous coloured dot of the header was removed: the whole column carries the colour now.) A card shows the
 name and the tags of the task on a plain card, so it stands out from the
 coloured column behind it; clicking it opens the task and the pencil opens its
 editor.
@@ -497,8 +518,9 @@ a search.
 
 ### Changing the status
 
-A card is **dragged from one column to another one**: the `status=` key of its
-file is rewritten and the card moves to its new column. The column under the
+A card is **dragged from one column to another one**: the grouped key of its
+file is rewritten (`status=` under the status grouping, `type=` and `role=`
+under the other groupings) and the card moves to its new column. The column under the
 pointer is highlighted, the dragged card is dimmed and a chip with the name of
 the task follows the pointer.
 
@@ -518,8 +540,11 @@ otherwise each column follows its own toggle. Shown hidden cards look dimmed.
 The column toggles and the global toggle are saved in a `config.txt` file in
 the project folder, next to the task files. It holds global settings as
 `key=value` metadata in the same format as the other files, but it has no
-description section. The board reads it on load and rewrites it on every
-toggle change.
+description section. Status columns use `kanban_show_hidden_<status>`, type
+columns `kanban_show_hidden_type_<Type>` and role columns
+`kanban_show_hidden_role_<Role>` (read back case-insensitively, because the
+metadata keys are lowercased). The board reads them on load and rewrites them
+on every toggle change.
 
 ### Last view
 
@@ -547,12 +572,12 @@ The whole board costs **two** round trips and reads no file at all:
 
 ```
 GET  (find)      every task file below the project folder  -> the ids
-POST /api/shell  grep -rH -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' .
+POST /api/shell  grep -rH -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' -e '^type=' -e '^role=' .
 ```
 
-The command returns the parent, the status, the title and the tags of every
-task. The tasks that are the parent of another task are left out: they are not
-cards of the board.
+The command returns the parent, the status, the type, the role, the title and
+the tags of every task. The tasks that are the parent of another task are
+left out: they are not cards of the board.
 
 ---
 

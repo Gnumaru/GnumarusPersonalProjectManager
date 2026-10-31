@@ -85,6 +85,10 @@ export interface TaskCard {
   /** `null` for a task without parent. */
   readonly parentId: number | null;
   readonly tags: readonly string[];
+  /** The kind of work the task represents. */
+  readonly type: TaskType;
+  /** The role responsible for the task. */
+  readonly role: TaskRole;
   /** Whether the card is hidden on the board. */
   readonly kanbanHidden: boolean;
   /** Path of the file of the task. */
@@ -105,6 +109,47 @@ export const TASK_ROLES = [
   'Research',
 ] as const;
 export type TaskRole = (typeof TASK_ROLES)[number];
+
+/** How the Kanban board groups its cards into columns. */
+export const KANBAN_GROUP_BYS = ['status', 'type', 'role'] as const;
+export type KanbanGroupBy = (typeof KANBAN_GROUP_BYS)[number];
+
+/** The label of every grouping, as shown in the board dropdown. */
+export const KANBAN_GROUP_LABELS: Readonly<Record<KanbanGroupBy, string>> = {
+  status: 'STATUS',
+  type: 'TYPE',
+  role: 'ROLE',
+};
+
+/** The columns of the board for a grouping, in the order they are shown. */
+export function kanbanGroups(groupBy: KanbanGroupBy): readonly string[] {
+  if (groupBy === 'type') {
+    return TASK_TYPES;
+  }
+  if (groupBy === 'role') {
+    return TASK_ROLES;
+  }
+  return BOARD_STATUSES;
+}
+
+/** The column a card belongs to under the active grouping. */
+export function kanbanGroupOf(
+  card: Pick<TaskCard, 'status' | 'type' | 'role'>,
+  groupBy: KanbanGroupBy,
+): string {
+  if (groupBy === 'type') {
+    return card.type;
+  }
+  if (groupBy === 'role') {
+    return card.role;
+  }
+  return card.status;
+}
+
+/** The title of a column, in the uppercase style of the board headers. */
+export function kanbanGroupLabel(group: string): string {
+  return group.toUpperCase();
+}
 
 export function isTaskType(value: string): value is TaskType {
   return (TASK_TYPES as readonly string[]).includes(value);
@@ -643,6 +688,29 @@ export function withStatus(task: Task, status: TaskStatus, now: Date): Task {
     status,
     updated: formatTaskTimestamp(now),
   };
+}
+
+/** Returns a copy of the task with another type. */
+export function withType(task: Task, type: TaskType, now: Date): Task {
+  return {
+    ...task,
+    type,
+    updated: formatTaskTimestamp(now),
+  };
+}
+
+/** Returns a copy of the task with another role. */
+export function withRole(task: Task, role: TaskRole, now: Date): Task {
+  return {
+    ...task,
+    role,
+    updated: formatTaskTimestamp(now),
+  };
+}
+
+/** True when the value is one of the Kanban groupings. */
+export function isKanbanGroupBy(value: string): value is KanbanGroupBy {
+  return (KANBAN_GROUP_BYS as readonly string[]).includes(value);
 }
 
 /** Returns a copy of the task with another start and end date. */

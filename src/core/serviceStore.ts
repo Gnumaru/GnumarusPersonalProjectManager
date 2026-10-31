@@ -18,14 +18,18 @@ import {
   type TaskComment,
 } from './comment.js';
 import {
+  isTaskRole,
   isTaskStatus,
+  isTaskType,
   normalizeTags,
   parseTask,
   parseTaskIdFromFileName,
   serializeTask,
   taskFileName,
   type Task,
+  type TaskRole,
   type TaskStatus,
+  type TaskType,
 } from './task.js';
 import {
   noteFileName,
@@ -46,6 +50,8 @@ interface MutableMetadata {
   status: TaskStatus;
   parentId: number | null;
   tags: string[];
+  type: TaskType;
+  role: TaskRole;
   start: string;
   end: string;
   updated: string;
@@ -110,7 +116,7 @@ export const COUNT_COMMENTS_COMMAND =
  * dates. The description of the tasks never reaches the browser.
  */
 export const READ_METADATA_COMMAND =
-  "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' -e '^start=' -e '^end=' -e '^updated=' -e '^expanded=' -e '^kanban_hidden=' -e '^tree_gantt_hidden=' -e '^kanban_order=' -e '^tree_gantt_order=' .";
+  "grep -rH --include='task_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg -e '^id=' -e '^parent=' -e '^status=' -e '^title=' -e '^tags=' -e '^type=' -e '^role=' -e '^start=' -e '^end=' -e '^updated=' -e '^expanded=' -e '^kanban_hidden=' -e '^tree_gantt_hidden=' -e '^kanban_order=' -e '^tree_gantt_order=' .";
 
 /**
  * Command used to detect the presence of ripgrep (`rg`) on the machine.
@@ -262,7 +268,7 @@ export class ServiceProjectStore implements ProjectStore {
       if (trimmed.length === 0) {
         continue;
       }
-      const match = /^(.*?):(id|parent|status|title|tags|start|end|updated|expanded|kanban_hidden|tree_gantt_hidden|kanban_order|tree_gantt_order)=(.*)$/u.exec(trimmed);
+      const match = /^(.*?):(id|parent|status|title|tags|type|role|start|end|updated|expanded|kanban_hidden|tree_gantt_hidden|kanban_order|tree_gantt_order)=(.*)$/u.exec(trimmed);
       if (match === null) {
         continue;
       }
@@ -278,6 +284,8 @@ export class ServiceProjectStore implements ProjectStore {
         status: 'todo' as TaskStatus,
         parentId: null,
         tags: [] as string[],
+        type: 'Feature' as TaskType,
+        role: 'Programming' as TaskRole,
         start: '',
         end: '',
         updated: '',
@@ -299,6 +307,10 @@ export class ServiceProjectStore implements ProjectStore {
         current.parentId = Number.isSafeInteger(parentId) ? parentId : null;
       } else if (key === 'tags') {
         current.tags = normalizeTags(value);
+      } else if (key === 'type') {
+        current.type = isTaskType(value.trim()) ? (value.trim() as TaskType) : 'Feature';
+      } else if (key === 'role') {
+        current.role = isTaskRole(value.trim()) ? (value.trim() as TaskRole) : 'Programming';
       } else if (key === 'start') {
         current.start = value;
       } else if (key === 'end') {
@@ -333,6 +345,8 @@ export class ServiceProjectStore implements ProjectStore {
         status: current.status,
         parentId: current.parentId,
         tags: current.tags,
+        type: current.type,
+        role: current.role,
         start: current.start,
         end: current.end,
         updated: current.updated,

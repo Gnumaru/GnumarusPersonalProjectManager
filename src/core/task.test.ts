@@ -5,10 +5,15 @@ import {
   dateInputValue,
   dateInputValueOfDate,
   formatTaskTimestamp,
+  isKanbanGroupBy,
   isTaskFileName,
   isTaskStatus,
   isDimmedStatus,
   isValidTag,
+  KANBAN_GROUP_BYS,
+  kanbanGroupLabel,
+  kanbanGroupOf,
+  kanbanGroups,
   METADATA_SEPARATOR,
   normalizeTags,
   normalizeTaskTimestamp,
@@ -28,6 +33,8 @@ import {
   withParent,
   withExpandedState,
   withKanbanHidden,
+  withRole,
+  withType,
   withTreeGanttHidden,
 } from './task.js';
 
@@ -333,6 +340,50 @@ describe('task types and roles', () => {
       expect(isTaskRole(role)).toBe(true);
     }
     expect(isTaskRole('whatever')).toBe(false);
+  });
+});
+
+describe('kanban grouping', () => {
+  it('knows the three groupings, defaulting to status', () => {
+    expect([...KANBAN_GROUP_BYS]).toEqual(['status', 'type', 'role']);
+    expect(isKanbanGroupBy('status')).toBe(true);
+    expect(isKanbanGroupBy('type')).toBe(true);
+    expect(isKanbanGroupBy('role')).toBe(true);
+    expect(isKanbanGroupBy('bogus')).toBe(false);
+  });
+
+  it('lists one group per column value', () => {
+    expect([...kanbanGroups('status')]).toEqual([
+      'planning',
+      'todo',
+      'next',
+      'paused',
+      'doing',
+      'done',
+      'canceled',
+    ]);
+    expect([...kanbanGroups('type')]).toEqual(['Bug', 'Improvement', 'Feature']);
+    expect([...kanbanGroups('role')]).toEqual([...TASK_ROLES]);
+  });
+
+  it('resolves the column of a card under every grouping', () => {
+    const card = { status: 'doing' as const, type: 'Bug' as const, role: 'Design' as const };
+    expect(kanbanGroupOf(card, 'status')).toBe('doing');
+    expect(kanbanGroupOf(card, 'type')).toBe('Bug');
+    expect(kanbanGroupOf(card, 'role')).toBe('Design');
+  });
+
+  it('labels the columns in uppercase', () => {
+    expect(kanbanGroupLabel('todo')).toBe('TODO');
+    expect(kanbanGroupLabel('Bug')).toBe('BUG');
+    expect(kanbanGroupLabel('Programming')).toBe('PROGRAMMING');
+  });
+
+  it('changes the type and the role of a task', () => {
+    const task = parseTask('id=1\ntitle=T\ntype=Feature\nrole=Programming\n----\nbody');
+    const now = new Date();
+    expect(withType(task, 'Bug', now).type).toBe('Bug');
+    expect(withRole(task, 'Design', now).role).toBe('Design');
   });
 });
 

@@ -86,18 +86,27 @@ import {
   applyTaskInput,
   buildTask,
   formatTaskTimestamp,
+  isKanbanGroupBy,
+  isTaskRole,
+  isTaskType,
+  kanbanGroupOf,
   parseTaskIdFromFileName,
   withDates,
   withDefaultDates,
   withExpandedState,
   withKanbanHidden,
+  withRole,
   withTreeGanttHidden,
   withParent,
   withStatus,
+  withType,
+  type KanbanGroupBy,
   type Task,
   type TaskCard,
   type TaskInput,
+  type TaskRole,
   type TaskStatus,
+  type TaskType,
 } from '../core/task.js';
 import { button, clear, el, input, select, type Child } from './dom.js';
 import { FileDialog } from './fileDialog.js';
@@ -253,10 +262,16 @@ export class App
   private noteTableHead!: HTMLElement;
   /** The cards of the board: the tasks that have no child. */
   private kanbanCards: TaskCard[] = [];
+  /** How the board groups its cards into columns. */
+  private kanbanGroupBy: KanbanGroupBy = 'status';
   /** When `true`, the hidden cards of every column are shown. */
   private kanbanShowAllHidden = false;
   /** Per column toggle for the hidden cards, `false` when absent. */
   private kanbanShowHiddenByStatus = new Map<TaskStatus, boolean>();
+  /** Per type column toggle for the hidden cards, `false` when absent. */
+  private kanbanShowHiddenByType = new Map<TaskType, boolean>();
+  /** Per role column toggle for the hidden cards, `false` when absent. */
+  private kanbanShowHiddenByRole = new Map<TaskRole, boolean>();
   /** When `true`, the hidden tasks of the tree and the Gantt are shown. */
   private treeGanttShowHidden = false;
   /** The metadata of the tasks, read for the Gantt chart. */
@@ -576,7 +591,7 @@ export class App
 
     this.kanbanViewButton = button(this.doc, 'Kanban', {
       class: 'view-toggle-button',
-      title: 'Show the tasks as a board of columns, one per status',
+      title: 'Show the tasks as a board of columns, grouped by status, type or role',
       onClick: () => {
         void this.setViewMode('kanban');
       },
@@ -676,8 +691,8 @@ export class App
     this.kanbanDrag = new KanbanDragController({
       doc: this.doc,
       container: this.kanbanElement,
-      onDrop: (taskId, status) => {
-        void this.changeTaskStatus(taskId, status);
+      onDrop: (taskId, target) => {
+        void this.changeKanbanGroup(taskId, target);
       },
     });
 
@@ -1429,6 +1444,8 @@ export class App
     const visibility = await this.loadKanbanVisibility();
     this.kanbanShowAllHidden = visibility.showAllHidden;
     this.kanbanShowHiddenByStatus = new Map(visibility.showHiddenByStatus);
+    this.kanbanShowHiddenByType = new Map(visibility.showHiddenByType);
+    this.kanbanShowHiddenByRole = new Map(visibility.showHiddenByRole);
     const summaries = await store.listTasks();
     await this.seedTaskDates(summaries);
     const parents = new Set<number>();
@@ -1452,6 +1469,8 @@ export class App
         status: task.status,
         parentId: task.parentId,
         tags: task.tags,
+        type: task.type,
+        role: task.role,
         kanbanHidden: task.kanbanHidden,
         path: task.path,
       }));
@@ -1518,6 +1537,8 @@ export class App
           focusGantt: patch.focusGantt ?? current.focusGantt,
           showAllHidden: patch.showAllHidden ?? current.showAllHidden,
           showHiddenByStatus: patch.showHiddenByStatus ?? current.showHiddenByStatus,
+          showHiddenByType: patch.showHiddenByType ?? current.showHiddenByType,
+          showHiddenByRole: patch.showHiddenByRole ?? current.showHiddenByRole,
           treeGanttShowHidden: patch.treeGanttShowHidden ?? current.treeGanttShowHidden,
         }),
       );
@@ -1531,6 +1552,8 @@ export class App
     await this.persistGlobalConfig({
       showAllHidden: this.kanbanShowAllHidden,
       showHiddenByStatus: this.kanbanShowHiddenByStatus,
+      showHiddenByType: this.kanbanShowHiddenByType,
+      showHiddenByRole: this.kanbanShowHiddenByRole,
     });
   }
   /**
@@ -1915,23 +1938,32 @@ export class App
     }
   }
 
-    /** Draws the board of the tasks: one column per status. */
+    /** Draws the board of the tasks: one column per group value. */
   private renderKanban(): void {
     clear(this.kanbanElement);
     this.kanbanElement.append(
-      renderKanbanToolbar(this.doc, this.kanbanShowAllHidden, (show) => {
-        this.kanbanShowAllHidden = show;
-        this.renderKanban();
-        void this.persistKanbanVisibility();
-      }),
+      renderKanbanToolbar(
+        this.doc,
+        this.kanbanShowAllHidden,
+        (show) => {
+          this.kanbanShowAllHidden = show;
+          this.renderKanban();
+          void this.persistKanbanVisibility();
+        },
+        this.kanbanGroupBy,
+        (groupBy) => {
+          this.kanbanGroupBy = groupBy;
+          this.renderKanban();
+        },
+      ),
     );
     this.kanbanElement.append(
       renderKanbanBoard(
         this.doc,
         this.kanbanCards,
         {
-          onDrop: (taskId, status) => {
-            void this.changeTaskStatus(taskId, status);
+          onDrop: (taskId, target) => {
+            void this.changeKanbanGroup(taskId, target);
           },
           onOpen: (taskId) => {
             void this.openTaskById(taskId);
@@ -1945,8 +1977,18 @@ export class App
           onToggleHidden: (taskId, hidden) => {
             void this.setKanbanHidden(taskId, hidden);
           },
-          onToggleShowColumn: (status, show) => {
-            this.kanbanShowHiddenByStatus.set(status, show);
+          onToggleShowColumn: (group, show) => {
+            if (this.kanbanGroupBy === 'type') {
+              if (isTaskType(group)) {
+                this.kanbanShowHiddenByType.set(group, show);
+              }
+            } else if (this.kanbanGroupBy === 'role') {
+              if (isTaskRole(group)) {
+                this.kanbanShowHiddenByRole.set(group, show);
+              }
+            } else {
+              this.kanbanShowHiddenByStatus.set(group as TaskStatus, show);
+            }
             this.renderKanban();
             void this.persistKanbanVisibility();
           },
@@ -1954,14 +1996,26 @@ export class App
         this.commentCounts,
         {
           showAllHidden: this.kanbanShowAllHidden,
-          showHiddenByStatus: this.kanbanShowHiddenByStatus,
+          showHiddenByGroup: this.kanbanVisibilityGroups(),
         },
+        this.kanbanGroupBy,
       ),
     );
 
     this.updateEmptyState(this.kanbanCards.length === 0);
     this.resultCountElement.textContent = this.buildResultCount();
     this.updateToolbarState();
+  }
+
+  /** The per-column show-hidden toggles of the active grouping. */
+  private kanbanVisibilityGroups(): ReadonlyMap<string, boolean> {
+    if (this.kanbanGroupBy === 'type') {
+      return this.kanbanShowHiddenByType;
+    }
+    if (this.kanbanGroupBy === 'role') {
+      return this.kanbanShowHiddenByRole;
+    }
+    return this.kanbanShowHiddenByStatus;
   }
 
   /**
@@ -2338,8 +2392,26 @@ export class App
     if (target === undefined) {
       return;
     }
+    const card = this.kanbanCards.find((candidate) => candidate.id === id);
+    const groupBy = this.kanbanGroupBy;
+    const targetGroup =
+      card !== undefined
+        ? kanbanGroupOf(card, groupBy)
+        : groupBy === 'type'
+          ? target.type
+          : groupBy === 'role'
+            ? target.role
+            : target.status;
     const siblings = summaries
-      .filter((task) => task.status === target.status)
+      .filter((task) => {
+        if (groupBy === 'type') {
+          return task.type === targetGroup;
+        }
+        if (groupBy === 'role') {
+          return task.role === targetGroup;
+        }
+        return task.status === targetGroup;
+      })
       .sort((left, right) => left.kanbanOrder - right.kanbanOrder || left.id - right.id);
     const index = siblings.findIndex((task) => task.id === id);
     const next = index + delta;
@@ -3000,6 +3072,95 @@ export class App
     await store.writeTask(target.path, withStatus({ ...full, kanbanOrder: newOrder }, status, new Date()));
     await this.normalizeKanbanOrders();
     await this.refresh();
+  }
+
+  /**
+   * Changes the value a card is grouped by under the active grouping.
+   *
+   * A drop on another column rewrites the grouped key (`status=`, `type=` or
+   * `role=`) and moves the card to the end of its new column.
+   */
+  private async changeKanbanGroup(taskId: number, target: string): Promise<void> {
+    if (this.kanbanGroupBy === 'type') {
+      if (isTaskType(target)) {
+        await this.changeTaskType(taskId, target);
+      }
+      return;
+    }
+    if (this.kanbanGroupBy === 'role') {
+      if (isTaskRole(target)) {
+        await this.changeTaskRole(taskId, target);
+      }
+      return;
+    }
+    const statuses: readonly string[] = ['planning', 'next', 'todo', 'doing', 'paused', 'done', 'canceled'];
+    if (statuses.includes(target)) {
+      await this.changeTaskStatus(taskId, target as TaskStatus);
+    }
+  }
+
+  /** Changes the type of a task when its card is dropped on another type column. */
+  private async changeTaskType(taskId: number, type: TaskType): Promise<void> {
+    const store = this.store;
+    const card = this.kanbanCards.find((candidate) => candidate.id === taskId);
+    if (card === undefined || card.type === type || store === null) {
+      return;
+    }
+    const summaries = await store.listTasks();
+    const target = summaries.find((task) => task.id === taskId);
+    if (target === undefined) {
+      return;
+    }
+    const newColumn = summaries.filter((task) => task.type === type);
+    const newOrder = newColumn.length;
+    showToast({
+      doc: this.doc,
+      message: `The task #${taskId} is now ${type}.`,
+      kind: 'success',
+    });
+    const full = await store.readTask(target.path);
+    await store.writeTask(target.path, withType({ ...full, kanbanOrder: newOrder }, type, new Date()));
+    await this.normalizeKanbanOrders();
+    await this.refresh();
+  }
+
+  /** Changes the role of a task when its card is dropped on another role column. */
+  private async changeTaskRole(taskId: number, role: TaskRole): Promise<void> {
+    const store = this.store;
+    const card = this.kanbanCards.find((candidate) => candidate.id === taskId);
+    if (card === undefined || card.role === role || store === null) {
+      return;
+    }
+    const summaries = await store.listTasks();
+    const target = summaries.find((task) => task.id === taskId);
+    if (target === undefined) {
+      return;
+    }
+    const newColumn = summaries.filter((task) => task.role === role);
+    const newOrder = newColumn.length;
+    showToast({
+      doc: this.doc,
+      message: `The task #${taskId} is now ${role}.`,
+      kind: 'success',
+    });
+    const full = await store.readTask(target.path);
+    await store.writeTask(target.path, withRole({ ...full, kanbanOrder: newOrder }, role, new Date()));
+    await this.normalizeKanbanOrders();
+    await this.refresh();
+  }
+
+  /** The grouping chosen in the board dropdown, for tests and the drag. */
+  kanbanGrouping(): KanbanGroupBy {
+    return this.kanbanGroupBy;
+  }
+
+  /** Chooses how the board groups its cards, for tests. */
+  setKanbanGrouping(groupBy: KanbanGroupBy): void {
+    if (!isKanbanGroupBy(groupBy)) {
+      return;
+    }
+    this.kanbanGroupBy = groupBy;
+    this.renderKanban();
   }
 
   /** Opens the editor of a task that is only known by its id. */

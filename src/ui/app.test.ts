@@ -45,6 +45,10 @@ interface HarnessOptions {
     readonly parentId?: number;
     readonly expanded?: boolean;
     readonly updated?: string;
+    readonly status?: string;
+    readonly type?: string;
+    readonly role?: string;
+    readonly kanbanHidden?: boolean;
   }[];
   /** The notes created on the fake disk. */
   readonly notes?: readonly {
@@ -77,8 +81,12 @@ function taskContent(
   parentId: number | null = null,
   expanded = false,
   updated = '20261002100000000',
+  status = 'todo',
+  type = 'Feature',
+  role = 'Programming',
+  kanbanHidden = false,
 ): string {
-  const lines = [`id=${id}`, `title=Task ${id}`, 'status=todo'];
+  const lines = [`id=${id}`, `title=Task ${id}`, `status=${status}`];
   if (parentId !== null) {
     lines.push(`parent=${parentId}`);
   }
@@ -92,6 +100,10 @@ function taskContent(
   if (expanded) {
     lines.push('expanded=true');
   }
+  if (kanbanHidden) {
+    lines.push('kanban_hidden=true');
+  }
+  lines.push(`type=${type}`, `role=${role}`);
   lines.push('----', `marker-${id}`);
   return lines.join('\n');
 }
@@ -125,7 +137,16 @@ export async function createHarness(taskCount = 25, options: HarnessOptions = {}
     for (const task of options.tasks) {
       bridge.addFile(
         `/home/user/projects/task_${task.id}.txt`,
-        taskContent(task.id, task.parentId ?? null, task.expanded ?? false, task.updated),
+        taskContent(
+          task.id,
+          task.parentId ?? null,
+          task.expanded ?? false,
+          task.updated ?? '20261002100000000',
+          task.status ?? 'todo',
+          task.type ?? 'Feature',
+          task.role ?? 'Programming',
+          task.kanbanHidden ?? false,
+        ),
       );
     }
   } else {
@@ -2121,6 +2142,172 @@ describe('App and the board', () => {
 
     expect(harness.root.querySelector('.kanban-board')).not.toBeNull();
     expect(harness.root.querySelector('.table-wrap')?.hasAttribute('hidden')).toBe(true);
+
+    harness.app.dispose();
+  });
+
+  it('shows a group-by dropdown defaulting to status', async () => {
+    const harness = await createBoardHarness();
+    await switchToBoard(harness);
+
+    const selectElement = harness.root.querySelector<HTMLSelectElement>('.kanban-group-select');
+    expect(selectElement).not.toBeNull();
+    expect(selectElement?.value).toBe('status');
+    expect([...(selectElement?.options ?? [])].map((option) => option.value)).toEqual([
+      'status',
+      'type',
+      'role',
+    ]);
+
+    harness.app.dispose();
+  });
+
+  it('groups the columns by type when the dropdown changes', async () => {
+    const harness = await createHarness(0, {
+      tasks: [
+        { id: 1, type: 'Bug' },
+        { id: 2, type: 'Feature' },
+        { id: 3, type: 'Bug' },
+        { id: 4, parentId: 1, type: 'Bug' },
+      ],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+    await switchToBoard(harness);
+
+    const selectElement = harness.root.querySelector<HTMLSelectElement>('.kanban-group-select');
+    expect(selectElement).not.toBeNull();
+    if (selectElement === null) {
+      return;
+    }
+    selectElement.value = 'type';
+    selectElement.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+
+    const columns = [...harness.root.querySelectorAll('.kanban-column')];
+    expect(columns.map((column) => column.getAttribute('data-type'))).toEqual([
+      'Bug',
+      'Improvement',
+      'Feature',
+    ]);
+    // Only leaves are shown: task 1 has a child, so the Bug leaves are 3 and 4.
+    const bug = harness.root.querySelector('.kanban-column[data-type="Bug"]');
+    expect(bug?.querySelector('.kanban-column-count')?.textContent).toBe('2');
+    expect(
+      [...(bug?.querySelectorAll('.kanban-card') ?? [])].map((card) =>
+        card.getAttribute('data-task-id'),
+      ).sort(),
+    ).toEqual(['3', '4']);
+    const feature = harness.root.querySelector('.kanban-column[data-type="Feature"]');
+    expect(feature?.querySelectorAll('.kanban-card')).toHaveLength(1);
+
+    harness.app.dispose();
+  });
+
+  it('groups the columns by role when the dropdown changes', async () => {
+    const harness = await createHarness(0, {
+      tasks: [
+        { id: 1, role: 'Design' },
+        { id: 2, role: 'Programming' },
+      ],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+    await switchToBoard(harness);
+
+    const selectElement = harness.root.querySelector<HTMLSelectElement>('.kanban-group-select');
+    if (selectElement === null) {
+      return;
+    }
+    selectElement.value = 'role';
+    selectElement.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+
+    const columns = [...harness.root.querySelectorAll('.kanban-column')];
+    expect(columns).toHaveLength(8);
+    expect(
+      harness.root.querySelector('.kanban-column[data-role="Design"] .kanban-card'),
+    ).not.toBeNull();
+    expect(
+      harness.root.querySelector('.kanban-column[data-role="Programming"] .kanban-card'),
+    ).not.toBeNull();
+
+    harness.app.dispose();
+  });
+
+  it('changes the type of a task when its card is dropped on another type column', async () => {
+    const harness = await createHarness(0, {
+      tasks: [
+        { id: 1, type: 'Bug' },
+        { id: 2, type: 'Feature' },
+      ],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+    await switchToBoard(harness);
+
+    const selectElement = harness.root.querySelector<HTMLSelectElement>('.kanban-group-select');
+    if (selectElement === null) {
+      return;
+    }
+    selectElement.value = 'type';
+    selectElement.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+
+    const source = harness.root.querySelector<HTMLElement>(
+      '.kanban-card[data-task-id="1"] .kanban-card-title',
+    );
+    const target = harness.root.querySelector<HTMLElement>('.kanban-column[data-type="Feature"]');
+    if (source === null || target === null) {
+      return;
+    }
+    const event = (type: string, node: Element, x: number, y: number): void => {
+      node.dispatchEvent(
+        new harness.dom.window.MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 }),
+      );
+    };
+    event('mousedown', source, 10, 10);
+    event('mousemove', target, 60, 60);
+    event('mouseup', target, 60, 60);
+    await flush();
+
+    expect(harness.bridge.files.get('/home/user/projects/task_1.txt')).toContain('type=Feature');
+
+    harness.app.dispose();
+  });
+
+  it('hides type columns through their toggles and persists them', async () => {
+    const harness = await createHarness(0, {
+      tasks: [
+        { id: 1, type: 'Bug', kanbanHidden: true },
+        { id: 2, type: 'Bug' },
+      ],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+    await switchToBoard(harness);
+
+    const selectElement = harness.root.querySelector<HTMLSelectElement>('.kanban-group-select');
+    if (selectElement === null) {
+      return;
+    }
+    selectElement.value = 'type';
+    selectElement.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+
+    const bugCards = (): number =>
+      harness.root.querySelectorAll('.kanban-column[data-type="Bug"] .kanban-card').length;
+    expect(bugCards()).toBe(1);
+
+    const toggle = harness.root.querySelector<HTMLInputElement>(
+      '.kanban-column[data-type="Bug"] .kanban-show-hidden',
+    );
+    if (toggle === null) {
+      return;
+    }
+    toggle.checked = true;
+    toggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    expect(bugCards()).toBe(2);
+    expect(harness.bridge.files.get('/home/user/projects/config.txt')).toContain(
+      'kanban_show_hidden_type_Bug=true',
+    );
 
     harness.app.dispose();
   });

@@ -1,12 +1,12 @@
 /**
  * Drag and drop of the cards of the board.
  *
- * A card is dragged from one column to another one to change the status of the
- * task. The mechanics of the drag (the threshold, the chip that follows the
- * pointer, the dimming of the dragged card) come from `PointerDrag`.
+ * A card is dragged from one column to another one to change the value it is
+ * grouped by (its status, its type or its role). The mechanics of the drag
+ * (the threshold, the chip that follows the pointer, the dimming of the
+ * dragged card) come from `PointerDrag`.
  */
 
-import { isTaskStatus, type TaskStatus } from '../core/task.js';
 import { COLUMN_CLASS } from './kanbanBoard.js';
 import { PointerDrag, findByClass } from './pointerDrag.js';
 
@@ -18,11 +18,11 @@ export interface KanbanDragOptions {
   /** The element that holds the columns of the board. */
   readonly container: HTMLElement;
   /** Called when a card is dropped on a column. */
-  readonly onDrop: (taskId: number, status: TaskStatus) => void;
+  readonly onDrop: (taskId: number, target: string) => void;
 }
 
 export class KanbanDragController {
-  private readonly onDrop: (taskId: number, status: TaskStatus) => void;
+  private readonly onDrop: (taskId: number, target: string) => void;
   private readonly drag: PointerDrag;
   /** The column under the pointer, `null` when there is none. */
   private targetColumn: HTMLElement | null = null;
@@ -55,11 +55,15 @@ export class KanbanDragController {
         if (column === null) {
           return;
         }
-        const status = column.dataset['status'];
-        if (status === undefined || !isTaskStatus(status)) {
+        const target =
+          column.dataset['group'] ??
+          column.dataset['status'] ??
+          column.dataset['type'] ??
+          column.dataset['role'];
+        if (target === undefined || target.length === 0) {
           return;
         }
-        this.onDrop(id, status);
+        this.onDrop(id, target);
       },
     });
   }

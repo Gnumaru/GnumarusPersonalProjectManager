@@ -19,7 +19,7 @@
 
 import type { TaskComment } from './comment.js';
 import type { Note, NoteSearchScope } from './note.js';
-import type { Task, TaskStatus } from './task.js';
+import type { Task, TaskStatus, TaskType, TaskRole } from './task.js';
 
 /** The kind of storage a project uses. */
 export type ProjectKind = 'service' | 'embedded' | 'filesystem';
@@ -37,6 +37,8 @@ export interface TaskSummary {
   readonly status: TaskStatus;
   readonly parentId: number | null;
   readonly tags: readonly string[];
+  readonly type: TaskType;
+  readonly role: TaskRole;
   readonly start: string;
   readonly end: string;
   /** The timestamp of the last update, empty when unknown. */

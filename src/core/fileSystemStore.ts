@@ -474,6 +474,8 @@ export class FileSystemProjectStore implements ProjectStore {
       status: task.status,
       parentId: task.parentId,
       tags: task.tags,
+      type: task.type ?? 'Feature',
+      role: task.role ?? 'Programming',
       start: task.start,
       end: task.end,
       updated: task.updated,

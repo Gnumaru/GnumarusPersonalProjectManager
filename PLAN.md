@@ -8,6 +8,13 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 34 adds a group-by dropdown to the Kanban view:
+  `status` (default), `type` and `role`. Columns follow the chosen
+  grouping (7 status columns, 3 type columns, 8 role columns). Only leaf
+  tasks are shown, hidden cards follow `kanban_hidden` with per-column and
+  global toggles, cards are positioned and colored by their own column, and
+  drag-and-drop plus up/down reordering work inside the active grouping.
+- Verification: 468 unit tests pass.
 - Batch 33 strengthens the highlight of the colored editor
   dropdowns: the hovered/selected option and the hovered closed select use a
   stronger tone of the same colour, so the highlight never hides which colour

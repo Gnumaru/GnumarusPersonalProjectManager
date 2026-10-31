@@ -1132,8 +1132,22 @@ button[hidden] {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   padding: 4px 2px;
+}
+
+.kanban-group-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.kanban-group-select {
+  font-size: 12.5px;
+  padding: 4px 8px;
 }
 
 /* A hidden card shown through a toggle looks dimmed. */
@@ -1259,6 +1273,147 @@ button[hidden] {
   color: var(--danger);
 }
 
+/* Type columns reuse the colours of the type dropdown of the editor:
+   Bug is red, Improvement is amber and Feature is green. */
+.kanban-column[data-type='Bug'] {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+}
+
+.kanban-column[data-type='Improvement'] {
+  background: var(--warning-soft);
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+}
+
+.kanban-column[data-type='Feature'] {
+  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border));
+}
+
+.kanban-column[data-type='Bug'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+}
+
+.kanban-column[data-type='Improvement'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+}
+
+.kanban-column[data-type='Feature'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--success) 55%, var(--border));
+}
+
+.kanban-column[data-type='Bug'] .kanban-column-title {
+  color: var(--danger);
+}
+
+.kanban-column[data-type='Improvement'] .kanban-column-title {
+  color: var(--warning);
+}
+
+.kanban-column[data-type='Feature'] .kanban-column-title {
+  color: var(--success);
+}
+
+/* Role columns share the 8-colour palette of the role dropdown of the editor. */
+.kanban-column[data-role='Graphics'] {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+.kanban-column[data-role='Audio'] {
+  background: var(--info-soft);
+  border-color: color-mix(in srgb, var(--info) 55%, var(--border));
+}
+
+.kanban-column[data-role='Programming'] {
+  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border));
+}
+
+.kanban-column[data-role='Design'] {
+  background: var(--warning-soft);
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+}
+
+.kanban-column[data-role='Assembly'] {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+}
+
+.kanban-column[data-role='Management'] {
+  background: var(--paused-soft);
+  border-color: color-mix(in srgb, var(--paused) 55%, var(--border));
+}
+
+.kanban-column[data-role='Test'] {
+  background: color-mix(in srgb, var(--text-faint) 12%, var(--bg-elevated));
+}
+
+.kanban-column[data-role='Research'] {
+  background: color-mix(in srgb, var(--info-soft) 50%, var(--success-soft));
+  border-color: color-mix(in srgb, var(--info) 30%, var(--success) 25%, var(--border));
+}
+
+.kanban-column[data-role='Graphics'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+.kanban-column[data-role='Audio'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--info) 55%, var(--border));
+}
+
+.kanban-column[data-role='Programming'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--success) 55%, var(--border));
+}
+
+.kanban-column[data-role='Design'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+}
+
+.kanban-column[data-role='Assembly'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+}
+
+.kanban-column[data-role='Management'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--paused) 55%, var(--border));
+}
+
+.kanban-column[data-role='Test'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--text-faint) 35%, var(--border));
+}
+
+.kanban-column[data-role='Research'] .kanban-column-header {
+  border-bottom-color: color-mix(in srgb, var(--info) 30%, var(--success) 25%, var(--border));
+}
+
+.kanban-column[data-role='Graphics'] .kanban-column-title {
+  color: var(--accent);
+}
+
+.kanban-column[data-role='Audio'] .kanban-column-title {
+  color: var(--info);
+}
+
+.kanban-column[data-role='Programming'] .kanban-column-title {
+  color: var(--success);
+}
+
+.kanban-column[data-role='Design'] .kanban-column-title {
+  color: var(--warning);
+}
+
+.kanban-column[data-role='Assembly'] .kanban-column-title {
+  color: var(--danger);
+}
+
+.kanban-column[data-role='Management'] .kanban-column-title {
+  color: var(--paused);
+}
+
+.kanban-column[data-role='Research'] .kanban-column-title {
+  color: color-mix(in srgb, var(--info) 50%, var(--success));
+}
+
 .kanban-cards {
   flex: 1;
   min-height: 0;
@@ -1318,6 +1473,67 @@ button[hidden] {
 .kanban-column[data-status='canceled'] .kanban-card {
   background: color-mix(in srgb, var(--danger) 16%, var(--danger-soft));
   border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+}
+
+.kanban-column[data-type='Bug'] .kanban-card {
+  background: color-mix(in srgb, var(--danger) 16%, var(--danger-soft));
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+}
+
+.kanban-column[data-type='Improvement'] .kanban-card {
+  background: color-mix(in srgb, var(--warning) 16%, var(--warning-soft));
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--border));
+}
+
+.kanban-column[data-type='Feature'] .kanban-card {
+  background: color-mix(in srgb, var(--success) 16%, var(--success-soft));
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border));
+}
+
+.kanban-column[data-role='Graphics'] .kanban-card {
+  background: color-mix(in srgb, var(--accent) 16%, var(--accent-soft));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+.kanban-column[data-role='Audio'] .kanban-card {
+  background: color-mix(in srgb, var(--info) 16%, var(--info-soft));
+  border-color: color-mix(in srgb, var(--info) 30%, var(--border));
+}
+
+.kanban-column[data-role='Programming'] .kanban-card {
+  background: color-mix(in srgb, var(--success) 16%, var(--success-soft));
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border));
+}
+
+.kanban-column[data-role='Design'] .kanban-card {
+  background: color-mix(in srgb, var(--warning) 16%, var(--warning-soft));
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--border));
+}
+
+.kanban-column[data-role='Assembly'] .kanban-card {
+  background: color-mix(in srgb, var(--danger) 16%, var(--danger-soft));
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+}
+
+.kanban-column[data-role='Management'] .kanban-card {
+  background: color-mix(in srgb, var(--paused) 16%, var(--paused-soft));
+  border-color: color-mix(in srgb, var(--paused) 30%, var(--border));
+}
+
+.kanban-column[data-role='Test'] .kanban-card {
+  background: color-mix(in srgb, var(--text-faint) 14%, var(--bg-elevated));
+  border-color: color-mix(in srgb, var(--text-faint) 28%, var(--border));
+}
+
+.kanban-column[data-role='Research'] .kanban-card {
+  background: color-mix(
+    in srgb,
+    var(--info) 8%,
+    var(--success) 8%,
+    var(--info-soft) 42%,
+    var(--success-soft) 42%
+  );
+  border-color: color-mix(in srgb, var(--info) 15%, var(--success) 15%, var(--border));
 }
 
 .kanban-card:hover {

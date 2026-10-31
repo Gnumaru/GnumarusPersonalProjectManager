@@ -21,6 +21,17 @@ describe('parseGlobalConfig', () => {
     expect(config.showHiddenByStatus.get('doing')).toBeUndefined();
   });
 
+  it('reads the type and role column toggles', () => {
+    const config = parseGlobalConfig(
+      'kanban_show_hidden_type_Bug=true\nkanban_show_hidden_role_Programming=true\n',
+    );
+    expect(config.showHiddenByType.get('Bug')).toBe(true);
+    expect(config.showHiddenByRole.get('Programming')).toBe(true);
+    expect(config.showHiddenByType.get('Feature')).toBeUndefined();
+    expect(config.showHiddenByRole.get('Design')).toBeUndefined();
+    expect(config.showHiddenByStatus.size).toBe(0);
+  });
+
   it('reads the saved view and ignores unknown ones', () => {
     expect(parseGlobalConfig('view=kanban\n').view).toBe('kanban');
     expect(parseGlobalConfig('view=bogus\n').view).toBeNull();
@@ -43,6 +54,8 @@ describe('parseGlobalConfig', () => {
         'kanban_show_all_hidden=false',
         'kanban_show_hidden_bogus=true',
         'kanban_show_hidden_doing=false',
+        'kanban_show_hidden_type_Bogus=true',
+        'kanban_show_hidden_role_Bogus=true',
         'unrelated=true',
         '----',
         'free text',
@@ -50,6 +63,8 @@ describe('parseGlobalConfig', () => {
     );
     expect(config.showAllHidden).toBe(false);
     expect(config.showHiddenByStatus.size).toBe(0);
+    expect(config.showHiddenByType.size).toBe(0);
+    expect(config.showHiddenByRole.size).toBe(0);
   });
 });
 
@@ -69,11 +84,28 @@ describe('serializeGlobalConfig', () => {
         ['todo', true],
         ['doing', false],
       ]),
+      showHiddenByType: new Map(),
+      showHiddenByRole: new Map(),
     });
     expect(content).toContain('kanban_show_all_hidden=true');
     expect(content).toContain('kanban_show_hidden_todo=true');
     expect(content).not.toContain('doing');
     expect(content).not.toContain('view=');
+  });
+
+  it('writes the type and role toggles that are on', () => {
+    const content = serializeGlobalConfig({
+      view: null,
+      focusTree: null,
+      focusGantt: null,
+      treeGanttShowHidden: false,
+      showAllHidden: false,
+      showHiddenByStatus: new Map(),
+      showHiddenByType: new Map([['Bug', true]]),
+      showHiddenByRole: new Map([['Programming', true]]),
+    });
+    expect(content).toContain('kanban_show_hidden_type_Bug=true');
+    expect(content).toContain('kanban_show_hidden_role_Programming=true');
   });
 
   it('writes the saved view', () => {
@@ -85,6 +117,8 @@ describe('serializeGlobalConfig', () => {
         treeGanttShowHidden: false,
         showAllHidden: false,
         showHiddenByStatus: new Map(),
+        showHiddenByType: new Map(),
+        showHiddenByRole: new Map(),
       }),
     ).toContain('view=gantt');
   });
@@ -97,6 +131,8 @@ describe('serializeGlobalConfig', () => {
       treeGanttShowHidden: false,
       showAllHidden: false,
       showHiddenByStatus: new Map(),
+      showHiddenByType: new Map(),
+      showHiddenByRole: new Map(),
     });
     expect(focused).toContain('focus_tree=2');
     expect(focused).toContain('focus_gantt=2');
@@ -107,6 +143,8 @@ describe('serializeGlobalConfig', () => {
       treeGanttShowHidden: false,
       showAllHidden: false,
       showHiddenByStatus: new Map(),
+      showHiddenByType: new Map(),
+      showHiddenByRole: new Map(),
     });
     expect(unfocused).not.toContain('focus_');
   });
@@ -119,6 +157,8 @@ describe('serializeGlobalConfig', () => {
       treeGanttShowHidden: true,
       showAllHidden: true,
       showHiddenByStatus: new Map([['doing', true]] as const),
+      showHiddenByType: new Map([['Bug', true]] as const),
+      showHiddenByRole: new Map([['Programming', true]] as const),
     };
     const parsed = parseGlobalConfig(serializeGlobalConfig(config));
     expect(parsed.view).toBe('kanban');
@@ -126,5 +166,7 @@ describe('serializeGlobalConfig', () => {
     expect(parsed.focusGantt).toBe(3);
     expect(parsed.showAllHidden).toBe(true);
     expect(parsed.showHiddenByStatus.get('doing')).toBe(true);
+    expect(parsed.showHiddenByType.get('Bug')).toBe(true);
+    expect(parsed.showHiddenByRole.get('Programming')).toBe(true);
   });
 });
