@@ -1,5 +1,29 @@
 # Checklist
 
+## Batch 35 - Kanban global show-groups checkbox
+
+### Change
+
+- [x] `Show groups` checkbox in `renderKanbanToolbar`
+      (`src/ui/kanbanBoard.ts`), default unchecked, next to the group-by
+      dropdown and the show-hidden toggle
+- [x] `kanbanShowGroups` state (default `false`), `refreshKanban`
+      shows every task when `true`, toggle refreshes the board
+      (`src/ui/app.ts`)
+- [x] Matching checkbox styles (`.kanban-show-groups-label`,
+      `.kanban-show-groups`) in `src/styles.css`
+
+### Tests
+
+- [x] `src/ui/kanbanBoard.test.ts` - checkbox default, checked state,
+      toggle notification
+- [x] `src/ui/app.test.ts` - group tasks hidden by default, shown with
+      the toggle in their own columns (status and type groupings), toggle
+      back restores leaves only
+- [x] `npm run typecheck`, `npm test` (473 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 34 - Kanban group-by dropdown (status / type / role)
 
 ### Change

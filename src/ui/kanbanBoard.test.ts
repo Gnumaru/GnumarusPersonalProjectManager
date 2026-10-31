@@ -432,4 +432,47 @@ describe('renderKanbanToolbar', () => {
     const selectElement = label.querySelector<HTMLSelectElement>('select');
     expect(selectElement?.value).toBe('role');
   });
+
+  it('shows a show-groups checkbox defaulting to unchecked', () => {
+    const doc = createDocument();
+    const toolbar = renderKanbanToolbar(doc, false, () => undefined);
+    const checkbox = toolbar.querySelector<HTMLInputElement>('.kanban-show-groups');
+    expect(checkbox).not.toBeNull();
+    expect(checkbox?.checked).toBe(false);
+    expect(toolbar.querySelector('.kanban-show-groups-label')?.textContent).toContain('Show groups');
+  });
+
+  it('reflects a checked show-groups state', () => {
+    const doc = createDocument();
+    const toolbar = renderKanbanToolbar(
+      doc,
+      false,
+      () => undefined,
+      'status',
+      () => undefined,
+      true,
+    );
+    expect(toolbar.querySelector<HTMLInputElement>('.kanban-show-groups')?.checked).toBe(true);
+  });
+
+  it('notifies when show-groups is toggled', () => {
+    const doc = createDocument();
+    const onToggleShowGroups = vi.fn();
+    const toolbar = renderKanbanToolbar(
+      doc,
+      false,
+      () => undefined,
+      'status',
+      () => undefined,
+      false,
+      onToggleShowGroups,
+    );
+    const checkbox = toolbar.querySelector<HTMLInputElement>('.kanban-show-groups');
+    if (checkbox === null) {
+      return;
+    }
+    checkbox.checked = true;
+    dispatchChange(checkbox);
+    expect(onToggleShowGroups).toHaveBeenCalledWith(true);
+  });
 });

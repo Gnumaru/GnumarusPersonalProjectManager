@@ -8,6 +8,11 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 35 adds a global `Show groups` checkbox to the Kanban
+  toolbar, next to the group-by dropdown and the show-hidden toggle.
+  Default `false` keeps the board as is (only leaf tasks). When `true`,
+  every task is shown in its column, whether it has children or not.
+- Verification: 473 unit tests pass.
 - Batch 34 adds a group-by dropdown to the Kanban view:
   `status` (default), `type` and `role`. Columns follow the chosen
   grouping (7 status columns, 3 type columns, 8 role columns). Only leaf

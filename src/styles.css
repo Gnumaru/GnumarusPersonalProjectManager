@@ -1090,6 +1090,7 @@ button[hidden] {
 
 .kanban-show-hidden-label,
 .kanban-show-all-label,
+.kanban-show-groups-label,
 .kanban-hide-label,
 .tree-show-hidden-label,
 .tree-hide-label,
@@ -1106,6 +1107,7 @@ button[hidden] {
 
 .kanban-show-hidden-label:hover,
 .kanban-show-all-label:hover,
+.kanban-show-groups-label:hover,
 .kanban-hide-label:hover,
 .tree-show-hidden-label:hover,
 .tree-hide-label:hover,
@@ -1116,6 +1118,7 @@ button[hidden] {
 
 .kanban-show-hidden,
 .kanban-show-all-hidden,
+.kanban-show-groups,
 .kanban-hide-checkbox,
 .tree-show-hidden,
 .tree-hide-checkbox,

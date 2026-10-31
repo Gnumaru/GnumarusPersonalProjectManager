@@ -459,7 +459,12 @@ default of the tree.
 
 The third display mode is a **board**: one column per group value, with the
 cards of the tasks that have **no child**. A task that has children is
-represented by its children, the board shows the leaves of the tree.
+represented by its children, the board shows the leaves of the tree. The
+global **Show groups** checkbox of the toolbar (unchecked by default, next to
+the group-by dropdown and the show-hidden toggle) shows **every task**
+instead, whether it has children or not: group tasks appear in the column of
+their own status, type or role, following the same hidden, color and
+drag-and-drop rules as the leaves.
 
 ### Grouping by status, type or role
 

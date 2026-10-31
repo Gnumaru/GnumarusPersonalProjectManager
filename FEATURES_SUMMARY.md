@@ -85,6 +85,7 @@ list or as a tree.
 | ------- | ------ | ----- |
 | **Kanban board: one column per status** | Done | `src/ui/kanbanBoard.ts` |
 | **Kanban board: group-by dropdown (status, type, role), columns per group value** | Done | `src/ui/kanbanBoard.ts`, `src/ui/app.ts`, `src/core/task.ts` |
+| **Kanban board: global Show groups checkbox (leaves only by default, every task when on)** | Done | `src/ui/kanbanBoard.ts`, `src/ui/app.ts` |
 | **Board columns colored from top to bottom with the colour of their status** | Done | `src/styles.css` |
 | **Cards colored with the colour of their column, a shade darker, changing when dragged** | Done | `src/styles.css` |
 | **Search on the board: only the matching leaves stay on the board** | Done | `src/ui/app.ts` |

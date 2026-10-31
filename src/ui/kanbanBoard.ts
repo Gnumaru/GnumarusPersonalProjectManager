@@ -1,8 +1,10 @@
 /**
  * The board of the tasks: one column per group.
  *
- * Only the tasks that have **no child** are shown: a task with children is
- * represented by its children, the board shows the leaves of the tree.
+ * By default only the tasks that have **no child** are shown: a task with
+ * children is represented by its children, the board shows the leaves of the
+ * tree. The global **Show groups** checkbox shows every task instead,
+ * whether it has children or not.
  *
  * The board groups its cards by `status` (the default), `type` or `role`.
  * A card can be dragged from one column to another one to change the value it
@@ -86,27 +88,42 @@ export function renderKanbanGroupSelect(
   ]);
 }
 
-/** The global toggle above the board: shows the hidden cards of every column. */
+/** The global toggles above the board: grouping, group tasks and hidden cards. */
 export function renderKanbanToolbar(
   doc: Document,
   showAllHidden: boolean,
   onToggleShowAll: (show: boolean) => void,
   groupBy: KanbanGroupBy = 'status',
   onChangeGroupBy: (groupBy: KanbanGroupBy) => void = () => undefined,
+  showGroups = false,
+  onToggleShowGroups: (show: boolean) => void = () => undefined,
 ): HTMLElement {
-  const checkbox = doc.createElement('input');
-  checkbox.type = 'checkbox';
-  checkbox.className = 'kanban-show-all-hidden';
-  checkbox.checked = showAllHidden;
-  checkbox.title = 'Show every hidden card';
-  checkbox.setAttribute('aria-label', 'Show every hidden card');
-  checkbox.addEventListener('change', () => {
-    onToggleShowAll(checkbox.checked);
+  const hiddenCheckbox = doc.createElement('input');
+  hiddenCheckbox.type = 'checkbox';
+  hiddenCheckbox.className = 'kanban-show-all-hidden';
+  hiddenCheckbox.checked = showAllHidden;
+  hiddenCheckbox.title = 'Show every hidden card';
+  hiddenCheckbox.setAttribute('aria-label', 'Show every hidden card');
+  hiddenCheckbox.addEventListener('change', () => {
+    onToggleShowAll(hiddenCheckbox.checked);
+  });
+  const groupsCheckbox = doc.createElement('input');
+  groupsCheckbox.type = 'checkbox';
+  groupsCheckbox.className = 'kanban-show-groups';
+  groupsCheckbox.checked = showGroups;
+  groupsCheckbox.title = 'Show the tasks that have children';
+  groupsCheckbox.setAttribute('aria-label', 'Show the tasks that have children');
+  groupsCheckbox.addEventListener('change', () => {
+    onToggleShowGroups(groupsCheckbox.checked);
   });
   return el(doc, 'div', { class: 'kanban-toolbar' }, [
     renderKanbanGroupSelect(doc, groupBy, onChangeGroupBy),
+    el(doc, 'label', { class: 'kanban-show-groups-label', title: 'Show the tasks that have children' }, [
+      groupsCheckbox,
+      el(doc, 'span', { text: 'Show groups' }),
+    ]),
     el(doc, 'label', { class: 'kanban-show-all-label', title: 'Show every hidden card' }, [
-      checkbox,
+      hiddenCheckbox,
       el(doc, 'span', { text: 'Show hidden' }),
     ]),
   ]);

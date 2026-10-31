@@ -162,11 +162,13 @@ o highlight do mouseover nas opcoes dos dropdowns faz o usuario esquecer qual é
 ====
 na view de kanban deve ser exibido um dropdown com as opcoes 'status', 'type' e 'role'. o valor padrao é 'status'. ao mudar o valor do dropdown as colunas do kanban vao mudar. ao inves de exibir uma coluna por status de tarefa (todo, doing, done etc) exibira uma coluna pra cada valor possivel da coisa escolhida no dropdown (como 'bug', 'improvement' e 'feature' no caso de 'type'). as tarefas continuam sendo exibidas segundo as mesmas regras de antes. apenas tarefas folha (sem filhas) sao exibidas, elas são escondidas ou exibidas segundo os metadados que escondem e exibem as tarefas, e elas sao posicionadas e coloridas em suas respectivas colunas.
 ====
+na view kanban adicione um checkbox global (de fora das colunas, junto com o checkbox show hidden e o dropdown group by) chamado 'show groups'. o valor padrao é false. se ele for false tudo continua como está. se ele for true todas as tarefas são exibidas nas colunas do kanban independente de elas serem tarefas folha (sem filhas) ou tarefas de grupo (com filhas).
 ====
 ====
 ====
 ====
 ====
+porque a fake bridge nao retorna kanban_order/tree_gantt_order? o problema de quebrar os testes não é culpa dos testes em si? a gente não deveria fazer a fake bridge ser igual a bridge real e consertar os testes? ou eu estou entendendo errado?
 ====
 ====
 ====

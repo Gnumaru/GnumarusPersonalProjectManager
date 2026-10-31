@@ -260,10 +260,12 @@ export class App
   private taskTableHead!: HTMLElement;
   /** The header row of the note table, rebuilt on every render. */
   private noteTableHead!: HTMLElement;
-  /** The cards of the board: the tasks that have no child. */
+  /** The cards of the board: the leaves, or every task while Show groups is on. */
   private kanbanCards: TaskCard[] = [];
   /** How the board groups its cards into columns. */
   private kanbanGroupBy: KanbanGroupBy = 'status';
+  /** When `true`, the tasks that have children are shown on the board as well. */
+  private kanbanShowGroups = false;
   /** When `true`, the hidden cards of every column are shown. */
   private kanbanShowAllHidden = false;
   /** Per column toggle for the hidden cards, `false` when absent. */
@@ -1458,8 +1460,11 @@ export class App
     this.treeMatches = matches;
     this.commentCounts = new Map(await store.commentCounts().catch(() => new Map<number, number>()));
     this.kanbanCards = summaries
-      .filter((task) => !parents.has(task.id))
-      // The search of the board shows only the leaves that match: the other
+      // The board shows only the leaves: a task with children is represented
+      // by its children. The global Show groups checkbox shows every task
+      // instead, whether it has children or not.
+      .filter((task) => this.kanbanShowGroups || !parents.has(task.id))
+      // The search of the board shows only the tasks that match: the other
       // cards come back when the search box is emptied.
       .filter((task) => matches === null || matches.has(task.id))
       .sort((a, b) => a.kanbanOrder - b.kanbanOrder || a.id - b.id)
@@ -1954,6 +1959,11 @@ export class App
         (groupBy) => {
           this.kanbanGroupBy = groupBy;
           this.renderKanban();
+        },
+        this.kanbanShowGroups,
+        (show) => {
+          this.kanbanShowGroups = show;
+          void this.refresh();
         },
       ),
     );

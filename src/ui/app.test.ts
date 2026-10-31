@@ -2311,6 +2311,88 @@ describe('App and the board', () => {
 
     harness.app.dispose();
   });
+
+  it('hides the group tasks unless show-groups is checked', async () => {
+    const harness = await createBoardHarness();
+    await switchToBoard(harness);
+
+    // The checkbox lives in the toolbar, outside the columns, unchecked by default.
+    const toggle = harness.root.querySelector<HTMLInputElement>('.kanban-show-groups');
+    expect(toggle).not.toBeNull();
+    expect(toggle?.checked).toBe(false);
+    expect(toggle?.closest('.kanban-column')).toBeNull();
+
+    // Only the leaves are on the board: tasks 1 and 2 have children.
+    let cards = [...harness.root.querySelectorAll('.kanban-card')];
+    expect(cards.map((card) => card.getAttribute('data-task-id'))).toEqual(['3', '4', '5']);
+
+    if (toggle === null) {
+      return;
+    }
+    toggle.checked = true;
+    toggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+
+    // Every task is shown now, whether it has children or not.
+    cards = [...harness.root.querySelectorAll('.kanban-card')];
+    expect(cards.map((card) => card.getAttribute('data-task-id')).sort()).toEqual(
+      ['1', '2', '3', '4', '5'],
+    );
+    expect(harness.root.querySelector('.result-count')?.textContent).toBe('5 cards');
+
+    // Unchecking it brings back the leaves only.
+    toggle.checked = false;
+    toggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+    cards = [...harness.root.querySelectorAll('.kanban-card')];
+    expect(cards.map((card) => card.getAttribute('data-task-id'))).toEqual(['3', '4', '5']);
+
+    harness.app.dispose();
+  });
+
+  it('shows the group tasks in their own columns when grouped by type', async () => {
+    const harness = await createHarness(0, {
+      tasks: [
+        { id: 1, type: 'Bug' },
+        { id: 2, parentId: 1, type: 'Feature' },
+      ],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+    await switchToBoard(harness);
+
+    const selectElement = harness.root.querySelector<HTMLSelectElement>('.kanban-group-select');
+    if (selectElement === null) {
+      return;
+    }
+    selectElement.value = 'type';
+    selectElement.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+
+    // The parent task is hidden while show-groups is off.
+    expect(
+      harness.root.querySelector('.kanban-card[data-task-id="1"]'),
+    ).toBeNull();
+
+    const toggle = harness.root.querySelector<HTMLInputElement>('.kanban-show-groups');
+    if (toggle === null) {
+      return;
+    }
+    toggle.checked = true;
+    toggle.dispatchEvent(new harness.dom.window.Event('change', { bubbles: true }));
+    await flush();
+
+    // Each task sits in the column of its own type.
+    expect(
+      harness.root.querySelector('.kanban-column[data-type="Bug"] .kanban-card[data-task-id="1"]'),
+    ).not.toBeNull();
+    expect(
+      harness.root.querySelector(
+        '.kanban-column[data-type="Feature"] .kanban-card[data-task-id="2"]',
+      ),
+    ).not.toBeNull();
+
+    harness.app.dispose();
+  });
 });
 
 describe('App and the Gantt chart', () => {
