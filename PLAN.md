@@ -8,6 +8,9 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 38 shows the parent chain of the task view modal as a
+  vertical list, one ancestor per row, so long chains stay readable.
+- Verification: 482 unit tests pass.
 - Batch 37 shows the whole parent chain in the task view modal:
   every ancestor from the root down to the immediate parent, each with its
   id and title truncated to 64 characters, clickable to open the ancestor.

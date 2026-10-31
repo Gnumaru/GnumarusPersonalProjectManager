@@ -232,7 +232,8 @@ describe('parent chain of the task view', () => {
 
     const links = [...doc.querySelectorAll('.task-parent-chain .task-parent-link')];
     expect(links.map((link) => link.textContent)).toEqual(['#1 Root task', '#2 Middle task']);
-    expect(doc.querySelectorAll('.task-parent-chain .task-parent-sep')).toHaveLength(1);
+    // One row per ancestor: a vertical list.
+    expect(doc.querySelectorAll('.task-parent-chain .task-parent-item')).toHaveLength(2);
   });
 
   it('truncates a long ancestor title to 64 characters', () => {

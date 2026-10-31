@@ -170,6 +170,7 @@ implemente o fix recomendado
 ====
 na modal de visualizar tarefa é exibido apenas o parent imediato da tarefa. eu quero que seja exibida toda a cadeia de parents, com os ids e nomes (truncados pra 64 caracteres)
 ====
+a cadeia de parents no modal que visualiza a tarefa deve ser exibida como lista vertical, caso contrario fica dificil de ler
 ====
 
 ====

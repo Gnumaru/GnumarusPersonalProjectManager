@@ -269,7 +269,7 @@ The store refuses to create a child of a task that does not exist
 | The **Parent** column of the table | `#1` for a child task (a link that opens the parent, even when the parent is on another page), `—` for a root task. |
 | The **title of a task** | A badge with the amount of children it has. |
 | The **view of a task** | The list of its children (`#2 Write the migrations - TODO`); clicking a child opens it. |
-| The **view of a child** | A banner with the whole chain of parents, from the root down to its parent (`#1 Design the database schema › #2 Write the migrations`); every ancestor shows its id and its title truncated to 64 characters, and clicking one opens it. |
+| The **view of a child** | A banner with the whole chain of parents as a vertical list, one ancestor per row from the root down to its parent (`#1 Design the database schema`, `#2 Write the migrations`); every ancestor shows its id and its title truncated to 64 characters, and clicking one opens it. |
 | The **editor of a child** | A banner with the parent of the task. |
 
 The amount of children of every task is read with a single command that only

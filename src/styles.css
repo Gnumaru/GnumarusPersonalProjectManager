@@ -2237,7 +2237,7 @@ input[type='date'] {
 
 .task-parent-banner {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   background: var(--accent-soft);
   color: var(--accent);
@@ -2247,17 +2247,19 @@ input[type='date'] {
   margin-bottom: 12px;
 }
 
-/* The chain of parents of the viewed task, from the root to its parent. */
+/* The chain of parents of the viewed task, one ancestor per row. */
 .task-parent-chain {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
   min-width: 0;
+  flex: 1;
 }
 
-.task-parent-sep {
-  opacity: 0.6;
+.task-parent-item {
+  display: flex;
+  min-width: 0;
 }
 
 .task-parent-link {

@@ -337,33 +337,29 @@ export class TaskDialog {
   /**
    * The chain of parents of the task, from the root down to its parent.
    *
-   * Every ancestor shows its id and its title, truncated to 64 characters
-   * like the other task labels, and opens when clicked.
+   * Every ancestor gets its own row with its id and its title, truncated to
+   * 64 characters like the other task labels, and opens when clicked.
    */
   private renderParentChain(): HTMLElement {
     const chain = el(this.doc, 'div', { class: 'task-parent-chain' });
-    this.parents.forEach((parent, index) => {
-      if (index > 0) {
-        chain.append(el(this.doc, 'span', { class: 'task-parent-sep', text: '›' }));
-      }
+    for (const parent of this.parents) {
       const label = parentLabelOf(parent);
-      if (this.onOpenParent !== undefined) {
-        const item = el(this.doc, 'button', {
-          class: 'task-parent-link',
-          text: label,
-          attrs: { type: 'button', title: `Open task #${parent.id}` },
-          on: {
-            click: () => {
-              this.modal.close();
-              this.onOpenParent?.(parent);
-            },
-          },
-        });
-        chain.append(item);
-      } else {
-        chain.append(el(this.doc, 'span', { class: 'task-parent-name', text: label }));
-      }
-    });
+      const item =
+        this.onOpenParent !== undefined
+          ? el(this.doc, 'button', {
+              class: 'task-parent-link',
+              text: label,
+              attrs: { type: 'button', title: `Open task #${parent.id}` },
+              on: {
+                click: () => {
+                  this.modal.close();
+                  this.onOpenParent?.(parent);
+                },
+              },
+            })
+          : el(this.doc, 'span', { class: 'task-parent-name', text: label });
+      chain.append(el(this.doc, 'div', { class: 'task-parent-item' }, [item]));
+    }
     return el(this.doc, 'div', { class: 'task-parent-banner' }, [
       createIcon(this.doc, 'child'),
       chain,

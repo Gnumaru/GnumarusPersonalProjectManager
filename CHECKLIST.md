@@ -1,5 +1,21 @@
 # Checklist
 
+## Batch 38 - Parent chain as a vertical list
+
+### Change
+
+- [x] `renderParentChain` renders one ancestor per row (`.task-parent-item`),
+      no separators (`src/ui/taskDialog.ts`)
+- [x] Column layout for the chain, banner aligned to the top
+      (`src/styles.css`)
+
+### Tests
+
+- [x] `src/ui/taskDialog.test.ts` - one row per ancestor
+- [x] `npm run typecheck`, `npm test` (482 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 37 - Full parent chain in the task view modal
 
 ### Change
