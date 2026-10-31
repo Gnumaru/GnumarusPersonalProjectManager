@@ -172,7 +172,7 @@ na modal de visualizar tarefa é exibido apenas o parent imediato da tarefa. eu 
 ====
 a cadeia de parents no modal que visualiza a tarefa deve ser exibida como lista vertical, caso contrario fica dificil de ler
 ====
-
+faça com que seja uma lista numerada. alem disso, quando o nome é grande demais (quando a concatenacao do id com o nome passa de 50 caracteres) a string inteira está sendo visualmente truncada e nao esta alinhando a esquerda, ela parece como se estivesse centralizada
 ====
 ====
 ====

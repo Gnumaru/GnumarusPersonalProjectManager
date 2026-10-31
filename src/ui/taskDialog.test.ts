@@ -232,8 +232,10 @@ describe('parent chain of the task view', () => {
 
     const links = [...doc.querySelectorAll('.task-parent-chain .task-parent-link')];
     expect(links.map((link) => link.textContent)).toEqual(['#1 Root task', '#2 Middle task']);
-    // One row per ancestor: a vertical list.
+    // A numbered vertical list: one row per ancestor.
+    expect(doc.querySelector('.task-parent-chain')?.tagName).toBe('OL');
     expect(doc.querySelectorAll('.task-parent-chain .task-parent-item')).toHaveLength(2);
+    expect(doc.querySelector('.task-parent-chain .task-parent-item')?.tagName).toBe('LI');
   });
 
   it('truncates a long ancestor title to 64 characters', () => {
@@ -279,5 +281,12 @@ describe('parent chain of the task view', () => {
 
     expect(doc.querySelector('.task-parent-chain')).toBeNull();
     expect(doc.querySelector('.task-parent-banner')?.textContent).toContain('Child of task #2');
+  });
+
+  it('numbers the chain and left-aligns long names as blocks', () => {
+    expect(stylesCss).toContain('ol.task-parent-chain');
+    expect(stylesCss).toContain('list-style: decimal');
+    // Clipped names must ellipsize to the left: blocks, not centered flex.
+    expect(stylesCss).toMatch(/\.task-parent-link,\s*\.task-parent-name \{[^}]*display: block[^}]*text-align: left/su);
   });
 });

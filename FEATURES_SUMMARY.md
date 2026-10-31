@@ -14,7 +14,7 @@ list or as a tree.
 | **Create a child task from an existing parent task** | Done | `src/ui/taskTable.ts`, `src/ui/taskDialog.ts` |
 | **List the children of a task and open them** | Done | `src/ui/taskDialog.ts` |
 | **Show the parent of a task and the amount of children of a task** | Done | `src/ui/taskTable.ts` |
-| **Show the whole parent chain in the task view (vertical list, ids and titles, 64 chars, clickable)** | Done | `src/ui/taskDialog.ts`, `src/ui/app.ts` |
+| **Show the whole parent chain in the task view (numbered list, ids and titles, 64 chars, clickable)** | Done | `src/ui/taskDialog.ts`, `src/ui/app.ts` |
 | Edit a task | Done | `src/ui/taskDialog.ts`, `src/core/projectStore.ts` |
 | View a task | Done | `src/ui/taskDialog.ts` |
 | Delete a task (with confirmation) | Done | `src/ui/taskDialog.ts`, `src/core/projectStore.ts` |

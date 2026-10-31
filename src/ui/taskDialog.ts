@@ -337,11 +337,12 @@ export class TaskDialog {
   /**
    * The chain of parents of the task, from the root down to its parent.
    *
-   * Every ancestor gets its own row with its id and its title, truncated to
-   * 64 characters like the other task labels, and opens when clicked.
+   * A numbered list with one ancestor per row. Every ancestor shows its id
+   * and its title, truncated to 64 characters like the other task labels,
+   * and opens when clicked.
    */
   private renderParentChain(): HTMLElement {
-    const chain = el(this.doc, 'div', { class: 'task-parent-chain' });
+    const chain = el(this.doc, 'ol', { class: 'task-parent-chain' });
     for (const parent of this.parents) {
       const label = parentLabelOf(parent);
       const item =
@@ -358,7 +359,7 @@ export class TaskDialog {
               },
             })
           : el(this.doc, 'span', { class: 'task-parent-name', text: label });
-      chain.append(el(this.doc, 'div', { class: 'task-parent-item' }, [item]));
+      chain.append(el(this.doc, 'li', { class: 'task-parent-item' }, [item]));
     }
     return el(this.doc, 'div', { class: 'task-parent-banner' }, [
       createIcon(this.doc, 'child'),

@@ -1,5 +1,24 @@
 # Checklist
 
+## Batch 39 - Numbered parent chain and left-aligned long names
+
+### Change
+
+- [x] `renderParentChain` renders an `ol`/`li` numbered list, one ancestor
+      per row (`src/ui/taskDialog.ts`)
+- [x] Chain items become left-aligned blocks with ellipsis (`max-width`
+      matching the 64 label characters) instead of the global centered
+      flex buttons, so clipped names ellipsize to the left
+      (`src/styles.css`)
+
+### Tests
+
+- [x] `src/ui/taskDialog.test.ts` - `ol`/`li` structure, one row per
+      ancestor, stylesheet guards for numbering and left alignment
+- [x] `npm run typecheck`, `npm test` (483 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 38 - Parent chain as a vertical list
 
 ### Change

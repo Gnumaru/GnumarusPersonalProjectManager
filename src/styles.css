@@ -2247,19 +2247,41 @@ input[type='date'] {
   margin-bottom: 12px;
 }
 
-/* The chain of parents of the viewed task, one ancestor per row. */
-.task-parent-chain {
+/* The chain of parents of the viewed task: a numbered list with one
+   ancestor per row. */
+ol.task-parent-chain {
+  list-style: decimal;
+  margin: 0;
+  padding-left: 24px;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
   gap: 2px;
-  min-width: 0;
   flex: 1;
+  min-width: 0;
 }
 
 .task-parent-item {
-  display: flex;
   min-width: 0;
+}
+
+.task-parent-item::marker {
+  font-weight: 700;
+}
+
+/* Long names ellipsize to the left: the global buttons are centered flex
+   boxes, where clipped text looks centered and ellipsis never applies, so
+   the chain items are left-aligned blocks instead. The width matches the
+   64 characters of the labels, so only unbroken overflow is clipped. */
+.task-parent-link,
+.task-parent-name {
+  display: block;
+  width: 100%;
+  max-width: 64ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-weight: 600;
 }
 
 .task-parent-link {
@@ -2268,25 +2290,12 @@ input[type='date'] {
   padding: 0;
   color: inherit;
   font: inherit;
-  font-weight: 600;
   cursor: pointer;
-  max-width: 40ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .task-parent-link:hover:not(:disabled) {
   background: transparent;
   text-decoration: underline;
-}
-
-.task-parent-name {
-  font-weight: 600;
-  max-width: 40ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .task-children {

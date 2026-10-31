@@ -8,6 +8,11 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 39 renders the parent chain as a numbered list and fixes
+  the alignment of long ancestor names: the global centered button style
+  made clipped names look centered, so chain buttons become left-aligned
+  blocks with ellipsis.
+- Verification: 483 unit tests pass.
 - Batch 38 shows the parent chain of the task view modal as a
   vertical list, one ancestor per row, so long chains stay readable.
 - Verification: 482 unit tests pass.
