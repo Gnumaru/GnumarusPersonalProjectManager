@@ -14,7 +14,7 @@ plain text file on the local disk, accessed exclusively through the
   `public.gnumarus_files` table (missing/wrong table shows the CREATE TABLE
   + RLS setup queries, invalid credentials re-ask), all over plain fetch
   with no new dependencies.
-- Verification: 527 unit tests pass.
+- Verification: 528 unit tests pass.
 - Batch 40 replaces sequential integer ids with random nonzero
   ids in `[Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]`, globally
   unique across tasks, comments and notes. Allocation checks for collisions

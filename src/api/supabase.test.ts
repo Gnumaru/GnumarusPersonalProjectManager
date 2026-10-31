@@ -134,6 +134,32 @@ describe('normalizeSupabaseUrl', () => {
 });
 
 describe('SupabaseClient', () => {
+  it('calls the global fetch bound, avoiding Illegal invocation', async () => {
+    const seen: string[] = [];
+    // Like a browser: the global fetch only works bound to the global scope.
+    function strictFetch(
+      this: unknown,
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> {
+      void init;
+      if (this !== globalThis) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+      }
+      seen.push(typeof input === 'string' ? input : String(input));
+      return Promise.resolve(jsonResponse([]));
+    }
+    const previous = globalThis.fetch;
+    globalThis.fetch = strictFetch as typeof fetch;
+    try {
+      const client = new SupabaseClient({ url: SUPABASE_URL, key: KEY });
+      await client.probeTable();
+      expect(seen).toHaveLength(1);
+    } finally {
+      globalThis.fetch = previous;
+    }
+  });
+
   it('sends the key as apikey and bearer on every request', async () => {
     const { routes, seen } = healthyRoutes();
     const client = clientWith(routes, seen);

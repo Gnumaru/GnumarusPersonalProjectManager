@@ -144,7 +144,9 @@ export class SupabaseClient {
   constructor(options: SupabaseClientOptions) {
     this.baseUrl = normalizeSupabaseUrl(options.url);
     this.key = options.key;
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    // A bare `fetch` reference fails as "Illegal invocation" when called
+    // unbound, so the global one is bound like the bridge client does.
+    this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
   }
 
   /** The normalized project URL, for the messages. */

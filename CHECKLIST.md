@@ -29,9 +29,11 @@
 - [x] `src/ui/app.test.ts`: Supabase smoke (create + list), rejected and
       missing credentials, dialog form (re-ask, setup SQL, success),
       four dialog choices
+- [x] Fix: global `fetch` bound (`globalThis.fetch.bind`), like the bridge
+      client; regression test simulates the browser rejection (528 tests)
 - [x] e2e `project-choice` length assertions updated (3 -> 4);
       `node --check scripts/e2e-browser.mjs`
-- [x] `npm run typecheck`, `npm test` (527 tests), `npm run build`
+- [x] `npm run typecheck`, `npm test` (528 tests), `npm run build`
 - [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
 - [x] Compared consistency of all documentation files
 
