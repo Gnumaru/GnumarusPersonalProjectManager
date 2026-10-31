@@ -1,5 +1,25 @@
 # Checklist
 
+## Batch 43 - Quoted identifiers and timestamp columns in Supabase
+
+### Change
+
+- [x] Quote every identifier in `SUPABASE_SETUP_SQL` (`end` is reserved)
+- [x] Date columns become nullable `timestamp`; dual-format conversion
+      (compact/PG/ISO in, PG-or-null out) so old text columns keep working
+      (`src/core/supabaseStore.ts`)
+
+### Tests
+
+- [x] `src/api/supabase.test.ts` - quoted identifiers, timestamp columns,
+      still no grants/policies
+- [x] `src/core/supabaseStore.test.ts` - conversion round trips, null
+      dates stored as null and read back empty
+- [x] `npm run typecheck`, `npm test` (532 tests, 3 consecutive green runs),
+      `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 42 - Normalized Supabase schema (tasks/comments/notes/config/ids)
 
 ### Change

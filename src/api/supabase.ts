@@ -42,6 +42,10 @@ export interface SupabaseTableDef {
 /**
  * The schema of the project, the single source of truth for the setup
  * script, the verification and the fake of the tests.
+ *
+ * Dates are real `timestamp` columns (without time zone, like the local
+ * times of the compact format), nullable for unknown dates. Every
+ * identifier is double-quoted: `end` is a reserved word.
  */
 export const SUPABASE_SCHEMA: Readonly<Record<SupabaseTable, SupabaseTableDef>> = {
   tasks: {
@@ -52,10 +56,10 @@ export const SUPABASE_SCHEMA: Readonly<Record<SupabaseTable, SupabaseTableDef>> 
       { name: 'status', definition: "text not null default 'todo'" },
       { name: 'parent', definition: 'bigint' },
       { name: 'tags', definition: "text not null default ''" },
-      { name: 'created', definition: "text not null default ''" },
-      { name: 'updated', definition: "text not null default ''" },
-      { name: 'start', definition: "text not null default ''" },
-      { name: 'end', definition: "text not null default ''" },
+      { name: 'created', definition: 'timestamp' },
+      { name: 'updated', definition: 'timestamp' },
+      { name: 'start', definition: 'timestamp' },
+      { name: 'end', definition: 'timestamp' },
       { name: 'blocked_by', definition: "text not null default ''" },
       { name: 'related', definition: "text not null default ''" },
       { name: 'expanded', definition: 'boolean not null default false' },
@@ -73,8 +77,8 @@ export const SUPABASE_SCHEMA: Readonly<Record<SupabaseTable, SupabaseTableDef>> 
     idType: 'bigint',
     columns: [
       { name: 'task', definition: 'bigint not null' },
-      { name: 'created', definition: "text not null default ''" },
-      { name: 'updated', definition: "text not null default ''" },
+      { name: 'created', definition: 'timestamp' },
+      { name: 'updated', definition: 'timestamp' },
       { name: 'body', definition: "text not null default ''" },
     ],
   },
@@ -83,8 +87,8 @@ export const SUPABASE_SCHEMA: Readonly<Record<SupabaseTable, SupabaseTableDef>> 
     idType: 'bigint',
     columns: [
       { name: 'title', definition: "text not null default ''" },
-      { name: 'created', definition: "text not null default ''" },
-      { name: 'updated', definition: "text not null default ''" },
+      { name: 'created', definition: 'timestamp' },
+      { name: 'updated', definition: 'timestamp' },
       { name: 'body', definition: "text not null default ''" },
     ],
   },
@@ -124,11 +128,11 @@ export const SUPABASE_SETUP_SQL: string = (() => {
   for (const table of SUPABASE_TABLES) {
     const def = SUPABASE_SCHEMA[table];
     blocks.push(
-      `create table if not exists public.${table} (${def.idColumn} ${def.idType} primary key);`,
+      `create table if not exists public."${table}" ("${def.idColumn}" ${def.idType} primary key);`,
     );
     for (const column of def.columns) {
       blocks.push(
-        `alter table public.${table} add column if not exists ${column.name} ${column.definition};`,
+        `alter table public."${table}" add column if not exists "${column.name}" ${column.definition};`,
       );
     }
   }

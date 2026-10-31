@@ -1029,7 +1029,10 @@ application talks to the PostgREST API of the project with plain `fetch`.
 Every record is one row of a normalized table: each task metadata is a
 column of `tasks` plus a `description` column, comments and notes work the
 same way with a `body` column, `config` holds one row per setting (the
-setting name as primary key), and `ids` holds every used id. Lists stay
+setting name as primary key), and `ids` holds every used id. Dates are real
+`timestamp` columns (without time zone, like the local times of the app),
+nullable for unknown dates; rows written before the timestamp columns read
+back the same. Lists stay
 space-separated (`tags`) or comma-separated (`blocked_by`, `related`) text,
 exactly like the files, and missing values read back with the same defaults
 as the file format. Numeric ids are the primary keys; there are no foreign
@@ -1045,8 +1048,9 @@ ones. A missing table or a missing column shows the queries that create the
 database (`SUPABASE_SETUP_SQL` in `src/api/supabase.ts`): every table is
 created with just its id column and all other columns follow one by one with
 `add column if not exists`, so the block is safe on a new database and on
-one that already holds some tables. Nothing else is included (no grants and
-no policies), on the assumption of a new database without row level
+one that already holds some tables. Every identifier is double-quoted
+(`end` is a reserved word). Nothing else is included (no grants and no
+policies), on the assumption of a new database without row level
 security.
 
 The Supabase project never needs the bridge service, and a `401` answer

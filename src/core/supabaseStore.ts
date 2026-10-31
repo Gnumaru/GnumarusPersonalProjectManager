@@ -100,6 +100,48 @@ function idOf(value: SupabaseValueOfRow): number | null {
 
 type SupabaseValueOfRow = string | number | boolean | null | undefined;
 
+/**
+ * Reads a date cell as a compact timestamp.
+ *
+ * Accepts the PostgreSQL `timestamp` output (`YYYY-MM-DD HH:MI:SS` with
+ * optional fractional seconds), the compact format and the legacy ISO
+ * format, so rows written before the timestamp columns keep working.
+ * Unknown dates become an empty string.
+ */
+export function parseDatabaseTimestamp(value: SupabaseValueOfRow): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return '';
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?$/u.exec(trimmed);
+  if (match !== null) {
+    const fraction = `${match[7] ?? ''}000`.slice(0, 3);
+    return normalizeTaskTimestamp(
+      `${match[1] ?? ''}${match[2] ?? ''}${match[3] ?? ''}${match[4] ?? ''}${match[5] ?? ''}${match[6] ?? ''}${fraction}`,
+    );
+  }
+  return normalizeTaskTimestamp(trimmed);
+}
+
+/**
+ * Writes a compact timestamp as a database value: a PostgreSQL timestamp
+ * literal, or null for an unknown date.
+ */
+export function databaseTimestampValue(compact: string): string | null {
+  const trimmed = compact.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  const match = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{3})$/.exec(trimmed);
+  if (match === null) {
+    return trimmed;
+  }
+  return `${match[1] ?? ''}-${match[2] ?? ''}-${match[3] ?? ''} ${match[4] ?? ''}:${match[5] ?? ''}:${match[6] ?? ''}.${match[7] ?? ''}`;
+}
+
 /** A task row as the summary the tree, the board and the chart need. */
 function rowToSummary(row: SupabaseRow, path: string): TaskSummary | null {
   const id = idOf(row['id']);
@@ -117,9 +159,9 @@ function rowToSummary(row: SupabaseRow, path: string): TaskSummary | null {
     tags: normalizeTags(textOf(row, 'tags')),
     type: isTaskType(rawType) ? rawType : 'Feature',
     role: isTaskRole(rawRole) ? rawRole : 'Programming',
-    start: normalizeTaskTimestamp(textOf(row, 'start')),
-    end: normalizeTaskTimestamp(textOf(row, 'end')),
-    updated: normalizeTaskTimestamp(textOf(row, 'updated')),
+    start: parseDatabaseTimestamp(row['start']),
+    end: parseDatabaseTimestamp(row['end']),
+    updated: parseDatabaseTimestamp(row['updated']),
     expanded: booleanOf(row, 'expanded'),
     kanbanHidden: booleanOf(row, 'kanban_hidden'),
     treeGanttHidden: booleanOf(row, 'tree_gantt_hidden'),
@@ -141,7 +183,7 @@ function rowToTask(row: SupabaseRow): Task | null {
     status: summary.status,
     parentId: summary.parentId,
     tags: summary.tags,
-    created: normalizeTaskTimestamp(textOf(row, 'created')),
+    created: parseDatabaseTimestamp(row['created']),
     updated: summary.updated,
     start: summary.start,
     end: summary.end,
@@ -166,10 +208,10 @@ function taskToRow(task: Task): SupabaseRow {
     status: task.status,
     parent: task.parentId,
     tags: task.tags.join(' '),
-    created: task.created,
-    updated: task.updated,
-    start: task.start,
-    end: task.end,
+    created: databaseTimestampValue(task.created),
+    updated: databaseTimestampValue(task.updated),
+    start: databaseTimestampValue(task.start),
+    end: databaseTimestampValue(task.end),
     blocked_by: task.blockedBy.join(','),
     related: task.related.join(','),
     expanded: task.expanded,
@@ -192,8 +234,8 @@ function rowToComment(row: SupabaseRow): TaskComment | null {
   return {
     id,
     taskId: idOf(row['task']) ?? 0,
-    created: normalizeTaskTimestamp(textOf(row, 'created')),
-    updated: normalizeTaskTimestamp(textOf(row, 'updated')),
+    created: parseDatabaseTimestamp(row['created']),
+    updated: parseDatabaseTimestamp(row['updated']),
     text: textOf(row, 'body'),
   };
 }
@@ -207,8 +249,8 @@ function rowToNote(row: SupabaseRow): Note | null {
   return {
     id,
     title: textOf(row, 'title'),
-    created: normalizeTaskTimestamp(textOf(row, 'created')),
-    updated: normalizeTaskTimestamp(textOf(row, 'updated')),
+    created: parseDatabaseTimestamp(row['created']),
+    updated: parseDatabaseTimestamp(row['updated']),
     content: textOf(row, 'body'),
   };
 }
@@ -481,8 +523,8 @@ export class SupabaseProjectStore implements ProjectStore {
         {
           id: comment.id,
           task: comment.taskId,
-          created: comment.created,
-          updated: comment.updated,
+          created: databaseTimestampValue(comment.created),
+          updated: databaseTimestampValue(comment.updated),
           body: comment.text,
         },
       ]);
@@ -500,8 +542,8 @@ export class SupabaseProjectStore implements ProjectStore {
       {
         id: comment.id,
         task: comment.taskId,
-        created: comment.created,
-        updated: comment.updated,
+        created: databaseTimestampValue(comment.created),
+        updated: databaseTimestampValue(comment.updated),
         body: comment.text,
       },
     ]);
@@ -541,7 +583,7 @@ export class SupabaseProjectStore implements ProjectStore {
       summaries.push({
         id,
         title: textOf(row, 'title'),
-        updated: normalizeTaskTimestamp(textOf(row, 'updated')),
+        updated: parseDatabaseTimestamp(row['updated']),
         path: noteFileName(id),
       });
     }
@@ -589,8 +631,8 @@ export class SupabaseProjectStore implements ProjectStore {
       {
         id: note.id,
         title: note.title,
-        created: note.created,
-        updated: note.updated,
+        created: databaseTimestampValue(note.created),
+        updated: databaseTimestampValue(note.updated),
         body: note.content,
       },
     ]);
@@ -602,8 +644,8 @@ export class SupabaseProjectStore implements ProjectStore {
         {
           id: note.id,
           title: note.title,
-          created: note.created,
-          updated: note.updated,
+          created: databaseTimestampValue(note.created),
+          updated: databaseTimestampValue(note.updated),
           body: note.content,
         },
       ]);
@@ -704,8 +746,8 @@ export class SupabaseProjectStore implements ProjectStore {
           {
             id: comment.id,
             task: comment.taskId,
-            created: comment.created,
-            updated: comment.updated,
+            created: databaseTimestampValue(comment.created),
+            updated: databaseTimestampValue(comment.updated),
             body: comment.text,
           },
         ]);
@@ -719,8 +761,8 @@ export class SupabaseProjectStore implements ProjectStore {
           {
             id: note.id,
             title: note.title,
-            created: note.created,
-            updated: note.updated,
+            created: databaseTimestampValue(note.created),
+            updated: databaseTimestampValue(note.updated),
             body: note.content,
           },
         ]);

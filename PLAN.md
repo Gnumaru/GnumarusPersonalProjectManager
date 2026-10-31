@@ -8,6 +8,11 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 43 fixes the Supabase setup script (`end` is a reserved
+  word: every identifier is quoted) and stores dates as `timestamp`
+  (nullable, NULL for unknown) with dual-format conversion, so old text
+  columns keep working with no migration.
+- Verification: 532 unit tests pass.
 - Batch 42 normalizes the Supabase backend: real `tasks`,
   `comments`, `notes`, `config` (key/value, setting name as PK) and `ids`
   tables, no path column, no subfolders. Setup SQL is idempotent DDL only

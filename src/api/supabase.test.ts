@@ -337,11 +337,14 @@ describe('verifySupabaseSchema', () => {
 describe('SUPABASE_SETUP_SQL', () => {
   it('creates every table with its id column and adds the rest one by one', () => {
     for (const table of SUPABASE_TABLES) {
-      expect(SUPABASE_SETUP_SQL).toContain(`create table if not exists public.${table}`);
+      expect(SUPABASE_SETUP_SQL).toContain(`create table if not exists public."${table}"`);
     }
-    expect(SUPABASE_SETUP_SQL).toContain('add column if not exists description');
-    expect(SUPABASE_SETUP_SQL).toContain('add column if not exists body');
-    expect(SUPABASE_SETUP_SQL).toContain('add column if not exists value');
+    expect(SUPABASE_SETUP_SQL).toContain('add column if not exists "description"');
+    expect(SUPABASE_SETUP_SQL).toContain('add column if not exists "body"');
+    expect(SUPABASE_SETUP_SQL).toContain('add column if not exists "value"');
+    // `end` is reserved: every identifier is quoted.
+    expect(SUPABASE_SETUP_SQL).toContain('add column if not exists "end" timestamp');
+    expect(SUPABASE_SETUP_SQL).toContain('"created" timestamp');
     expect(SUPABASE_SETUP_SQL).not.toContain('grant');
     expect(SUPABASE_SETUP_SQL).not.toContain('policy');
     expect(SUPABASE_SETUP_SQL).not.toContain('row level security');

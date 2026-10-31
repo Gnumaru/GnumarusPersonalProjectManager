@@ -3,7 +3,7 @@ import { SupabaseClient } from '../api/supabase.js';
 import { FakePostgrest } from '../test-support/fakePostgrest.js';
 import { isValidRecordId } from './ids.js';
 import { buildNote } from './note.js';
-import { SupabaseProjectStore } from './supabaseStore.js';
+import { databaseTimestampValue, parseDatabaseTimestamp, SupabaseProjectStore } from './supabaseStore.js';
 import { buildTask, type TaskInput } from './task.js';
 
 const URL = 'https://xyz.supabase.co';
@@ -30,6 +30,34 @@ function createStore(
 }
 
 describe('SupabaseProjectStore', () => {
+  it('converts timestamps between the compact format and the database', () => {
+    expect(parseDatabaseTimestamp('2026-10-24 10:00:00')).toBe('20261024100000000');
+    expect(parseDatabaseTimestamp('2026-10-24 10:00:00.123')).toBe('20261024100000123');
+    expect(parseDatabaseTimestamp('2026-10-24 10:00:00.123456')).toBe('20261024100000123');
+    expect(parseDatabaseTimestamp('20261024100000000')).toBe('20261024100000000');
+    expect(parseDatabaseTimestamp('')).toBe('');
+    expect(parseDatabaseTimestamp(null)).toBe('');
+    expect(parseDatabaseTimestamp(42)).toBe('');
+    expect(databaseTimestampValue('')).toBeNull();
+    expect(databaseTimestampValue('20261024100000123')).toBe('2026-10-24 10:00:00.123');
+  });
+
+  it('stores unknown dates as null and reads them back empty', async () => {
+    const { store, backend } = createStore();
+    const id = await store.allocateId();
+    await store.createTaskFile(
+      store.taskPath(id),
+      { ...buildTask(input('Dateless task'), id, new Date()), start: '', end: '' },
+    );
+
+    expect(backend.tables.tasks.get(String(id))?.['start']).toBeNull();
+    expect(backend.tables.tasks.get(String(id))?.['end']).toBeNull();
+    const reloaded = await store.readTask(store.taskPath(id));
+    expect(reloaded.start).toBe('');
+    expect(reloaded.end).toBe('');
+    expect(reloaded.created).toMatch(/^\d{17}$/u);
+  });
+
   it('creates a task in a row of its own', async () => {
     const { store, backend } = createStore();
 
