@@ -1,5 +1,26 @@
 # Checklist
 
+## Batch 36 - Faithful fake orders and append-on-create
+
+### Change
+
+- [x] Fake bridge returns `kanban_order`/`tree_gantt_order` like the real
+      bridge (`src/test-support/fakeBridge.ts`)
+- [x] `createTask` appends new tasks at the end: sibling count for
+      `treeGanttOrder`, status-column size for `kanbanOrder`, mirroring a
+      drop on a new column (`src/ui/app.ts`)
+
+### Tests
+
+- [x] `src/ui/app.test.ts` - new child appended after its siblings
+      (`tree_gantt_order` in file, last row position), new card appended
+      at the end of its status column (`kanban_order` in file, last card
+      position); both fail without the fix
+- [x] Existing tree tests now run against faithful order metadata
+- [x] `npm run typecheck`, `npm test` (475 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 35 - Kanban global show-groups checkbox
 
 ### Change

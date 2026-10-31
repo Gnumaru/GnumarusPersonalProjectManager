@@ -117,6 +117,7 @@ list or as a tree.
 | **Up and down reordering in the tree and in the Gantt chart** | Done | `src/ui/taskTreeView.ts`, `src/ui/ganttView.ts` |
 | **Up and down reordering in the Kanban columns** | Done | `src/ui/kanbanBoard.ts` |
 | **Shared order for the tree and the Gantt, independent for the Kanban** | Done | `src/core/task.ts` |
+| **New tasks appended at the end (siblings in tree/Gantt, status column in Kanban)** | Done | `src/ui/app.ts` |
 | **Normalization of the orders on load** | Done | `src/ui/app.ts` |
 | **Search on the chart: the matches and their chain of ancestors** | Done | `src/core/taskTree.ts`, `src/ui/app.ts` |
 | **One column per day** | Done | `src/core/gantt.ts` |

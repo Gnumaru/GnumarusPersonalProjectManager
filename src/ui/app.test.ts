@@ -1481,6 +1481,37 @@ describe('App and the tree view', () => {
     harness.app.dispose();
   });
 
+  it('appends a new child after its siblings', async () => {
+    const harness = await createTreeHarness();
+    await switchToTree(harness);
+
+    // Opening the branch normalizes the siblings to distinct orders.
+    click(harness.root.querySelector<HTMLButtonElement>('.tree-row[data-task-id="1"] .tree-twisty'));
+    await flush();
+
+    click(treeAction(harness, 1, 5));
+    await flush();
+    const titleInput = harness.doc.querySelector<HTMLInputElement>('#task-title');
+    expect(titleInput).not.toBeNull();
+    if (titleInput === null) {
+      return;
+    }
+    titleInput.value = 'Appended child';
+    click(buttonByText(harness.doc, 'Create task'));
+    await flush();
+
+    // The file carries the sibling position, so the child sorts last even
+    // though its siblings already hold distinct orders.
+    expect(harness.bridge.files.get('/home/user/projects/task_6.txt')).toContain(
+      'tree_gantt_order=2',
+    );
+    const rows = treeRows(harness);
+    expect(rows.map((row) => row.getAttribute('data-task-id'))).toEqual(['1', '2', '3', '6', '5']);
+    expect(rows[3]?.querySelector('.tree-title')?.textContent).toBe('Appended child');
+
+    harness.app.dispose();
+  });
+
   it('focuses a task so that it becomes the root of the tree', async () => {
     const harness = await createTreeHarness();
     await switchToTree(harness);
@@ -2390,6 +2421,38 @@ describe('App and the board', () => {
         '.kanban-column[data-type="Feature"] .kanban-card[data-task-id="2"]',
       ),
     ).not.toBeNull();
+
+    harness.app.dispose();
+  });
+
+  it('appends a new card at the end of its status column', async () => {
+    const harness = await createHarness(0, {
+      tasks: [{ id: 1 }, { id: 2 }],
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+    await switchToBoard(harness);
+
+    click(buttonByText(harness.doc, 'New task'));
+    await flush();
+    const titleInput = harness.doc.querySelector<HTMLInputElement>('#task-title');
+    expect(titleInput).not.toBeNull();
+    if (titleInput === null) {
+      return;
+    }
+    titleInput.value = 'Appended card';
+    click(buttonByText(harness.doc, 'Create task'));
+    await flush();
+
+    // The file carries the column position, so the card sorts last.
+    expect(harness.bridge.files.get('/home/user/projects/task_3.txt')).toContain(
+      'kanban_order=2',
+    );
+    const todoCards = [
+      ...harness.root.querySelectorAll(
+        '.kanban-column[data-status="todo"] .kanban-card',
+      ),
+    ].map((card) => card.getAttribute('data-task-id'));
+    expect(todoCards).toEqual(['1', '2', '3']);
 
     harness.app.dispose();
   });

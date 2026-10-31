@@ -622,7 +622,9 @@ integers of at least zero.
 
 The views offer up and down buttons to reorder a task among its siblings.
 When a Kanban card is dropped on another column, its order is recomputed in
-the new column and both columns are renumbered. On load the orders are
+the new column and both columns are renumbered. A newly created task is
+appended at the end: after its siblings in the tree/Gantt and at the end of
+its status column on the board. On load the orders are
 normalized to `0, 1, 2, ...` per parent (tree/Gantt) and per status (Kanban),
 and any value that changes is written back to the file.
 

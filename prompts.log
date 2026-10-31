@@ -164,11 +164,14 @@ na view de kanban deve ser exibido um dropdown com as opcoes 'status', 'type' e 
 ====
 na view kanban adicione um checkbox global (de fora das colunas, junto com o checkbox show hidden e o dropdown group by) chamado 'show groups'. o valor padrao é false. se ele for false tudo continua como está. se ele for true todas as tarefas são exibidas nas colunas do kanban independente de elas serem tarefas folha (sem filhas) ou tarefas de grupo (com filhas).
 ====
-====
-====
-====
-====
 porque a fake bridge nao retorna kanban_order/tree_gantt_order? o problema de quebrar os testes não é culpa dos testes em si? a gente não deveria fazer a fake bridge ser igual a bridge real e consertar os testes? ou eu estou entendendo errado?
+====
+implemente o fix recomendado
+====
+na modal de visualizar tarefa é exibido apenas o parent imediato da tarefa. eu quero que seja exibida toda a cadeia de parents, com os ids e nomes (truncados pra 64 caracteres)
+====
+====
+
 ====
 ====
 ====

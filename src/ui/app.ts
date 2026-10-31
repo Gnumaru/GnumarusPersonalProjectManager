@@ -3481,7 +3481,25 @@ export class App
     }
     const resolvedParent = taskInput.parentId === undefined ? parentId : taskInput.parentId;
     const id = await store.nextTaskId();
-    const task = buildTask(taskInput, id, new Date(), resolvedParent);
+    // A new task goes last: after its siblings in the tree/Gantt and at the
+    // end of its status column on the Kanban board, mirroring a drop on a new
+    // column. Without this, a fresh order of zero would sort into the middle
+    // once the existing orders are normalized to distinct values.
+    let treeGanttOrder = 0;
+    let kanbanOrder = 0;
+    try {
+      const summaries = await store.listTasks();
+      treeGanttOrder = summaries.filter((task) => task.parentId === resolvedParent).length;
+      kanbanOrder = summaries.filter((task) => task.status === taskInput.status).length;
+    } catch {
+      // The listing failed: fall back to zero, the normalization on load
+      // repairs the orders on the next refresh.
+    }
+    const task = {
+      ...buildTask(taskInput, id, new Date(), resolvedParent),
+      treeGanttOrder,
+      kanbanOrder,
+    };
     await store.createTaskFile(store.taskPath(id), task);
     if (resolvedParent !== null) {
       // The new child has to be visible: the branch of the parent is opened,

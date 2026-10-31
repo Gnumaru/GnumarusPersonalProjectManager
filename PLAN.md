@@ -8,6 +8,12 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 36 makes the fake bridge return `kanban_order` /
+  `tree_gantt_order` like the real bridge and makes creation append new
+  tasks at the end (sibling count for tree/Gantt, status-column size for
+  Kanban), so a new child/card always lands last and the tree tests pass
+  against faithful metadata.
+- Verification: 475 unit tests pass.
 - Batch 35 adds a global `Show groups` checkbox to the Kanban
   toolbar, next to the group-by dropdown and the show-hidden toggle.
   Default `false` keeps the board as is (only leaf tasks). When `true`,

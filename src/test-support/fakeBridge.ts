@@ -267,7 +267,7 @@ export class FakeBridge {
           if (line.trim() === '----') {
             break;
           }
-          if (/^(id|parent|status|title|tags|type|role|start|end|updated|expanded|kanban_hidden|tree_gantt_hidden)=/u.test(line)) {
+          if (/^(id|parent|status|title|tags|type|role|start|end|updated|expanded|kanban_hidden|tree_gantt_hidden|kanban_order|tree_gantt_order)=/u.test(line)) {
             lines.push(`${relative}:${line}`);
           }
         }
