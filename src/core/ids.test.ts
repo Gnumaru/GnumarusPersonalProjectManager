@@ -5,6 +5,7 @@ import {
   generateUniqueId,
   isValidRecordId,
   parseIdsFile,
+  parseRecordId,
   randomCandidateId,
   serializeIdsFile,
   type RandomUint32,
@@ -28,6 +29,30 @@ describe('isValidRecordId', () => {
     expect(isValidRecordId(Number.NaN)).toBe(false);
     expect(isValidRecordId(Number.MAX_SAFE_INTEGER + 1)).toBe(false);
     expect(isValidRecordId(Number.MIN_SAFE_INTEGER - 1)).toBe(false);
+  });
+});
+
+describe('parseRecordId', () => {
+  it('accepts the full safe range, including the negative side', () => {
+    expect(parseRecordId('12')).toBe(12);
+    expect(parseRecordId('-34')).toBe(-34);
+    expect(parseRecordId(String(MIN_ID))).toBe(MIN_ID);
+    expect(parseRecordId(String(MAX_ID))).toBe(MAX_ID);
+    expect(parseRecordId('00042')).toBe(42);
+    expect(parseRecordId('  -00042  ')).toBe(-42);
+  });
+
+  it('rejects zero, garbage and values outside the safe range', () => {
+    expect(parseRecordId('0')).toBeNull();
+    expect(parseRecordId('-0')).toBeNull();
+    expect(parseRecordId('')).toBeNull();
+    expect(parseRecordId('1.5')).toBeNull();
+    expect(parseRecordId('12abc')).toBeNull();
+    expect(parseRecordId('+12')).toBeNull();
+    expect(parseRecordId(String(MAX_ID + 1))).toBeNull();
+    expect(parseRecordId(String(MIN_ID - 1))).toBeNull();
+    // This one would be rounded to MAX_ID by Number.parseInt.
+    expect(parseRecordId('9007199254740993')).toBeNull();
   });
 });
 

@@ -37,6 +37,7 @@ import {
   withType,
   withTreeGanttHidden,
 } from './task.js';
+import { MIN_ID } from './ids.js';
 
 describe('task file names', () => {
   it('builds the file name out of the id', () => {
@@ -58,6 +59,9 @@ describe('task file names', () => {
     expect(parseTaskIdFromFileName('task_9.txt')).toBe(9);
     expect(parseTaskIdFromFileName('task_1234.txt')).toBe(1234);
     expect(parseTaskIdFromFileName('task_-42.txt')).toBe(-42);
+    expect(parseTaskIdFromFileName('task_-9007199254740991.txt')).toBe(MIN_ID);
+    expect(parseTaskIdFromFileName('task_9007199254740992.txt')).toBeNull();
+    expect(parseTaskIdFromFileName('task_9007199254740993.txt')).toBeNull();
     expect(parseTaskIdFromFileName('task_0.txt')).toBeNull();
     expect(parseTaskIdFromFileName('task_x.txt')).toBeNull();
     expect(parseTaskIdFromFileName('readme.txt')).toBeNull();
@@ -196,6 +200,7 @@ describe('the blocking and the related tasks', () => {
     expect(parseIdList('3, 3, 5')).toEqual([3, 5]);
     expect(parseIdList('0,abc')).toEqual([]);
     expect(parseIdList('-2, 0, 5')).toEqual([-2, 5]);
+    expect(parseIdList('-9007199254740991,9007199254740992,12x')).toEqual([MIN_ID]);
   });
 
   it('reads the relations of a task', () => {
@@ -454,6 +459,17 @@ describe('parseTask', () => {
   it('falls back to the id hint when the file has no id key', () => {
     const task = parseTask('title=No id\n----\nbody', 42);
     expect(task.id).toBe(42);
+  });
+
+  it('falls back to the id hint when the id key is out of range', () => {
+    const task = parseTask('id=9007199254740993\ntitle=Too long\n----\nbody', 42);
+    expect(task.id).toBe(42);
+    expect(parseTask('id=-9007199254740992\n----\nbody').id).toBe(0);
+  });
+
+  it('ignores an out-of-range parent id', () => {
+    const task = parseTask('id=2\ntitle=Child\nparent=9007199254740993\n----\nbody');
+    expect(task.parentId).toBeNull();
   });
 
   it('uses the todo status for unknown values', () => {

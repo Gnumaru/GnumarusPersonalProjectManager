@@ -25,6 +25,8 @@ describe('the comment file names', () => {
   it('extracts the id from the name', () => {
     expect(parseCommentIdFromFileName('comment_12.txt')).toBe(12);
     expect(parseCommentIdFromFileName('comment_-12.txt')).toBe(-12);
+    expect(parseCommentIdFromFileName('comment_-9007199254740991.txt')).toBe(-9007199254740991);
+    expect(parseCommentIdFromFileName('comment_9007199254740992.txt')).toBeNull();
     expect(parseCommentIdFromFileName('comment_0.txt')).toBeNull();
     expect(parseCommentIdFromFileName('comment_x.txt')).toBeNull();
   });

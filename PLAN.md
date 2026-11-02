@@ -8,6 +8,18 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 46 hardens the whole codebase for random signed ids up to 17
+  characters (the 16 digits of `Number.MAX_SAFE_INTEGER` plus the minus
+  sign). A shared `parseRecordId` reads ids as `bigint` and rejects
+  out-of-range values instead of silently rounding them; every task, comment,
+  note, config, metadata, service and Supabase path parser uses it. The
+  Supabase path lists now sort numerically (they used a plain string sort),
+  the service lists comments by their own ids, the drag controllers validate
+  signed ids, and the flat list shows full ids in wider ID/Parent columns.
+  The e2e browser test no longer assumes newly created records are positive
+  and last, and its Gantt schedule fixture is deterministic.
+- Verification: 569 unit tests pass; `npm run e2e` passes; the browser e2e
+  passes all 128 checks.
 - Batch 45 fixes the parse of the counts read with `uniq -c`: the ids are
   random and may be negative, but the parser only accepted `\d+`, so a task
   with a negative id lost its comment badge in every view and a negative

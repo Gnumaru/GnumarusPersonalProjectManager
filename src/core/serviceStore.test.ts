@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vite-plus/test';
 import { ApiClient } from '../api/client.js';
-import { ServiceProjectStore, parseIdCounts } from './serviceStore.js';
+import { ServiceProjectStore, parseIdCounts, parseServicePaths } from './serviceStore.js';
 import { isValidRecordId } from './ids.js';
 import { buildNote } from './note.js';
 import {
@@ -61,10 +61,34 @@ describe('parseIdCounts', () => {
     expect(counts.size).toBe(2);
   });
 
-  it('ignores malformed lines', () => {
-    const counts = parseIdCounts('not a count\n      1 abc\n      2 3.5\n\n');
+  it('ignores malformed lines and out-of-range ids', () => {
+    const counts = parseIdCounts(
+      'not a count\n      1 abc\n      2 3.5\n      1 9007199254740993\n\n',
+    );
 
     expect(counts.size).toBe(0);
+  });
+});
+
+describe('parseServicePaths', () => {
+  it('sorts the paths by numeric id, including long negative ids', () => {
+    const stdout = [
+      './task_10.txt',
+      './task_-2.txt',
+      './task_9007199254740991.txt',
+      './task_-10.txt',
+      './task_2.txt',
+      './task_-9007199254740991.txt',
+    ].join('\n');
+
+    expect(parseServicePaths(stdout, '/project')).toEqual([
+      '/project/task_-9007199254740991.txt',
+      '/project/task_-10.txt',
+      '/project/task_-2.txt',
+      '/project/task_2.txt',
+      '/project/task_10.txt',
+      '/project/task_9007199254740991.txt',
+    ]);
   });
 });
 
@@ -216,9 +240,9 @@ describeLive('ServiceProjectStore against the live service', () => {
     expect(counts.get(id)).toBe(1);
   });
 
-  it('counts the children of a task with a negative id', async () => {
-    const parentId = -9007199254740001;
-    const childId = -9007199254740002;
+  it('counts the children of a task with a long negative id', async () => {
+    const parentId = -9007199254740991;
+    const childId = -9007199254740990;
     await store.createTaskFile(
       store.taskPath(parentId),
       buildTask(input('Negative parent'), parentId, new Date()),
@@ -232,8 +256,8 @@ describeLive('ServiceProjectStore against the live service', () => {
     expect(counts.get(parentId)).toBe(1);
   });
 
-  it('counts the comments of a task with a negative id', async () => {
-    const taskId = -9007199254740003;
+  it('counts the comments of a task with a long negative id', async () => {
+    const taskId = -9007199254740989;
     await store.createTaskFile(
       store.taskPath(taskId),
       buildTask(input('Negative commented task'), taskId, new Date()),
@@ -242,6 +266,8 @@ describeLive('ServiceProjectStore against the live service', () => {
 
     const counts = await store.commentCounts();
     expect(counts.get(taskId)).toBe(1);
+    const comments = await store.listComments(taskId);
+    expect(comments.map((comment) => comment.text)).toEqual(['A comment of a negative task']);
   });
 
   it('lists the children of a task', async () => {

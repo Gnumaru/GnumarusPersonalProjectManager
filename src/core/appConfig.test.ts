@@ -44,6 +44,8 @@ describe('parseGlobalConfig', () => {
     expect(config.focusGantt).toBe(5);
     expect(parseGlobalConfig('focus_tree=-7\n').focusTree).toBe(-7);
     expect(parseGlobalConfig('focus_gantt=-3\n').focusGantt).toBe(-3);
+    expect(parseGlobalConfig('focus_tree=-9007199254740991\n').focusTree).toBe(-9007199254740991);
+    expect(parseGlobalConfig('focus_gantt=9007199254740993\n').focusGantt).toBeNull();
     expect(parseGlobalConfig('').focusTree).toBeNull();
     expect(parseGlobalConfig('focus_tree=0\n').focusTree).toBeNull();
     expect(parseGlobalConfig('focus_tree=abc\n').focusTree).toBeNull();

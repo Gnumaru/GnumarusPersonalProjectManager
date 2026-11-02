@@ -32,7 +32,7 @@ import {
   parseMetadataBlock,
   sanitizeMetadataValue,
 } from './task.js';
-import { isValidRecordId } from './ids.js';
+import { parseRecordId } from './ids.js';
 
 export const NOTE_FILE_PREFIX = 'note_';
 export const NOTE_FILE_SUFFIX = '.txt';
@@ -92,8 +92,7 @@ export function parseNoteIdFromFileName(name: string): number | null {
   if (match === null) {
     return null;
   }
-  const id = Number.parseInt(match[1] ?? '', 10);
-  return isValidRecordId(id) ? id : null;
+  return parseRecordId(match[1] ?? '');
 }
 
 /**
@@ -105,10 +104,10 @@ export function parseNoteIdFromFileName(name: string): number | null {
 export function parseNote(content: string, idHint?: number): Note {
   const { metadata, description } = parseMetadataBlock(content);
 
-  const rawId = Number.parseInt(metadata.get('id') ?? '', 10);
+  const fileId = parseRecordId(metadata.get('id') ?? '');
 
   return {
-    id: isValidRecordId(rawId) ? rawId : (idHint ?? 0),
+    id: fileId ?? idHint ?? 0,
     title: metadata.get('title') ?? '',
     created: normalizeTaskTimestamp(metadata.get('created') ?? ''),
     updated: normalizeTaskTimestamp(metadata.get('updated') ?? ''),

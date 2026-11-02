@@ -163,6 +163,49 @@ async function findCreatedFile(before, pattern) {
   return fresh.length === 1 ? `${taskDirectory}/${fresh[0]}` : null;
 }
 
+/**
+ * Searches the active list for a term.
+ *
+ * New records have random ids, so they can land on any page. A search is the
+ * only stable way to bring one row to the screen.
+ */
+async function searchList(term) {
+  const scopeChanged = await evaluate(`(() => {
+    const scope = document.querySelector('#note-scope');
+    if (scope !== null && !scope.hasAttribute('hidden') && scope.value !== 'both') {
+      scope.value = 'both';
+      scope.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    return false;
+  })()`);
+  // The change of the scope launches its own refresh: let it finish before the
+  // search launches the next one, so the two never race.
+  if (scopeChanged === true) {
+    await delay(700);
+  }
+  await evaluate(`(() => {
+    const input = document.querySelector('#search-input');
+    input.value = ${JSON.stringify(term)};
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Search');
+    button.click();
+    return true;
+  })()`);
+  await delay(900);
+}
+
+/** Clears the search of the active list and goes back to its first page. */
+async function clearListSearch() {
+  await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find((node) => node.textContent.trim() === 'Clear');
+    if (button !== undefined && !button.disabled) {
+      button.click();
+    }
+    return true;
+  })()`);
+  await delay(900);
+}
+
 /** The id encoded in the path of a task file. */
 function idOfTaskFile(path) {
   return /task_(-?\d+)\.txt$/.exec(path)?.[1] ?? null;
@@ -467,11 +510,12 @@ async function runChecks() {
   })()`);
   // A task that blocks the new one and a task that is related to it.
   await evaluate(`(() => {
-    const fields = [...document.querySelectorAll('.id-list')];
-    const blocked = fields[1].querySelector('.id-list-input');
+    const fieldByLabel = (label) => [...document.querySelectorAll('.id-list-field')]
+      .find((field) => field.querySelector('.field-label')?.textContent.trim() === label);
+    const blocked = fieldByLabel('Blocked by').querySelector('.id-list-input');
     blocked.value = 'Browser test task 2';
     blocked.dispatchEvent(new Event('input', { bubbles: true }));
-    const related = fields[2].querySelector('.id-list-input');
+    const related = fieldByLabel('Related tasks').querySelector('.id-list-input');
     related.value = 'Browser test task 3';
     related.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
@@ -479,10 +523,11 @@ async function runChecks() {
   await delay(400);
   const filesBeforeCreate = await directoryFileNames();
   await evaluate(`(() => {
-    const fields = [...document.querySelectorAll('.id-list')];
-    const blocked = fields[1].querySelector('.id-list-input');
+    const fieldByLabel = (label) => [...document.querySelectorAll('.id-list-field')]
+      .find((field) => field.querySelector('.field-label')?.textContent.trim() === label);
+    const blocked = fieldByLabel('Blocked by').querySelector('.id-list-input');
     blocked.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    const related = fields[2].querySelector('.id-list-input');
+    const related = fieldByLabel('Related tasks').querySelector('.id-list-input');
     related.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     return true;
   })()`);
@@ -494,6 +539,7 @@ async function runChecks() {
   })()`);
   await delay(1500);
 
+  const createdPath = await findCreatedFile(filesBeforeCreate, /^task_-?\d+\.txt$/);
   const createdId = createdPath === null ? null : idOfTaskFile(createdPath);
   check(createdId !== null, 'the id of the new task is a valid nonzero id');
   let createdContent = null;
@@ -536,7 +582,7 @@ async function runChecks() {
 
   // --- edit -----------------------------------------------------------------
 
-  await evaluate(`document.querySelector('[data-page-action="last"]').click()`);
+  await searchList(String(createdId));
   await waitFor(`document.querySelector('tr[data-task-id="${createdId}"]') !== null`);
   await evaluate(`(() => {
     const row = document.querySelector('tr[data-task-id="${createdId}"]');
@@ -625,6 +671,7 @@ async function runChecks() {
 
   // --- child tasks ----------------------------------------------------------
 
+  await clearListSearch();
   await evaluate(`document.querySelector('[data-page-action="first"]').click()`);
   await waitFor(`document.querySelector('.page-current')?.textContent === '1'`);
 
@@ -642,6 +689,8 @@ async function runChecks() {
   await evaluate(`(() => {
     document.querySelector('#task-title').value = 'Child of the first task';
     document.querySelector('#task-description').value = 'Created from the parent task.';
+    document.querySelector('#task-start').value = '2026-10-26';
+    document.querySelector('#task-end').value = '2026-10-27';
     return true;
   })()`);
   const filesBeforeChild = await directoryFileNames();
@@ -665,8 +714,8 @@ async function runChecks() {
   );
   check(childContent.content.includes('parent=1'), 'the child task file points to its parent');
 
-  await evaluate(`document.querySelector('[data-page-action="last"]').click()`);
-  await waitFor(`document.querySelector('.page-current')?.textContent === '2'`);
+  await searchList(String(childId));
+  await waitFor(`document.querySelector('tr[data-task-id="${childId}"]') !== null`);
   const parentLink = await evaluate(`(() => {
     const rows = [...document.querySelectorAll('.task-table tbody tr')];
     const row = rows.find((candidate) => candidate.dataset['taskId'] === '${childId}');
@@ -674,6 +723,7 @@ async function runChecks() {
   })()`);
   check(parentLink === '#1', 'the listing shows the parent of the child task', parentLink);
 
+  await clearListSearch();
   await evaluate(`document.querySelector('[data-page-action="first"]').click()`);
   await waitFor(`document.querySelector('.page-current')?.textContent === '1'`);
 
@@ -715,6 +765,8 @@ async function runChecks() {
         'tags=browser sample',
         'created=2026-10-01T10:00:00.000Z',
         'updated=2026-10-01T10:00:00.000Z',
+        'start=20261026000000000',
+        'end=20261027000000000',
         '----',
         'The grand child of the first task.',
       ].join('\n'),
@@ -1509,8 +1561,7 @@ async function runChecks() {
   await waitFor(`document.querySelector('.pagination-footer')?.hasAttribute('hidden') === false`);
   await waitFor(`document.querySelector('.page-current')?.textContent === '1'`);
 
-  await evaluate(`document.querySelector('[data-page-action="last"]').click()`);
-  await waitFor(`document.querySelector('.page-current')?.textContent === '2'`);
+  await searchList(String(childId));
   await waitFor(`document.querySelector('tr[data-task-id="${childId}"]') !== null`);
   await evaluate(`(() => {
     const rows = [...document.querySelectorAll('.task-table tbody tr')];
@@ -1533,6 +1584,7 @@ async function runChecks() {
     return true;
   })()`);
   await delay(1200);
+  await clearListSearch();
 
   // --- screenshots ----------------------------------------------------------
 
@@ -1727,9 +1779,12 @@ async function checkNotes() {
   })()`);
   await waitFor(`document.querySelector('.result-count')?.textContent === '13 notes'`);
 
-  // The new note is the last one: it is on the second page.
-  await evaluate(`document.querySelector('[data-page-action="last"]').click()`);
-  await waitFor(`document.querySelector('.page-current')?.textContent === '2'`);
+  // New notes have random ids, so search for the title instead of assuming
+  // that the note is on the last page.
+  await searchList('A note of the browser test');
+  await waitFor(
+    `[...document.querySelectorAll('.note-table tbody .cell-title')].some((node) => node.textContent.includes('A note of the browser test'))`,
+  );
   const created = await evaluate(
     `[...document.querySelectorAll('.note-table tbody .cell-title')].some((node) => node.textContent.includes('A note of the browser test'))`,
   );
@@ -1768,6 +1823,7 @@ async function checkNotes() {
     button.click();
     return true;
   })()`);
+  await clearListSearch();
   await waitFor(`document.querySelector('.result-count')?.textContent === '12 notes'`);
   const deleted = await evaluate(
     `[...document.querySelectorAll('.note-table tbody .cell-title')].some((node) => node.textContent.includes('A note of the browser test'))`,

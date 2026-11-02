@@ -17,7 +17,7 @@
  */
 
 import { TASK_ROLES, TASK_STATUSES, TASK_TYPES, type TaskRole, type TaskStatus, type TaskType } from './task.js';
-import { isValidRecordId } from './ids.js';
+import { parseRecordId } from './ids.js';
 import { parseMetadataBlock } from './task.js';
 
 /** Name of the configuration file, relative to the project folder. */
@@ -105,8 +105,7 @@ function parseTaskId(value: string | undefined): number | null {
   if (value === undefined) {
     return null;
   }
-  const id = Number.parseInt(value.trim(), 10);
-  return isValidRecordId(id) ? id : null;
+  return parseRecordId(value);
 }
 
 /** Reads the settings from the content of a `config.txt` file. */

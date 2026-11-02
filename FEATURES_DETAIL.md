@@ -39,7 +39,9 @@ Rules:
   zero is invalid. The id inside the file is the one the application uses:
   the name is only a fallback for the files written before the key existed.
   The same rule holds for the comments (`comment_<id>.txt`) and for the
-  notes (`note_<id>.txt`).
+  notes (`note_<id>.txt`). The parsers read the whole textual form, up to the
+  17 characters of `-9007199254740991`; a longer number is rejected instead
+  of being rounded to a different id.
 * `title` - mandatory, single line (new lines are replaced by spaces on write).
 * `status` - one of `planning`, `next`, `todo`, `doing`, `paused`, `done`,
   `canceled`. Anything else falls back to `todo`. The badge of the task shows
@@ -947,6 +949,46 @@ badge, and a task with a negative id can still show the amount of its children.
 
 ---
 
+## 5 septies. Signed ids across the whole range
+
+**Files:** `src/core/ids.ts`, `src/core/task.ts`, `src/core/comment.ts`, `src/core/note.ts`, `src/core/appConfig.ts`, `src/core/serviceStore.ts`, `src/core/supabaseStore.ts`, `src/ui/pointerDrag.ts`, `src/ui/ganttDrag.ts`, `src/styles.css`
+
+The ids are random nonzero integers in
+`[Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]`, so they can be negative,
+positive, and as long as 17 characters including the minus sign. Five rules
+keep that range from leaking into edge cases:
+
+* **One parser for every id in text.** `parseRecordId` reads the value as a
+  `bigint`, accepts the optional minus sign and leading zeros, and rejects
+  zero, trailing text and anything outside the safe range. Reading as
+  `bigint` matters: `Number.parseInt('9007199254740993')` would round the
+  value to `9007199254740992`, which is a different valid-looking id.
+  File names, metadata keys, the `ids.txt` registry, the layout configuration
+  and the service metadata all use that parser.
+* **Numeric order in every backend.** The service, file-system and embedded
+  stores already sorted the paths by the id encoded in the file name. The
+  Supabase store now does the same for its virtual paths; a plain string sort
+  would put `task_-2.txt` after `task_-10.txt` and `task_10.txt` before
+  `task_2.txt`.
+* **Drag controllers validate the signed value.** The tree, the board and the
+  Gantt chart read the `data-task-id` attributes through the same safe parser,
+  so a negative id survives a drag and an invalid attribute is ignored.
+* **The flat list shows the full id.** The ID column is 160 pixels wide and
+  the Parent column is 180 pixels; the parent link never wraps and the ID cells
+  never wrap. Below 900 pixels the ID column becomes 140 pixels, the Parent
+  column 158 pixels and the parent link uses an 11 pixel mono face, so the
+  title still has room in a narrow window. The id chips of the editor ellipsize
+  their label instead of overflowing the dialog, and the child list keeps its
+  id visible while the title takes the remaining space.
+* **The tests do not assume positive or sequential ids.** New records are
+  found by diffing the folder of the test and by searching their id, not by
+  expecting them on the last page. The browser e2e also fills the editor
+  fields by their label (the tag field shares the `.id-list` class) and uses
+  fixed dates in its Gantt fixture, so its schedule check does not depend on
+  the day the test runs.
+
+---
+
 ## 6. The project of the user
 
 **Files:** `src/core/projectStore.ts`, `src/core/serviceStore.ts`, `src/core/embeddedStore.ts`, `src/core/browserStorage.ts`, `src/core/fileSystemAccess.ts`, `src/core/fileSystemStore.ts`, `src/core/supabaseStore.ts`, `src/api/supabase.ts`, `src/core/zip.ts`, `src/ui/projectDialog.ts`
@@ -1210,22 +1252,25 @@ be entered with a double click.
 
 | Suite | What it covers |
 | ----- | -------------- |
-| `src/core/task.test.ts` | Format, parsing, serialization, round trip, tags, moving a task under another parent, the two orders. |
+| `src/core/task.test.ts` | Format, parsing, serialization, round trip, tags, moving a task under another parent, the two orders, and long negative or out-of-range ids. |
+| `src/core/ids.test.ts` | The safe integer range, signed ids, leading zeros, zero, garbage, out-of-range values and the `ids.txt` registry. |
+| `src/core/appConfig.test.ts` | Configuration parsing and serialization, the kind of storage and its default, and long negative focus ids. |
+| `src/core/tableSort.test.ts` | The sort of the tasks and of the notes, including the whole safe id range. |
 | `src/core/pagination.test.ts` | Page count, clamping, slicing, page information. |
 | `src/core/taskTree.test.ts` | The tree of the tasks: roots, children, orphan tasks, cycles, focus, expansion, search and subtree of a task. |
 | `src/core/config.test.ts` | Configuration parsing and serialization, the kind of storage and its default. |
 | `src/api/client.test.ts` | Tagged values, headers, error handling, shell calls, authentication policy of the service (mocked `fetch`). |
 | `src/api/supabase.test.ts` | URL normalization, auth headers, schema verification outcomes, CRUD shapes, paging, setup SQL (mocked `fetch`, no network). |
-| `src/core/serviceStore.test.ts` | The store of the service against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
-| `src/core/supabaseStore.test.ts` | The Supabase project against an in memory fake of PostgREST: the tasks, the notes, the comments, the search, the counts, the id registry, the export and the import. |
+| `src/core/serviceStore.test.ts` | The store of the service against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy, signed count output, numeric path order and long negative ids. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
+| `src/core/supabaseStore.test.ts` | The Supabase project against an in memory fake of PostgREST: the tasks, the notes, the comments, the search, the counts, the id registry, the numeric path order across the whole id range, the export and the import. |
 | `src/core/zip.test.ts` | The ZIP archives: the checksum, the round trip, the empty archive, the damaged file and the unicode characters. |
 | `src/core/embeddedStore.test.ts` | The embedded project: the creation of a task, the metadata, the search, the children, the comments, the export and the import. |
 | `src/core/browserStorage.test.ts` | The storage of the browser: the storages the browser offers, the detection of the OPFS and the files it keeps at its root. |
-| `src/core/fileSystemStore.test.ts` | The store over a folder of the disk: the tasks, the comments, the notes, the search, the export and the import. |
+| `src/core/fileSystemStore.test.ts` | The store over a folder of the disk: the tasks, the comments, the notes, the search, the numeric path order with long negative ids, the export and the import. |
 | `src/core/fileSystemAccess.test.ts` | The picker of the browser, the state of the permission and the storage of the handle of the folder. |
 | `src/core/note.test.ts` | The note file format: the names, the parsing, the serialization, the round trip, the search scopes and the summary of the body. |
 | `src/core/markdown.test.ts` | The markdown parser: the headings, the paragraphs, the lists, the quotes, the code blocks, the rules and the inline marks. |
-| `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons) and the pagination bar (jsdom). |
+| `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons, long negative ids and their comment badge) and the pagination bar (jsdom). |
 | `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token, the tree view, the board and the Gantt chart (the focus breadcrumb, the reset of the focus, the creation of a child from the chart, the margin weeks from the displayed rows and the month-spanning collapse), the four storage choices and the Supabase project (creation, credentials, dialog). |
 | `src/ui/kanbanBoard.test.ts` | The board: the columns and their order, the cards, their tags and their actions. |
 | `src/ui/kanbanDrag.test.ts` | The drag and drop of the cards of the board between the columns. |
@@ -1236,7 +1281,7 @@ be entered with a double click.
 | `src/ui/fileDialog.test.ts` | Path helpers, sorting of the file list, the picker itself: the list is not rebuilt when an item is selected and `Enter` enters the selected folder. |
 | `src/ui/markdownView.test.ts` | The rendering of the markdown: the blocks, the inline marks, the safe URLs and the fact that the text of a note is never injected as markup. |
 | `scripts/e2e-smoke.sh` | The built application is rendered by a headless Chrome at the domain root and at a nested path. |
-| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. It also drives the **notes** (the listing, the pagination, the jump to a page, the search scopes, the preview and the creation), the **Gantt chart** (the wider wrapping names, the shared row heights, the sticky names, the 9px indentation, the row actions, the focus breadcrumb, the margin weeks around the tasks and the chart rows spanning the whole chart), the **four choices** of the dialog of the project and the **embedded project**: the switch, the creation of a task, the export of the ZIP archive, its import and the **cold start** (the application opened on the embedded project asks for no folder and creates a task). |
+| `scripts/e2e-browser.mjs` | A real browser drives the application: pagination, search, creation, edition, deletion and the tree view, checked against the files on disk. Created records are found by search because their ids are random and may be negative. It also drives the **notes** (the listing, the pagination, the jump to a page, the search scopes, the preview and the creation), the **Gantt chart** (the wider wrapping names, the shared row heights, the sticky names, the 9px indentation, the row actions, the focus breadcrumb, the margin weeks around the tasks and the chart rows spanning the whole chart), the **four choices** of the dialog of the project and the **embedded project**: the switch, the creation of a task, the export of the ZIP archive, its import and the **cold start** (the application opened on the embedded project asks for no folder and creates a task). |
 
 Commands:
 

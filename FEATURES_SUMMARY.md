@@ -52,6 +52,8 @@ list or as a tree.
 | `key=value` metadata block ended by `----` | Done | `src/core/task.ts` |
 | Description as free text after the separator | Done | `src/core/task.ts` |
 | Random nonzero task id, unique across tasks, comments and notes | Done | `src/core/ids.ts`, `src/core/projectStore.ts` |
+| Signed ids up to 17 characters parsed exactly; out-of-range ids rejected instead of rounded | Done | `src/core/ids.ts`, `src/core/task.ts`, `src/core/comment.ts`, `src/core/note.ts`, `src/core/serviceStore.ts`, `src/core/supabaseStore.ts` |
+| Task and note paths sorted by numeric id in every backend, including negative and long ids | Done | `src/core/serviceStore.ts`, `src/core/fileSystemStore.ts`, `src/core/embeddedStore.ts`, `src/core/supabaseStore.ts` |
 | Automatic id allocation, collision safe (`allocateId`, `ids.txt` registry) | Done | `src/core/ids.ts`, `src/core/serviceStore.ts`, `src/core/embeddedStore.ts`, `src/core/fileSystemStore.ts` |
 | `parent=<id>` key written and read for the child tasks | Done | `src/core/task.ts` |
 | **`blocked_by=...`: the tasks that block a task** | Done | `src/core/task.ts` |
@@ -180,6 +182,7 @@ list or as a tree.
 | **Enter enters the selected folder in the picker** | Done | `src/ui/fileDialog.ts` |
 | **The scroll of the picker is kept when an item is clicked** | Done | `src/ui/fileDialog.ts` |
 | Responsive, desktop first layout (1366x768 and above) | Done | `src/styles.css` |
+| Full 17-character ids visible in the ID and Parent columns, chips and child lists | Done | `src/styles.css` |
 | Light and dark colour schemes | Done | `src/styles.css` |
 | Keyboard shortcuts (`Ctrl+Shift+F` focuses the search, `Enter` searches, `Esc` clears) | Done | `src/ui/app.ts` |
 | Toasts for the feedback of every action | Done | `src/ui/toast.ts` |

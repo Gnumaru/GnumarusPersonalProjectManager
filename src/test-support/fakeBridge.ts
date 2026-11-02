@@ -244,7 +244,7 @@ export class FakeBridge {
       stdout = [...this.files.keys()]
         .filter((filePath) => filePath.startsWith(prefix))
         .filter((filePath) => namePattern.test(filePath.slice(prefix.length)))
-        .filter((filePath) => filePath.slice(prefix.length).split('/').every((part) => /^task_\d+$/.test(part) || part.length > 0))
+        .filter((filePath) => filePath.slice(prefix.length).split('/').every((part) => /^task_-?\d+\.txt$/u.test(part) || part.length > 0))
         .map((filePath) => `./${filePath.slice(prefix.length)}`)
         .join('\n');
       if (stdout.length > 0) {
@@ -252,7 +252,7 @@ export class FakeBridge {
       }
     } else if (command.includes("-e '^task=")) {
       // The comment files of a task.
-      const match = /-e '\^task=(\d+)\$'/u.exec(command);
+      const match = /-e '\^task=(-?\d+)\$'/u.exec(command);
       const taskId = match?.[1] ?? '';
       const matches = files()
         .filter(([, content]) => new RegExp(`^task=${taskId}$`, 'mu').test(content))
@@ -292,7 +292,7 @@ export class FakeBridge {
       // Reading the hierarchy: one line per task that has a parent.
       const lines: string[] = [];
       for (const [filePath, content] of files()) {
-        const match = /^parent=(\d+)$/mu.exec(content);
+        const match = /^parent=(-?\d+)$/mu.exec(content);
         if (match === null) {
           continue;
         }
@@ -303,7 +303,7 @@ export class FakeBridge {
       // Counting the children of every task.
       const counts = new Map<string, number>();
       for (const [, content] of files()) {
-        const match = /^parent=(\d+)$/mu.exec(content);
+        const match = /^parent=(-?\d+)$/mu.exec(content);
         if (match === null) {
           continue;
         }
@@ -318,7 +318,7 @@ export class FakeBridge {
       // Counting the comments of every task.
       const counts = new Map<string, number>();
       for (const [, content] of files()) {
-        const match = /^task=(\d+)$/mu.exec(content);
+        const match = /^task=(-?\d+)$/mu.exec(content);
         if (match === null) {
           continue;
         }
@@ -331,7 +331,7 @@ export class FakeBridge {
         .join('');
     } else if (command.includes("-e '^parent=")) {
       // Listing the children of one task.
-      const match = /-e '\^parent=(\d+)\$'/u.exec(command);
+      const match = /-e '\^parent=(-?\d+)\$'/u.exec(command);
       const parentId = match?.[1] ?? '';
       const matches = files()
         .filter(([, content]) => new RegExp(`^parent=${parentId}$`, 'mu').test(content))

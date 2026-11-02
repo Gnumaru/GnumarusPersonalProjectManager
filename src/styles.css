@@ -521,10 +521,11 @@ button[hidden] {
 
 .task-table .cell-id,
 .note-table .cell-id {
-  width: 62px;
+  width: 160px;
   color: var(--text-faint);
   font-family: var(--mono);
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .task-table .cell-tags,
@@ -536,6 +537,12 @@ button[hidden] {
 .task-table .cell-parent,
 .note-table .cell-parent {
   width: 92px;
+}
+
+/* The random ids may be negative and hold up to 17 characters: the parent
+   cell has to fit "#-9007199254740991" without clipping it. */
+.task-table .cell-parent {
+  width: 180px;
 }
 
 .task-table .cell-status,
@@ -566,6 +573,7 @@ button[hidden] {
   background: var(--accent-soft);
   border: none;
   border-radius: 999px;
+  white-space: nowrap;
 }
 
 .parent-link:hover:not(:disabled) {
@@ -2144,18 +2152,29 @@ input[type='date'] {
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .id-chip {
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  max-width: 100%;
+  min-width: 0;
   padding: 1px 2px 1px 8px;
   font-family: var(--mono);
   font-size: 11.5px;
   color: var(--accent);
   background: var(--accent-soft);
   border-radius: 999px;
+}
+
+.id-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .id-chip-remove {
@@ -2370,6 +2389,8 @@ ol.task-parent-chain {
   font-size: 12px;
   color: var(--text-faint);
   min-width: 40px;
+  flex: none;
+  white-space: nowrap;
 }
 
 .child-title {
@@ -3290,6 +3311,23 @@ ol.task-parent-chain {
 
   .task-table .cell-tags {
     display: none;
+  }
+
+  /* The full signed ids still have to fit, but a smaller mono face and a
+     smaller parent pill leave more room for the title in a narrow window. */
+  .task-table .cell-id,
+  .note-table .cell-id {
+    width: 140px;
+    font-size: 11px;
+  }
+
+  .task-table .cell-parent {
+    width: 158px;
+  }
+
+  .parent-link {
+    padding: 1px 6px;
+    font-size: 11px;
   }
 
   .field-row {

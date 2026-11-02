@@ -150,6 +150,43 @@ describe('renderTaskRows', () => {
     );
     expect(rows[0]?.querySelector('.task-title-button')?.textContent).toBe('Untitled task');
   });
+
+  it('renders a long negative id with its comment badge', () => {
+    const doc = createDocument();
+    const id = -9007199254740991;
+    const rows = renderTaskRows(
+      doc,
+      [{ ...task, id, parentId: null }],
+      {
+        onView: () => undefined,
+        onEdit: () => undefined,
+        onAddChild: () => undefined,
+        onDelete: () => undefined,
+        onOpenParent: () => undefined,
+      },
+      new Map(),
+      new Map([[id, 2]]),
+    );
+
+    const row = rows[0];
+    expect(row?.dataset['taskId']).toBe(String(id));
+    expect(row?.querySelector('.cell-id')?.textContent).toBe(String(id));
+    expect(row?.querySelector('.comment-count')?.textContent).toBe('2');
+  });
+
+  it('renders a long negative parent link', () => {
+    const doc = createDocument();
+    const parentId = -9007199254740991;
+    const rows = renderTaskRows(doc, [{ ...task, parentId }], {
+      onView: () => undefined,
+      onEdit: () => undefined,
+      onAddChild: () => undefined,
+      onDelete: () => undefined,
+      onOpenParent: () => undefined,
+    });
+
+    expect(rows[0]?.querySelector('.parent-link')?.textContent).toBe(`#${parentId}`);
+  });
 });
 
 describe('statusBadge', () => {

@@ -28,6 +28,8 @@ describe('the note file names', () => {
   it('extracts the id from the name', () => {
     expect(parseNoteIdFromFileName('note_12.txt')).toBe(12);
     expect(parseNoteIdFromFileName('note_-12.txt')).toBe(-12);
+    expect(parseNoteIdFromFileName('note_-9007199254740991.txt')).toBe(-9007199254740991);
+    expect(parseNoteIdFromFileName('note_9007199254740992.txt')).toBeNull();
     expect(parseNoteIdFromFileName('note_0.txt')).toBeNull();
     expect(parseNoteIdFromFileName('note_x.txt')).toBeNull();
   });

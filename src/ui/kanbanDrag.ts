@@ -8,7 +8,7 @@
  */
 
 import { COLUMN_CLASS } from './kanbanBoard.js';
-import { PointerDrag, findByClass } from './pointerDrag.js';
+import { PointerDrag, findByClass, taskIdOf } from './pointerDrag.js';
 
 /** The buttons of a card that never start a drag. */
 const DRAG_EXCLUDED_CLASSES = ['kanban-card-action'] as const;
@@ -34,14 +34,7 @@ export class KanbanDragController {
       container: options.container,
       excludedClasses: DRAG_EXCLUDED_CLASSES,
       resolveSource: (target) => findByClass(target, 'kanban-card'),
-      idOf: (source) => {
-        const raw = source.dataset['taskId'];
-        if (raw === undefined) {
-          return null;
-        }
-        const id = Number.parseInt(raw, 10);
-        return Number.isSafeInteger(id) ? id : null;
-      },
+      idOf: (source) => taskIdOf(source),
       labelOf: (source) => source.querySelector('.kanban-card-title')?.textContent ?? '',
       onDragStart: () => {
         this.clearTarget();

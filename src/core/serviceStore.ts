@@ -21,6 +21,7 @@ import {
   IDS_FILE,
   generateUniqueId,
   parseIdsFile,
+  parseRecordId,
   serializeIdsFile,
 } from './ids.js';
 import {
@@ -133,8 +134,8 @@ export function parseIdCounts(stdout: string): Map<number, number> {
       continue;
     }
     const count = Number.parseInt(match[1] ?? '', 10);
-    const id = Number.parseInt(match[2] ?? '', 10);
-    if (Number.isSafeInteger(count) && Number.isSafeInteger(id)) {
+    const id = parseRecordId(match[2] ?? '');
+    if (Number.isSafeInteger(count) && id !== null) {
       counts.set(id, count);
     }
   }
@@ -329,15 +330,13 @@ export class ServiceProjectStore implements ProjectStore {
         treeGanttOrder: 0,
       };
       if (key === 'id') {
-        const id = Number.parseInt(value, 10);
-        current.id = Number.isSafeInteger(id) ? id : null;
+        current.id = parseRecordId(value);
       } else if (key === 'title') {
         current.title = value;
       } else if (key === 'status') {
         current.status = isTaskStatus(value) ? value : 'todo';
       } else if (key === 'parent') {
-        const parentId = Number.parseInt(value, 10);
-        current.parentId = Number.isSafeInteger(parentId) ? parentId : null;
+        current.parentId = parseRecordId(value);
       } else if (key === 'tags') {
         current.tags = normalizeTags(value);
       } else if (key === 'type') {
@@ -922,7 +921,7 @@ export class ServiceProjectStore implements ProjectStore {
         `Unable to list the comments of the task #${taskId}: ${result.stderr.trim() || `exit code ${result.returncode}`}`,
       );
     }
-    return parseServicePaths(result.stdout, this.projectDir);
+    return parseServicePaths(result.stdout, this.projectDir, parseCommentIdFromFileName);
   }
 
   /** Reads a comment file. */

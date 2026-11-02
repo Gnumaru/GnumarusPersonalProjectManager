@@ -16,6 +16,7 @@
  */
 
 import { el } from './dom.js';
+import { parseRecordId } from '../core/ids.js';
 
 /** Distance the pointer has to travel before a drag starts, in pixels. */
 export const DRAG_THRESHOLD_PX = 5;
@@ -258,6 +259,5 @@ export function taskIdOf(element: HTMLElement): number | null {
   if (raw === undefined) {
     return null;
   }
-  const id = Number.parseInt(raw, 10);
-  return Number.isSafeInteger(id) ? id : null;
+  return parseRecordId(raw);
 }

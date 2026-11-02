@@ -37,6 +37,26 @@ export function isValidRecordId(id: number): boolean {
   return Number.isSafeInteger(id) && id !== 0;
 }
 
+/**
+ * Parses a decimal record id written in text.
+ *
+ * The optional minus sign and leading zeros are accepted; zero, trailing
+ * garbage and values outside the safe integer range are rejected. The value
+ * is read as a `bigint` first, so a long number is rejected instead of being
+ * silently rounded to a different, valid-looking id by `Number.parseInt`.
+ */
+export function parseRecordId(value: string): number | null {
+  const trimmed = value.trim();
+  if (!/^-?\d+$/u.test(trimmed)) {
+    return null;
+  }
+  const parsed = BigInt(trimmed);
+  if (parsed === 0n || parsed < BigInt(MIN_ID) || parsed > BigInt(MAX_ID)) {
+    return null;
+  }
+  return Number(parsed);
+}
+
 /** A source of 32 random bits, injectable for deterministic tests. */
 export type RandomUint32 = () => number;
 
@@ -103,12 +123,8 @@ export function parseIdsFile(content: string): Set<number> {
     if (trimmed.length === 0) {
       continue;
     }
-    // Strict decimal integers only: no floats, no trailing text.
-    if (!/^-?\d+$/u.test(trimmed)) {
-      continue;
-    }
-    const id = Number.parseInt(trimmed, 10);
-    if (isValidRecordId(id)) {
+    const id = parseRecordId(trimmed);
+    if (id !== null) {
       ids.add(id);
     }
   }

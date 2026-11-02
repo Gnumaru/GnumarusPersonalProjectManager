@@ -69,6 +69,25 @@ describe('sortRows', () => {
     ).toEqual([3, 1, 2]);
   });
 
+  it('sorts the full safe integer range, including long negative ids', () => {
+    const extremes: Row[] = [
+      { id: 9007199254740991, title: 'max', updated: '', parent: null },
+      { id: -1, title: 'minus one', updated: '', parent: null },
+      { id: -9007199254740991, title: 'min', updated: '', parent: null },
+      { id: 1, title: 'one', updated: '', parent: null },
+    ];
+    expect(
+      sortRows(extremes, { field: 'id', direction: 'asc' }, (row) => row.id, 'number').map(
+        (row) => row.id,
+      ),
+    ).toEqual([-9007199254740991, -1, 1, 9007199254740991]);
+    expect(
+      sortRows(extremes, { field: 'id', direction: 'desc' }, (row) => row.id, 'number').map(
+        (row) => row.id,
+      ),
+    ).toEqual([9007199254740991, 1, -1, -9007199254740991]);
+  });
+
   it('sorts the rows without a value before the ones with one', () => {
     // Descending: the tasks without a parent (2 and 3) come first, then the
     // parent 7 before the parent 5.

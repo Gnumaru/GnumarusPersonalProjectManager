@@ -28,6 +28,7 @@ import {
   parseIdList,
   parseMetadataBlock,
   parseTask,
+  parseTaskIdFromFileName,
   serializeTask,
   taskFileName,
   type Task,
@@ -36,6 +37,7 @@ import {
   noteFileName,
   noteMatches,
   parseNote,
+  parseNoteIdFromFileName,
   serializeNote,
   type Note,
   type NoteSearchScope,
@@ -45,6 +47,7 @@ import {
   MAX_ID_ATTEMPTS,
   isValidRecordId,
   parseIdsFile,
+  parseRecordId,
   randomCandidateId,
   serializeIdsFile,
 } from './ids.js';
@@ -96,6 +99,27 @@ function orderOf(row: SupabaseRow, column: string): number {
 
 function idOf(value: SupabaseValueOfRow): number | null {
   return typeof value === 'number' && isValidRecordId(value) ? value : null;
+}
+
+/**
+ * Sorts virtual file paths by the numeric id encoded in their names.
+ *
+ * A plain string sort would put `task_-2.txt` after `task_-10.txt` and
+ * `task_10.txt` before `task_2.txt`; the list has to follow the ids, like
+ * the other backends.
+ */
+function sortPathsById(
+  paths: readonly string[],
+  parseId: (name: string) => number | null,
+): string[] {
+  return [...paths].sort((left, right) => {
+    const leftId = parseId(left.slice(left.lastIndexOf('/') + 1));
+    const rightId = parseId(right.slice(right.lastIndexOf('/') + 1));
+    if (leftId !== null && rightId !== null && leftId !== rightId) {
+      return leftId - rightId;
+    }
+    return left.localeCompare(right);
+  });
 }
 
 type SupabaseValueOfRow = string | number | boolean | null | undefined;
@@ -281,7 +305,7 @@ export class SupabaseProjectStore implements ProjectStore {
         paths.push(SupabaseProjectStore.taskPathOf(id));
       }
     }
-    return paths.sort((left, right) => left.localeCompare(right));
+    return sortPathsById(paths, parseTaskIdFromFileName);
   }
 
   async searchTaskPaths(term: string): Promise<readonly string[]> {
@@ -307,7 +331,7 @@ export class SupabaseProjectStore implements ProjectStore {
         matches.push(SupabaseProjectStore.taskPathOf(id));
       }
     }
-    return matches.sort((left, right) => left.localeCompare(right));
+    return sortPathsById(matches, parseTaskIdFromFileName);
   }
 
   async listTasks(): Promise<readonly TaskSummary[]> {
@@ -343,8 +367,7 @@ export class SupabaseProjectStore implements ProjectStore {
     if (match === null) {
       return null;
     }
-    const id = Number.parseInt(match[1] ?? '', 10);
-    return isValidRecordId(id) ? id : null;
+    return parseRecordId(match[1] ?? '');
   }
 
   async writeTask(_path: string, task: Task): Promise<void> {
@@ -387,8 +410,7 @@ export class SupabaseProjectStore implements ProjectStore {
     if (match === null) {
       return null;
     }
-    const id = Number.parseInt(match[1] ?? '', 10);
-    return isValidRecordId(id) ? id : null;
+    return parseRecordId(match[1] ?? '');
   }
 
   async readAppConfig(): Promise<string | null> {
@@ -567,7 +589,7 @@ export class SupabaseProjectStore implements ProjectStore {
         paths.push(noteFileName(id));
       }
     }
-    return paths.sort((left, right) => left.localeCompare(right));
+    return sortPathsById(paths, parseNoteIdFromFileName);
   }
 
   async listNoteSummaries(): Promise<readonly NoteSummary[]> {
@@ -607,7 +629,7 @@ export class SupabaseProjectStore implements ProjectStore {
         matches.push(noteFileName(id));
       }
     }
-    return matches.sort((left, right) => left.localeCompare(right));
+    return sortPathsById(matches, parseNoteIdFromFileName);
   }
 
   async readNote(path: string): Promise<Note> {

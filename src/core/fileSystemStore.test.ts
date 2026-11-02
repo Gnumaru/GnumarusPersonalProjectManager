@@ -89,6 +89,23 @@ describe('FileSystemProjectStore', () => {
     expect(paths).toEqual(['nested/task_9.txt']);
   });
 
+  it('sorts the task paths by numeric id, including long negative ids', async () => {
+    const { store, handle } = createStore();
+    const file = handle as unknown as { addFile: (path: string, content: string) => void };
+    for (const id of ['10', '-2', '9007199254740991', '-9007199254740991', '2', '-10']) {
+      file.addFile(`task_${id}.txt`, `id=${id}\ntitle=Task ${id}\n----\nbody\n`);
+    }
+
+    expect(await store.listTaskPaths()).toEqual([
+      'task_-9007199254740991.txt',
+      'task_-10.txt',
+      'task_-2.txt',
+      'task_2.txt',
+      'task_10.txt',
+      'task_9007199254740991.txt',
+    ]);
+  });
+
   it('searches the content of the tasks', async () => {
     const { store } = createStore();
     const id = await store.allocateId();

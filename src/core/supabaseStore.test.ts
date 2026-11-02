@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { SupabaseClient } from '../api/supabase.js';
 import { FakePostgrest } from '../test-support/fakePostgrest.js';
-import { isValidRecordId } from './ids.js';
+import { MAX_ID, MIN_ID, isValidRecordId } from './ids.js';
 import { buildNote } from './note.js';
 import { databaseTimestampValue, parseDatabaseTimestamp, SupabaseProjectStore } from './supabaseStore.js';
 import { buildTask, type TaskInput } from './task.js';
@@ -120,6 +120,31 @@ describe('SupabaseProjectStore', () => {
     expect(summaries[0]?.title).toBe('A task');
     expect(summaries[0]?.status).toBe('doing');
     expect(summaries[0]?.path).toBe(store.taskPath(id));
+  });
+
+  it('lists task and note paths in numeric id order, across the whole range', async () => {
+    const { store } = createStore();
+    const taskIds = [10, -2, MAX_ID, MIN_ID, 2, -10];
+    for (const id of taskIds) {
+      await store.createTaskFile(
+        store.taskPath(id),
+        buildTask(input(`Task ${id}`), id, new Date()),
+      );
+    }
+    const expectedTasks = [MIN_ID, -10, -2, 2, 10, MAX_ID].map((id) => store.taskPath(id));
+    expect(await store.listTaskPaths()).toEqual(expectedTasks);
+    expect(await store.searchTaskPaths('')).toEqual(expectedTasks);
+
+    const noteIds = [3, MIN_ID, -1, MAX_ID];
+    for (const id of noteIds) {
+      await store.createNoteFile(
+        store.notePath(id),
+        buildNote({ title: `Note ${id}`, content: '' }, id, new Date()),
+      );
+    }
+    const expectedNotes = [MIN_ID, -1, 3, MAX_ID].map((id) => store.notePath(id));
+    expect(await store.listNotePaths()).toEqual(expectedNotes);
+    expect(await store.searchNotePaths('', 'both')).toEqual(expectedNotes);
   });
 
   it('reads rows with missing values like the equivalent files', async () => {

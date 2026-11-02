@@ -33,7 +33,7 @@
  * change the `updated` timestamp: it is not a change of the task content.
  */
 
-import { isValidRecordId } from './ids.js';
+import { parseRecordId } from './ids.js';
 
 export const METADATA_SEPARATOR = '----';
 export const TASK_FILE_PREFIX = 'task_';
@@ -398,8 +398,7 @@ export function parseTaskIdFromFileName(name: string): number | null {
   if (match === null) {
     return null;
   }
-  const id = Number.parseInt(match[1] ?? '', 10);
-  return isValidRecordId(id) ? id : null;
+  return parseRecordId(match[1] ?? '');
 }
 
 /**
@@ -432,12 +431,7 @@ function parseInteger(value: string | undefined): number | null {
   if (value === undefined) {
     return null;
   }
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    return null;
-  }
-  const parsed = Number.parseInt(trimmed, 10);
-  return isValidRecordId(parsed) ? parsed : null;
+  return parseRecordId(value);
 }
 
 /** Reads an order key, clamped to a non-negative integer. */
@@ -525,8 +519,8 @@ export function parseIdList(value: string): number[] {
     if (trimmed.length === 0) {
       continue;
     }
-    const id = Number.parseInt(trimmed, 10);
-    if (!isValidRecordId(id) || seen.has(id)) {
+    const id = parseRecordId(trimmed);
+    if (id === null || seen.has(id)) {
       continue;
     }
     seen.add(id);

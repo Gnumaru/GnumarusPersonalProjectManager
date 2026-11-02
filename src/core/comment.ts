@@ -26,7 +26,7 @@ import {
   normalizeTaskTimestamp,
   parseMetadataBlock,
 } from './task.js';
-import { isValidRecordId } from './ids.js';
+import { parseRecordId } from './ids.js';
 
 export const COMMENT_FILE_PREFIX = 'comment_';
 export const COMMENT_FILE_SUFFIX = '.txt';
@@ -63,8 +63,7 @@ export function parseCommentIdFromFileName(name: string): number | null {
   if (match === null) {
     return null;
   }
-  const id = Number.parseInt(match[1] ?? '', 10);
-  return isValidRecordId(id) ? id : null;
+  return parseRecordId(match[1] ?? '');
 }
 
 /**
@@ -76,12 +75,12 @@ export function parseCommentIdFromFileName(name: string): number | null {
 export function parseComment(content: string, idHint?: number): TaskComment {
   const { metadata, description } = parseMetadataBlock(content);
 
-  const rawId = Number.parseInt(metadata.get('id') ?? '', 10);
-  const rawTaskId = Number.parseInt(metadata.get('task') ?? '', 10);
+  const fileId = parseRecordId(metadata.get('id') ?? '');
+  const taskId = parseRecordId(metadata.get('task') ?? '');
 
   return {
-    id: isValidRecordId(rawId) ? rawId : (idHint ?? 0),
-    taskId: isValidRecordId(rawTaskId) ? rawTaskId : 0,
+    id: fileId ?? idHint ?? 0,
+    taskId: taskId ?? 0,
     created: normalizeTaskTimestamp(metadata.get('created') ?? ''),
     updated: normalizeTaskTimestamp(metadata.get('updated') ?? ''),
     text: description,

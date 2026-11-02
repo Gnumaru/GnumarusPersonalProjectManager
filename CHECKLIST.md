@@ -1,5 +1,55 @@
 # Checklist
 
+## Batch 46 - Signed ids across the whole range
+
+### Change
+
+- [x] `parseRecordId` reads ids as `bigint`, accepts the minus sign and
+      leading zeros, and rejects zero, garbage and out-of-range values
+      (`src/core/ids.ts`)
+- [x] Task, comment, note, config, service-metadata and Supabase path parsers
+      use the shared parser (`src/core/task.ts`, `src/core/comment.ts`,
+      `src/core/note.ts`, `src/core/appConfig.ts`, `src/core/serviceStore.ts`,
+      `src/core/supabaseStore.ts`)
+- [x] Supabase task/note path lists sort by numeric id instead of a plain
+      string sort (`src/core/supabaseStore.ts`)
+- [x] The service lists the comments of one task by the comment id
+      (`src/core/serviceStore.ts`)
+- [x] Drag controllers validate signed ids (`src/ui/pointerDrag.ts`,
+      `src/ui/kanbanDrag.ts`, `src/ui/ganttDrag.ts`)
+- [x] The fake bridge understands negative count, parent and comment ids
+      (`src/test-support/fakeBridge.ts`)
+- [x] The flat list shows full 17-character ids: ID column 160 px, Parent
+      column 180 px, nowrap parent links, ellipsized id chips and nowrap child
+      ids (`src/styles.css`)
+- [x] The browser e2e finds created records through the search instead of
+      assuming they are last and positive, fills the task fields by label, and
+      uses fixed dates in the Gantt fixture (`scripts/e2e-browser.mjs`)
+
+### Tests
+
+- [x] `src/core/ids.test.ts` - signed range, leading zeros, zero, garbage,
+      out-of-range values
+- [x] `src/core/task.test.ts` - long file names, out-of-range ids and parents,
+      signed id lists
+- [x] `src/core/comment.test.ts`, `src/core/note.test.ts` - long negative file
+      names and out-of-range names
+- [x] `src/core/appConfig.test.ts` - long negative focus ids
+- [x] `src/core/tableSort.test.ts` - sorting across the whole safe range
+- [x] `src/core/serviceStore.test.ts` - signed `uniq -c` output, numeric path
+      order, and live long negative parent/comment counts and comments
+- [x] `src/core/supabaseStore.test.ts` - numeric task and note path order
+      across the whole range
+- [x] `src/core/fileSystemStore.test.ts` - numeric task path order with long
+      negative ids
+- [x] `src/ui/widgets.test.ts` - long negative id, comment badge and parent
+      link
+- [x] `npm run typecheck`, `npm test` (569 tests), `npm run build`
+- [x] `npm run e2e` (headless smoke)
+- [x] `npm run e2e:browser` (128/128 checks)
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 45 - Negative ids in the count badges
 
 ### Change

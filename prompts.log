@@ -197,7 +197,7 @@ na modal que permite escolher backend do projeto eu estou conseguindo mudar o ba
 ====
 em um projeto meu, em todas as views, tem uma task especifica que não esta mostrando a contagem de comentários. por coincidencia é a unica task com id negativo criada apos passarmos a usar ids aleatorios ao inves de sequenciais. além de nao exibir a contagem de comments, na view list o id está com estilo diferente dos outros ids positivos, a cor da fonte esta cinza ao inves de roxa.
 ====
-explore a base de codigo e procure e corrija potenciais bugs associados ao fato de agora estarmos usando ids negativos alem de positivos, bem como por estarmos usando ids com muitos caracteres (podem ter até 17 caracteres contando o sinal de negativo). apos terminar rode apenas desta vez os testes e2e
+explore a base de codigo e procure e corrija potenciais bugs associados ao fato de agora estarmos usando ids negativos alem de positivos, bem como por estarmos usando ids com muitos caracteres (podem ter até 17 caracteres contando o sinal de negativo). apos terminar rode apenas desta vez os testes e2e e corrija qualquer problema que surgir.
 ====
 ====
 ====

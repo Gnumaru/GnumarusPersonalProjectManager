@@ -14,6 +14,7 @@
  */
 
 import { formatTaskTimestamp } from '../core/task.js';
+import { parseRecordId } from '../core/ids.js';
 import {
   barGeometry,
   columnOfDay,
@@ -92,7 +93,7 @@ export class GanttDragController {
     if (bar === null) {
       return;
     }
-    const taskId = readNumber(bar, 'taskId');
+    const taskId = readTaskId(bar);
     const startDay = readNumber(bar, 'startDay');
     const endDay = readNumber(bar, 'endDay');
     if (taskId === null || startDay === null || endDay === null) {
@@ -250,6 +251,12 @@ function readNumber(element: HTMLElement, name: string): number | null {
   }
   const value = Number.parseInt(raw, 10);
   return Number.isSafeInteger(value) ? value : null;
+}
+
+/** The task id written in a data attribute of the bar. */
+function readTaskId(element: HTMLElement): number | null {
+  const raw = element.dataset['taskId'];
+  return raw === undefined ? null : parseRecordId(raw);
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
