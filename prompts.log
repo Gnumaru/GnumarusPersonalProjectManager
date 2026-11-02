@@ -186,10 +186,18 @@ nao tem problema dropar suporte a subdiretorio porque na pratica nao usamos isso
 a tabela de config precisa sim ter duas colunas pra termos chaves primarias unicas reais para cada configuracao.
 ao inves de validarmos o ddl de cada tabela, apenas gere um sql que cria a tabela apenas com sua coluna de id e logo em seguida adiciona todas as outras colunas sequencialmente usando "if not exists". nao coloque nada mais no script, nada de grant nem drop ou create policy, assuma que o usuario vai criar um banco novo sem rls
 ====
-
+tive um erro ao rodar o sql no supabase
+```
+Failed to run sql query: ERROR:  42601: syntax error at or near "end"
+LINE 11: alter table public.tasks add column if not exists end text not null default '';
+```
+alem disso voce esta usando 'text' pra colunas de hora de criacao e alteracao. nao seria melhor usar TIMESTAMP?
 ====
+na modal que permite escolher backend do projeto eu estou conseguindo mudar o backend normalmente mas a opcao focada nao muda, independente de qual eu escolha a opcao inicial (que por padrao é o embedded project) permanece em foco
 ====
+em um projeto meu, em todas as views, tem uma task especifica que não esta mostrando a contagem de comentários. por coincidencia é a unica task com id negativo criada apos passarmos a usar ids aleatorios ao inves de sequenciais. além de nao exibir a contagem de comments, na view list o id está com estilo diferente dos outros ids positivos, a cor da fonte esta cinza ao inves de roxa.
 ====
+explore a base de codigo e procure e corrija potenciais bugs associados ao fato de agora estarmos usando ids negativos alem de positivos, bem como por estarmos usando ids com muitos caracteres (podem ter até 17 caracteres contando o sinal de negativo). apos terminar rode apenas desta vez os testes e2e
 ====
 ====
 ====

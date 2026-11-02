@@ -119,6 +119,29 @@ export const COUNT_COMMENTS_COMMAND =
   "grep -rh --include='comment_*.txt' --exclude-dir=.git --exclude-dir=.svn --exclude-dir=.hg '^task=' . | cut -d= -f2 | sort | uniq -c";
 
 /**
+ * Parses the output of a counting command (`uniq -c`).
+ *
+ * Every line holds a count and an id, separated by spaces. The ids are random
+ * and may be negative, so the sign is part of the pattern: a parser that only
+ * accepts `\d+` silently drops every record with a negative id.
+ */
+export function parseIdCounts(stdout: string): Map<number, number> {
+  const counts = new Map<number, number>();
+  for (const line of stdout.split('\n')) {
+    const match = /^\s*(\d+)\s+(-?\d+)\s*$/u.exec(line);
+    if (match === null) {
+      continue;
+    }
+    const count = Number.parseInt(match[1] ?? '', 10);
+    const id = Number.parseInt(match[2] ?? '', 10);
+    if (Number.isSafeInteger(count) && Number.isSafeInteger(id)) {
+      counts.set(id, count);
+    }
+  }
+  return counts;
+}
+
+/**
  * Command used to read the metadata of every task.
  *
  * Everything the tree, the board and the Gantt chart need is read in **one**
@@ -372,7 +395,6 @@ export class ServiceProjectStore implements ProjectStore {
   }
 
   async childCounts(): Promise<ReadonlyMap<number, number>> {
-    const counts = new Map<number, number>();
     const result = await this.api.execShell({
       command: COUNT_CHILDREN_COMMAND,
       cwd: this.projectDir,
@@ -383,22 +405,10 @@ export class ServiceProjectStore implements ProjectStore {
         `Unable to count the children of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
       );
     }
-    for (const line of result.stdout.split('\n')) {
-      const match = /^\s*(\d+)\s+(\d+)\s*$/u.exec(line);
-      if (match === null) {
-        continue;
-      }
-      const count = Number.parseInt(match[1] ?? '', 10);
-      const parentId = Number.parseInt(match[2] ?? '', 10);
-      if (Number.isSafeInteger(count) && Number.isSafeInteger(parentId)) {
-        counts.set(parentId, count);
-      }
-    }
-    return counts;
+    return parseIdCounts(result.stdout);
   }
 
   async commentCounts(): Promise<ReadonlyMap<number, number>> {
-    const counts = new Map<number, number>();
     const result = await this.api.execShell({
       command: COUNT_COMMENTS_COMMAND,
       cwd: this.projectDir,
@@ -409,18 +419,7 @@ export class ServiceProjectStore implements ProjectStore {
         `Unable to count the comments of "${this.projectDir}": ${result.stderr.trim() || `exit code ${result.returncode}`}`,
       );
     }
-    for (const line of result.stdout.split('\n')) {
-      const match = /^\s*(\d+)\s+(\d+)\s*$/u.exec(line);
-      if (match === null) {
-        continue;
-      }
-      const count = Number.parseInt(match[1] ?? '', 10);
-      const taskId = Number.parseInt(match[2] ?? '', 10);
-      if (Number.isSafeInteger(count) && Number.isSafeInteger(taskId)) {
-        counts.set(taskId, count);
-      }
-    }
-    return counts;
+    return parseIdCounts(result.stdout);
   }
 
   async readTask(path: string): Promise<Task> {

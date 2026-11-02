@@ -304,6 +304,9 @@ browser:
 grep -rh --include='task_*.txt' ... '^parent=' . | cut -d= -f2 | sort | uniq -c
 ```
 
+The ids may be negative, so the parser of that output accepts the optional
+sign. The same parser is used by the count of the comments.
+
 The children of one task are listed with:
 
 ```
@@ -937,6 +940,10 @@ all the `comment_*.txt` files and counts them by their `task=` key (one
 `grep` command, the same shape as the count of the children), and the embedded
 and the file system stores do the same in memory. The badge is purely
 informational: it does not change the sorting or the filtering of the tasks.
+
+The ids are random and may be negative. The service parser of the `uniq -c`
+output accepts the optional sign, so a task with a negative id still shows its
+badge, and a task with a negative id can still show the amount of its children.
 
 ---
 

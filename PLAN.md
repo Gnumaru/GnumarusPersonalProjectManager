@@ -8,6 +8,12 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 45 fixes the parse of the counts read with `uniq -c`: the ids are
+  random and may be negative, but the parser only accepted `\d+`, so a task
+  with a negative id lost its comment badge in every view and a negative
+  parent lost its child count. `parseIdCounts` accepts an optional sign and is
+  covered by unit and live-service tests.
+- Verification: 559 unit tests pass.
 - Batch 44 refreshes the focused backend choice in the project
   dialog after a switch: the highlight followed the mode from opening time
   and never moved.

@@ -67,6 +67,7 @@ list or as a tree.
 | **Date pickers for the start and the end date in the editor** | Done | `src/ui/taskDialog.ts` |
 | **Colored status, type and role dropdowns in the editor (Kanban colours for statuses, red/yellow/green for types, 8-colour palette for roles; highlight keeps a stronger tone of the same colour)** | Done | `src/ui/taskDialog.ts`, `src/styles.css` |
 | Amount of children per task (read with `grep`) | Done | `src/core/serviceStore.ts`, `src/core/embeddedStore.ts` |
+| Comment count badges on every task view, with negative random ids as well | Done | `src/core/serviceStore.ts`, `src/ui/taskTable.ts`, `src/ui/taskTreeView.ts`, `src/ui/kanbanBoard.ts`, `src/ui/ganttView.ts` |
 
 ## Bridge integration
 

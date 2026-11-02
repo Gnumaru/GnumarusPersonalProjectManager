@@ -1,5 +1,23 @@
 # Checklist
 
+## Batch 45 - Negative ids in the count badges
+
+### Change
+
+- [x] `parseIdCounts` accepts signed ids and is shared by `childCounts` and
+      `commentCounts` (`src/core/serviceStore.ts`)
+- [x] The service test no longer assumes a positive comment id
+      (`src/core/serviceStore.test.ts`)
+
+### Tests
+
+- [x] `src/core/serviceStore.test.ts` - signed `uniq -c` output, malformed
+      lines, and live counts for negative parent/comment ids (fails without
+      the fix)
+- [x] `npm run typecheck`, `npm test` (559 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 44 - Project dialog follows the backend switch
 
 ### Change

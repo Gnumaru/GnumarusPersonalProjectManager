@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vite-plus/test';
 import { ApiClient } from '../api/client.js';
-import { ServiceProjectStore } from './serviceStore.js';
+import { ServiceProjectStore, parseIdCounts } from './serviceStore.js';
 import { isValidRecordId } from './ids.js';
 import { buildNote } from './note.js';
 import {
@@ -51,6 +51,22 @@ function input(title: string, status: TaskInput['status'] = 'todo'): TaskInput {
     related: [],
   };
 }
+
+describe('parseIdCounts', () => {
+  it('parses positive and negative ids', () => {
+    const counts = parseIdCounts('      2 -8731492432407898\n      1 11\n');
+
+    expect(counts.get(-8731492432407898)).toBe(2);
+    expect(counts.get(11)).toBe(1);
+    expect(counts.size).toBe(2);
+  });
+
+  it('ignores malformed lines', () => {
+    const counts = parseIdCounts('not a count\n      1 abc\n      2 3.5\n\n');
+
+    expect(counts.size).toBe(0);
+  });
+});
 
 describeLive('ServiceProjectStore against the live service', () => {
   const api = new ApiClient({ baseUrl, token: token ?? null });
@@ -200,6 +216,34 @@ describeLive('ServiceProjectStore against the live service', () => {
     expect(counts.get(id)).toBe(1);
   });
 
+  it('counts the children of a task with a negative id', async () => {
+    const parentId = -9007199254740001;
+    const childId = -9007199254740002;
+    await store.createTaskFile(
+      store.taskPath(parentId),
+      buildTask(input('Negative parent'), parentId, new Date()),
+    );
+    await store.createTaskFile(
+      store.taskPath(childId),
+      buildTask(input('Negative child'), childId, new Date(), parentId),
+    );
+
+    const counts = await store.childCounts();
+    expect(counts.get(parentId)).toBe(1);
+  });
+
+  it('counts the comments of a task with a negative id', async () => {
+    const taskId = -9007199254740003;
+    await store.createTaskFile(
+      store.taskPath(taskId),
+      buildTask(input('Negative commented task'), taskId, new Date()),
+    );
+    await store.createComment(taskId, 'A comment of a negative task');
+
+    const counts = await store.commentCounts();
+    expect(counts.get(taskId)).toBe(1);
+  });
+
   it('lists the children of a task', async () => {
     const summaries = await store.listTasks();
     const parent = summaries.find((summary) => summary.title === 'Counted parent');
@@ -238,7 +282,7 @@ describeLive('ServiceProjectStore against the live service', () => {
     }
 
     const comment = await store.createComment(task.id, 'The first comment');
-    expect(comment.id).toBeGreaterThan(0);
+    expect(isValidRecordId(comment.id)).toBe(true);
     expect(comment.taskId).toBe(task.id);
 
     // The comment is a file of its own, in the format of the task files.
