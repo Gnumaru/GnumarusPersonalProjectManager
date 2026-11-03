@@ -162,6 +162,8 @@ list or as a tree.
 | **The File System Access API: the files live in a folder chosen by the user** | Done | `src/core/fileSystemStore.ts` |
 | **Supabase: the records live in normalized tables, reached with the project URL and API key** | Done | `src/core/supabaseStore.ts`, `src/api/supabase.ts` |
 | **Supabase credentials tested before use (per-table probes, setup queries shown, re-ask on rejection)** | Done | `src/ui/projectDialog.ts`, `src/api/supabase.ts` |
+| **Supabase connection feedback: timestamped console log of every step, immediate spinner in the dialog footer and colored toasts (common, success, warning, error)** | Done | `src/ui/projectDialog.ts`, `src/ui/log.ts`, `src/ui/toast.ts` |
+| **The tables verified by the dialog are not probed again when the project opens** | Done | `src/ui/app.ts` |
 | **The choices the browser does not offer are disabled** | Done | `src/ui/projectDialog.ts` |
 | **The default is the File System Access API, then the OPFS, then the service** | Done | `src/core/config.ts` |
 | **The application works without the low level service in that mode** | Done | `src/ui/app.ts` |
@@ -185,7 +187,8 @@ list or as a tree.
 | Full 17-character ids visible in the ID and Parent columns, chips and child lists | Done | `src/styles.css` |
 | Light and dark colour schemes | Done | `src/styles.css` |
 | Keyboard shortcuts (`Ctrl+Shift+F` focuses the search, `Enter` searches, `Esc` clears) | Done | `src/ui/app.ts` |
-| Toasts for the feedback of every action | Done | `src/ui/toast.ts` |
+| Toasts for the feedback of every action, in four colors (common, success, warning, error) | Done | `src/ui/toast.ts` |
+| **Timestamped console log of the application actions** | Done | `src/ui/log.ts` |
 | Works at the domain root and at any nested path | Done | `vite.config.ts` (`base: './'`) |
 
 ## Quality

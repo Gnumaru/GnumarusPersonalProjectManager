@@ -15,13 +15,26 @@
  * replaces the whole embedded project.
  */
 
-import { SUPABASE_SETUP_SQL, SupabaseClient, normalizeSupabaseUrl, verifySupabaseSchema } from '../api/supabase.js';
+import {
+  SUPABASE_SETUP_SQL,
+  SupabaseClient,
+  normalizeSupabaseUrl,
+  verifySupabaseSchema,
+  type SupabaseSchemaCheck,
+  type SupabaseSchemaIssue,
+  type SupabaseVerificationStep,
+} from '../api/supabase.js';
 import type { ProjectKind } from '../core/projectStore.js';
 import { el, input } from './dom.js';
 import { createIcon } from './icons.js';
+import { logAction } from './log.js';
 import { Modal } from './modal.js';
+import { showToast, type ToastKind } from './toast.js';
 
 export type ProjectDialogMode = ProjectKind;
+
+/** The toast that follows the whole Supabase connection, replaced in place. */
+const SUPABASE_CONNECTION_TOAST = 'supabase-connection';
 
 export interface ProjectDialogOptions {
   readonly doc: Document;
@@ -44,7 +57,7 @@ export interface ProjectDialogOptions {
   /** The `fetch` used to talk to Supabase; defaults to the global one. */
   readonly supabaseFetch?: typeof fetch | undefined;
   /** The user chooses Supabase with tested credentials. */
-  readonly onUseSupabase?: ((url: string, key: string) => void) | undefined;
+  readonly onUseSupabase?: ((url: string, key: string) => void | Promise<void>) | undefined;
   /** The user chooses the service. */
   readonly onUseService: () => void;
   /** The user chooses the embedded project. */
@@ -77,6 +90,13 @@ export class ProjectDialog {
   private supabaseSetupDetail: HTMLElement | null = null;
   private supabaseSetupSql: HTMLTextAreaElement | null = null;
   private supabaseStatus: HTMLElement | null = null;
+  private supabaseProgress: HTMLElement | null = null;
+  private supabaseProgressText: HTMLElement | null = null;
+  private supabaseConnectButton: HTMLButtonElement | null = null;
+  /** True while a connection is being tested; survives a rebuild of the form. */
+  private supabaseConnecting = false;
+  /** The success message, kept when the form is rebuilt after the switch. */
+  private supabaseStatusMessage = '';
 
   constructor(options: ProjectDialogOptions) {
     this.doc = options.doc;
@@ -100,8 +120,23 @@ export class ProjectDialog {
       this.fileInput.value = '';
     });
 
+    this.supabaseProgressText = el(options.doc, 'span', { class: 'supabase-progress-text' });
+    this.supabaseProgress = el(
+      options.doc,
+      'div',
+      {
+        class: 'supabase-progress',
+        attrs: { role: 'status', 'aria-live': 'polite', hidden: 'hidden' },
+      },
+      [
+        el(options.doc, 'span', { class: 'spinner', attrs: { 'aria-hidden': 'true' } }),
+        this.supabaseProgressText,
+      ],
+    );
+
     this.modal.setBody([this.buildBody()]);
     this.modal.setFooter([
+      el(options.doc, 'div', { class: 'project-footer-status' }, [this.supabaseProgress]),
       el(options.doc, 'div', { class: 'dialog-footer-buttons' }, [
         el(options.doc, 'button', {
           class: 'secondary',
@@ -323,7 +358,11 @@ export class ProjectDialog {
     });
 
     this.supabaseError = el(doc, 'div', { class: 'form-error' });
-    this.supabaseStatus = el(doc, 'p', { class: 'supabase-status', attrs: { hidden: 'hidden' } });
+    this.supabaseStatus = el(doc, 'p', {
+      class: 'supabase-status',
+      text: this.supabaseStatusMessage,
+      attrs: this.supabaseStatusMessage.length === 0 ? { hidden: 'hidden' } : {},
+    });
 
     this.supabaseSetupDetail = el(doc, 'p', { class: 'dialog-help' });
     this.supabaseSetupSql = doc.createElement('textarea');
@@ -354,9 +393,11 @@ export class ProjectDialog {
       ],
     );
 
-    const connect = el(doc, 'button', {
+    this.supabaseUrlInput.disabled = this.supabaseConnecting;
+    this.supabaseKeyInput.disabled = this.supabaseConnecting;
+    this.supabaseConnectButton = el(doc, 'button', {
       class: 'primary',
-      text: 'Connect',
+      text: this.supabaseConnecting ? 'Connecting…' : 'Connect',
       attrs: { type: 'button' },
       on: {
         click: () => {
@@ -364,6 +405,7 @@ export class ProjectDialog {
         },
       },
     });
+    this.supabaseConnectButton.disabled = this.supabaseConnecting;
 
     return el(doc, 'div', { class: 'supabase-form' }, [
       el(doc, 'span', { class: 'field-label', text: 'Supabase' }),
@@ -382,85 +424,219 @@ export class ProjectDialog {
       this.supabaseError,
       this.supabaseStatus,
       this.supabaseSetup,
-      el(doc, 'div', { class: 'dialog-footer-buttons' }, [connect]),
+      el(doc, 'div', { class: 'dialog-footer-buttons' }, [this.supabaseConnectButton]),
     ]);
   }
 
   /** Tests the Supabase database and uses it when it is as expected. */
   private async connectSupabase(): Promise<void> {
+    if (this.supabaseConnecting) {
+      return;
+    }
     const url = this.supabaseUrlInput?.value.trim() ?? this.supabaseUrlValue.trim();
     const key = (this.supabaseKeyInput?.value ?? this.supabaseKeyValue).trim();
     this.supabaseUrlValue = url;
     this.supabaseKeyValue = key;
-    if (this.supabaseError !== null) {
-      this.supabaseError.textContent = '';
-    }
-    this.hideSupabaseSetup();
-    if (this.supabaseStatus !== null) {
-      this.supabaseStatus.setAttribute('hidden', 'hidden');
-    }
-    if (url.length === 0 || key.length === 0) {
-      if (this.supabaseError !== null) {
-        this.supabaseError.textContent = 'The project URL and the API key are both needed.';
-      }
-      return;
-    }
-    let normalized: string;
+    this.supabaseStatusMessage = '';
+    this.beginSupabaseProgress('Connecting to Supabase…');
+    this.showSupabaseToast('Connecting to Supabase…', 'info');
+    logAction('[supabase] Connect pressed: starting the connection.');
     try {
-      normalized = normalizeSupabaseUrl(url);
-    } catch (error) {
       if (this.supabaseError !== null) {
-        this.supabaseError.textContent = error instanceof Error ? error.message : String(error);
+        this.supabaseError.textContent = '';
       }
-      return;
-    }
-    const client = new SupabaseClient({
-      url: normalized,
-      key,
-      fetchImpl: this.options.supabaseFetch,
-    });
-    const check = await verifySupabaseSchema(client).catch((error: unknown) => ({
-      ok: false as const,
-      issue: {
-        kind: 'unreachable' as const,
-        detail: error instanceof Error ? error.message : String(error),
-      },
-    }));
-    if (check.ok) {
+      this.hideSupabaseSetup();
       if (this.supabaseStatus !== null) {
-        this.supabaseStatus.textContent = 'The database is as expected: the Supabase project is used now.';
+        this.supabaseStatus.setAttribute('hidden', 'hidden');
+      }
+      if (url.length === 0 || key.length === 0) {
+        const message = 'The project URL and the API key are both needed.';
+        logAction(`[supabase] The connection was not started: ${message}`);
+        this.setSupabaseError(message);
+        this.showSupabaseToast(message, 'error');
+        return;
+      }
+      let normalized: string;
+      try {
+        normalized = normalizeSupabaseUrl(url);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logAction(`[supabase] The project URL is not valid: ${message}`);
+        this.setSupabaseError(message);
+        this.showSupabaseToast(message, 'error');
+        return;
+      }
+      logAction(`[supabase] Trying to reach the Supabase project at ${normalized}.`);
+      const client = new SupabaseClient({
+        url: normalized,
+        key,
+        fetchImpl: this.options.supabaseFetch,
+      });
+      let check: SupabaseSchemaCheck;
+      try {
+        check = await verifySupabaseSchema(client, {
+          onStep: (step) => {
+            this.reportSupabaseStep(step);
+          },
+        });
+      } catch (error) {
+        check = {
+          ok: false,
+          issue: {
+            kind: 'unreachable',
+            detail: error instanceof Error ? error.message : String(error),
+          },
+        };
+      }
+      if (!check.ok) {
+        this.reportSupabaseIssue(check.issue);
+        return;
+      }
+      logAction(`[supabase] Connected to the database at ${normalized}.`);
+      this.supabaseStatusMessage =
+        'The database is as expected: the Supabase project is used now.';
+      if (this.supabaseStatus !== null) {
+        this.supabaseStatus.textContent = this.supabaseStatusMessage;
         this.supabaseStatus.removeAttribute('hidden');
       }
-      this.options.onUseSupabase?.(normalized, key);
-      return;
+      this.updateSupabaseProgress('Opening the Supabase project…');
+      this.showSupabaseToast('Connected to Supabase. Opening the project…', 'success');
+      logAction('[supabase] Opening the Supabase project and loading its files.');
+      await this.options.onUseSupabase?.(normalized, key);
+      logAction('[supabase] The Supabase project is ready.');
+      this.updateSupabaseProgress('The Supabase project is ready.');
+      this.showSupabaseToast('The Supabase project is ready.', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logAction(`[supabase] The Supabase project could not be opened: ${message}`);
+      this.supabaseStatusMessage = '';
+      this.supabaseStatus?.setAttribute('hidden', 'hidden');
+      this.setSupabaseError(message);
+      this.showSupabaseToast(`The Supabase project could not be opened: ${message}`, 'error');
+    } finally {
+      this.endSupabaseProgress();
     }
-    if (check.issue.kind === 'invalid-credentials') {
-      if (this.supabaseError !== null) {
-        this.supabaseError.textContent = `The Supabase credentials were rejected (${check.issue.detail}). Check the URL and the key and try again.`;
-      }
-      return;
+  }
+
+  /** Shows one step of the verification in the console and in the spinner. */
+  private reportSupabaseStep(step: SupabaseVerificationStep): void {
+    let message: string;
+    switch (step.kind) {
+      case 'table':
+        message = `Checking the "${step.table}" table (${step.index}/${step.total})…`;
+        break;
+      case 'write':
+        message = 'Checking write access to the database…';
+        break;
+      case 'done':
+        message = 'The database is in the expected format.';
+        break;
     }
-    if (check.issue.kind === 'missing-table' || check.issue.kind === 'wrong-format') {
-      if (this.supabaseError !== null) {
-        this.supabaseError.textContent = check.issue.detail;
-      }
-      this.showSupabaseSetup(
-        'Run these queries once in the SQL editor of the Supabase project, then press Connect again.',
-      );
-      return;
+    logAction(`[supabase] ${message}`);
+    this.updateSupabaseProgress(message);
+    // The table probes are the connection itself, so the balloon keeps saying
+    // "connecting" while they run. The spinner shows the detailed step.
+    if (step.kind === 'write') {
+      this.showSupabaseToast('The project answered. Checking write access to the database…', 'info');
     }
-    if (check.issue.kind === 'access-denied') {
-      if (this.supabaseError !== null) {
-        this.supabaseError.textContent = check.issue.detail;
-      }
-      this.showSupabaseSetup(
-        'The key cannot use the tables. Run these queries, then press Connect again.',
-      );
-      return;
+  }
+
+  /** Reports a database that cannot be used, with the matching kind of message. */
+  private reportSupabaseIssue(issue: SupabaseSchemaIssue): void {
+    logAction(`[supabase] The database cannot be used (${issue.kind}): ${issue.detail}`);
+    switch (issue.kind) {
+      case 'invalid-credentials':
+        this.setSupabaseError(
+          `The Supabase credentials were rejected (${issue.detail}). Check the URL and the key and try again.`,
+        );
+        this.showSupabaseToast(
+          'Supabase rejected the credentials. Check the URL and the API key.',
+          'error',
+        );
+        return;
+      case 'unreachable':
+        this.setSupabaseError(issue.detail);
+        this.showSupabaseToast(issue.detail, 'error');
+        return;
+      case 'missing-table':
+      case 'wrong-format':
+        this.setSupabaseError(issue.detail);
+        this.showSupabaseSetup(
+          'Run these queries once in the SQL editor of the Supabase project, then press Connect again.',
+        );
+        this.showSupabaseToast(
+          'The Supabase database is not in the expected format. Run the setup queries and press Connect again.',
+          'warning',
+        );
+        return;
+      case 'access-denied':
+        this.setSupabaseError(issue.detail);
+        this.showSupabaseSetup(
+          'The key cannot use the tables. Run these queries, then press Connect again.',
+        );
+        this.showSupabaseToast(
+          'The Supabase key cannot write to the database. Run the setup queries and press Connect again.',
+          'warning',
+        );
+        return;
     }
+  }
+
+  /** Shows the spinner at once, before the first request leaves the browser. */
+  private beginSupabaseProgress(message: string): void {
+    this.supabaseConnecting = true;
+    if (this.supabaseUrlInput !== null) {
+      this.supabaseUrlInput.disabled = true;
+    }
+    if (this.supabaseKeyInput !== null) {
+      this.supabaseKeyInput.disabled = true;
+    }
+    if (this.supabaseConnectButton !== null) {
+      this.supabaseConnectButton.disabled = true;
+      this.supabaseConnectButton.textContent = 'Connecting…';
+    }
+    this.updateSupabaseProgress(message);
+  }
+
+  /** Updates the message of the spinner while the connection runs. */
+  private updateSupabaseProgress(message: string): void {
+    if (this.supabaseProgressText !== null) {
+      this.supabaseProgressText.textContent = message;
+    }
+    this.supabaseProgress?.removeAttribute('hidden');
+  }
+
+  /** Hides the spinner and gives the form back to the user. */
+  private endSupabaseProgress(): void {
+    this.supabaseConnecting = false;
+    if (this.supabaseUrlInput !== null) {
+      this.supabaseUrlInput.disabled = false;
+    }
+    if (this.supabaseKeyInput !== null) {
+      this.supabaseKeyInput.disabled = false;
+    }
+    if (this.supabaseConnectButton !== null) {
+      this.supabaseConnectButton.disabled = false;
+      this.supabaseConnectButton.textContent = 'Connect';
+    }
+    this.supabaseProgress?.setAttribute('hidden', 'hidden');
+  }
+
+  /** Writes a message under the Supabase fields, clearing it with an empty one. */
+  private setSupabaseError(message: string): void {
     if (this.supabaseError !== null) {
-      this.supabaseError.textContent = check.issue.detail;
+      this.supabaseError.textContent = message;
     }
+  }
+
+  /** Updates the single toast that follows the whole connection. */
+  private showSupabaseToast(message: string, kind: ToastKind): void {
+    showToast({
+      doc: this.doc,
+      message,
+      kind,
+      id: SUPABASE_CONNECTION_TOAST,
+    });
   }
 
   /** Shows the queries that create the Supabase tables. */

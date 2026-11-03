@@ -172,6 +172,25 @@ export type SupabaseSchemaCheck =
   | { readonly ok: true }
   | { readonly ok: false; readonly issue: SupabaseSchemaIssue };
 
+/** One step of the verification, reported while the database is tested. */
+export type SupabaseVerificationStep =
+  /** A table is being probed with all of its columns. */
+  | {
+      readonly kind: 'table';
+      readonly table: SupabaseTable;
+      readonly index: number;
+      readonly total: number;
+    }
+  /** The write-read-delete round trip is being made. */
+  | { readonly kind: 'write' }
+  /** Every check passed and the database can be used. */
+  | { readonly kind: 'done' };
+
+export interface SupabaseVerificationOptions {
+  /** Called before every step, so the caller can show the progress. */
+  readonly onStep?: ((step: SupabaseVerificationStep) => void) | undefined;
+}
+
 /**
  * Normalizes a Supabase project URL: trims it and drops trailing slashes.
  *
@@ -393,8 +412,13 @@ export class SupabaseClient {
  * round trip on the tasks table, so denied writes surface here and not in
  * the middle of the work.
  */
-export async function verifySupabaseSchema(client: SupabaseClient): Promise<SupabaseSchemaCheck> {
-  for (const table of SUPABASE_TABLES) {
+export async function verifySupabaseSchema(
+  client: SupabaseClient,
+  options: SupabaseVerificationOptions = {},
+): Promise<SupabaseSchemaCheck> {
+  const report = options.onStep ?? ((): void => undefined);
+  for (const [index, table] of SUPABASE_TABLES.entries()) {
+    report({ kind: 'table', table, index: index + 1, total: SUPABASE_TABLES.length });
     try {
       await client.probeTable(table, supabaseColumns(table));
     } catch (error) {
@@ -418,6 +442,7 @@ export async function verifySupabaseSchema(client: SupabaseClient): Promise<Supa
   }
 
   try {
+    report({ kind: 'write' });
     const probe = randomProbeId();
     await client.insertRows('tasks', [{ id: probe, title: '__gnumarus_probe__' }]);
     const back = await client.selectRows('tasks', {
@@ -443,6 +468,7 @@ export async function verifySupabaseSchema(client: SupabaseClient): Promise<Supa
       },
     };
   }
+  report({ kind: 'done' });
   return { ok: true };
 }
 

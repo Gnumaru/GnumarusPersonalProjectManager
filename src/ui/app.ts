@@ -124,6 +124,7 @@ import { GanttDragController, type GanttDragContext } from './ganttDrag.js';
 import { createIcon } from './icons.js';
 import { KanbanDragController } from './kanbanDrag.js';
 import { renderKanbanBoard, renderKanbanToolbar } from './kanbanBoard.js';
+import { logAction } from './log.js';
 import { Modal } from './modal.js';
 import { NoteDialog } from './noteDialog.js';
 import { renderNoteRows } from './noteTable.js';
@@ -390,15 +391,19 @@ export class App
    *
    * The service mode needs a folder, the embedded mode needs the storage of the
    * browser: when one of them is missing the application waits for the user.
+   * `supabaseVerified` skips the probes of a Supabase database that the project
+   * dialog has just verified.
    */
-  private async openStore(): Promise<void> {
+  private async openStore(
+    options: { readonly supabaseVerified?: boolean } = {},
+  ): Promise<void> {
     const config = this.config;
     if (config.mode === 'filesystem') {
       await this.openFileSystemStore();
       return;
     }
     if (config.mode === 'supabase') {
-      await this.openSupabaseStore();
+      await this.openSupabaseStore(options.supabaseVerified === true);
       return;
     }
     if (config.mode === 'embedded') {
@@ -497,27 +502,35 @@ export class App
    * Without credentials the application waits for the user; with rejected or
    * unreachable ones it reports why and waits as well.
    */
-  private async openSupabaseStore(): Promise<void> {
+  private async openSupabaseStore(verified = false): Promise<void> {
     const credentials = this.readSupabaseCredentials();
     if (credentials === null) {
+      logAction('[supabase] No Supabase credentials are stored in the browser.');
       this.supabaseError = null;
       this.store = null;
       return;
     }
     const client = new SupabaseClient({ ...credentials, fetchImpl: this.supabaseFetch });
-    try {
-      await Promise.all(
-        SUPABASE_TABLES.map((table) => client.probeTable(table, supabaseColumns(table))),
-      );
-    } catch (error) {
-      this.supabaseError = error instanceof Error ? error.message : String(error);
-      this.store = null;
-      showToast({
-        doc: this.doc,
-        message: `Unable to use the Supabase project: ${this.supabaseError}`,
-        kind: 'error',
-      });
-      return;
+    if (verified) {
+      logAction('[supabase] The tables were just verified by the project dialog: opening the store.');
+    } else {
+      logAction(`[supabase] Probing the tables of ${credentials.url} before opening the project.`);
+      try {
+        await Promise.all(
+          SUPABASE_TABLES.map((table) => client.probeTable(table, supabaseColumns(table))),
+        );
+      } catch (error) {
+        this.supabaseError = error instanceof Error ? error.message : String(error);
+        logAction(`[supabase] The project could not be opened: ${this.supabaseError}`);
+        this.store = null;
+        showToast({
+          doc: this.doc,
+          message: `Unable to use the Supabase project: ${this.supabaseError}`,
+          kind: 'error',
+        });
+        return;
+      }
+      logAction('[supabase] Every table answered: the project store is ready.');
     }
     this.supabaseError = null;
     this.store = new SupabaseProjectStore(client);
@@ -1037,9 +1050,9 @@ export class App
         dialog.setMode('filesystem');
         void this.switchToFileSystem();
       },
-      onUseSupabase: (url, key) => {
+      onUseSupabase: async (url, key) => {
         dialog.setMode('supabase');
-        void this.switchToSupabase(url, key);
+        await this.switchToSupabase(url, key);
       },
       onChooseFolder: () => {
         void this.openFolderPicker();
@@ -1129,14 +1142,21 @@ export class App
    * again when coming back.
    */
   private async switchToSupabase(url: string, key: string): Promise<void> {
+    logAction(`[project] Switching to the Supabase backend at ${url}.`);
     this.storeSupabaseCredentials({ url, key });
     writeMode('supabase', this.storage);
     this.config = { ...this.config, mode: 'supabase' };
     await this.persistConfig();
+    logAction('[project] The Supabase settings were saved: opening the project.');
     this.supabaseError = null;
-    await this.openStore();
+    await this.openStore({ supabaseVerified: true });
     this.updateProjectPath();
+    if (this.supabaseError !== null) {
+      throw new Error(this.supabaseError);
+    }
+    logAction('[project] Loading the tasks of the Supabase project.');
     await this.refresh();
+    logAction('[project] The Supabase project finished loading.');
   }
 
   /**

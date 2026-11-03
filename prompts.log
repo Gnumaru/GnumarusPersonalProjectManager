@@ -199,6 +199,10 @@ em um projeto meu, em todas as views, tem uma task especifica que não esta most
 ====
 explore a base de codigo e procure e corrija potenciais bugs associados ao fato de agora estarmos usando ids negativos alem de positivos, bem como por estarmos usando ids com muitos caracteres (podem ter até 17 caracteres contando o sinal de negativo). apos terminar rode apenas desta vez os testes e2e e corrija qualquer problema que surgir.
 ====
+ao escolher supabase como backend do projeto, informar a url de projeto e chave de api e clicar em "connect" o app demora um tempo até conseguir conectar de fato com o backend e nesse tempo não existe qualquer tipo de feedback ao usuário. eu quero o seguinte:
+- todas as ações devem ser logadas no console com console.log informando o momento do log junto com a mensagem. por exemplo, logo antes de tentar conectar no supabase vai ter uma mensagem do tipo "tentando conectar ao supabase", quando a conexão for bem sucedida, outra mensagem "conexão bem sucedida", depois "verificando se o banco está no formato correto" e assim por diante.
+- além dos logs de console, deve haver um elemento gráfico bem óbvio na tela, um spinner, que será exibido imediatamente ao clicar em "connect" e será escondido tão logo a conexão seja bem sucedida ou ocorra algum erro.
+- também devem haver balões de mensagem, com cores indicando o tipo de mensagem (erro, warning, mensagem comum) no campo inferior direito informando as ações que estão acontecento (tentando conectar, verificando integridade do banco etc)
 ====
 ====
 ====

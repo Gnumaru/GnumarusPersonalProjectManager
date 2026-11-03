@@ -1,5 +1,39 @@
 # Checklist
 
+## Batch 47 - Visible progress of the Supabase connection
+
+### Change
+
+- [x] Timestamped console log helper (`src/ui/log.ts`)
+- [x] `verifySupabaseSchema` reports every verification step through a typed
+      callback (`src/api/supabase.ts`)
+- [x] Spinner shown immediately when **Connect** is clicked, hidden only after
+      the success or the failure, and the button is disabled while connecting
+      (`src/ui/projectDialog.ts`, `src/styles.css`)
+- [x] Toasts for every step, with the new warning kind and an info icon
+      (`src/ui/toast.ts`, `src/ui/icons.ts`, `src/styles.css`)
+- [x] The dialog awaits the switch to the Supabase project, so the spinner
+      covers the loading of the project too (`src/ui/projectDialog.ts`,
+      `src/ui/app.ts`)
+- [x] The application logs the Supabase switch and the opening of the store
+      (`src/ui/app.ts`)
+- [x] The tables verified by the dialog are not probed again when the store
+      opens (`src/ui/app.ts`)
+
+### Tests
+
+- [x] `src/ui/log.test.ts` - timestamped messages
+- [x] `src/ui/toast.test.ts` - info, success, warning and error toasts, and
+      the replacement of a toast by id
+- [x] `src/api/supabase.test.ts` - the verification steps of a healthy
+      project
+- [x] `src/ui/projectDialog.test.ts` - the spinner appears before the first
+      request and disappears on success or failure, toasts follow the steps,
+      console logs carry a timestamp, and the dialog awaits the project switch
+- [x] `npm run typecheck`, `npm test` (583 tests), `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 46 - Signed ids across the whole range
 
 ### Change

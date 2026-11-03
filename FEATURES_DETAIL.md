@@ -1092,6 +1092,29 @@ every table with all of its columns, then a write-read-delete round trip on
 the tasks table, so denied writes surface here and not in the middle of the
 work.
 
+The whole connection gives visible feedback:
+
+* every step is written to the console with the moment it happened, as an ISO
+  timestamp with milliseconds (`src/ui/log.ts`): the click, the reach of the
+  project, every table, the write probe, the opening of the project and the
+  result;
+* a **spinner** in an accent panel of the dialog footer, always visible
+  regardless of the scroll of the form, appears synchronously with the click,
+  before the first request leaves the browser. It shows the current step
+  ("Checking the `tasks` table (1/5)…", "Checking write access to the
+  database…", "Opening the Supabase project…") and disappears only when the
+  project is ready or the connection fails. The Connect button is disabled
+  while it runs, so a second connection cannot start;
+* a **toast** in the bottom right corner follows the phases, with the colors
+  of its kind: a common message while connecting and verifying, a green
+  success when the project is ready, an amber warning when the database is
+  missing tables or columns or refuses writes, and a red error when the
+  credentials are rejected or the project cannot be reached. The balloon is
+  replaced in place, so the steps do not stack up;
+* the dialog **awaits the switch** to the project, so the spinner also covers
+  the opening of the store and the loading of the tasks. The tables the
+  dialog has just verified are not probed a second time when the store opens.
+
 Rejected credentials keep the dialog open with a warning and ask for new
 ones. A missing table or a missing column shows the queries that create the
 database (`SUPABASE_SETUP_SQL` in `src/api/supabase.ts`): every table is
@@ -1260,7 +1283,7 @@ be entered with a double click.
 | `src/core/taskTree.test.ts` | The tree of the tasks: roots, children, orphan tasks, cycles, focus, expansion, search and subtree of a task. |
 | `src/core/config.test.ts` | Configuration parsing and serialization, the kind of storage and its default. |
 | `src/api/client.test.ts` | Tagged values, headers, error handling, shell calls, authentication policy of the service (mocked `fetch`). |
-| `src/api/supabase.test.ts` | URL normalization, auth headers, schema verification outcomes, CRUD shapes, paging, setup SQL (mocked `fetch`, no network). |
+| `src/api/supabase.test.ts` | URL normalization, auth headers, schema verification outcomes and steps, CRUD shapes, paging, setup SQL (mocked `fetch`, no network). |
 | `src/core/serviceStore.test.ts` | The store of the service against the **running bridge**: creation, listing, pagination, recursive search, update, deletion, creation of a child task, counting and listing of the children, reading of the hierarchy, signed count output, numeric path order and long negative ids. Skipped when the service is unreachable, or when it demands a token that is not in `GNUMARUS_API_TOKEN`. |
 | `src/core/supabaseStore.test.ts` | The Supabase project against an in memory fake of PostgREST: the tasks, the notes, the comments, the search, the counts, the id registry, the numeric path order across the whole id range, the export and the import. |
 | `src/core/zip.test.ts` | The ZIP archives: the checksum, the round trip, the empty archive, the damaged file and the unicode characters. |
@@ -1272,6 +1295,9 @@ be entered with a double click.
 | `src/core/markdown.test.ts` | The markdown parser: the headings, the paragraphs, the lists, the quotes, the code blocks, the rules and the inline marks. |
 | `src/ui/widgets.test.ts` | The task table (parent column, children badge, action buttons, long negative ids and their comment badge) and the pagination bar (jsdom). |
 | `src/ui/app.test.ts` | The whole application against an in memory fake of the service (jsdom), including the creation of a child task, the navigation between the parent and its children, the optional token, the tree view, the board and the Gantt chart (the focus breadcrumb, the reset of the focus, the creation of a child from the chart, the margin weeks from the displayed rows and the month-spanning collapse), the four storage choices and the Supabase project (creation, credentials, dialog). |
+| `src/ui/projectDialog.test.ts` | The progress of the Supabase connection (jsdom): the spinner is visible before the first request is answered and hidden on success or failure, the button is disabled while connecting, the toasts follow the phases (common, success, warning, error), the console lines carry a timestamp and the dialog keeps the spinner while the project switch is pending. |
+| `src/ui/log.test.ts` | The timestamped console messages: the ISO prefix and the detail argument. |
+| `src/ui/toast.test.ts` | The four colors of the toasts and the replacement of a toast that carries the same id. |
 | `src/ui/kanbanBoard.test.ts` | The board: the columns and their order, the cards, their tags and their actions. |
 | `src/ui/kanbanDrag.test.ts` | The drag and drop of the cards of the board between the columns. |
 | `src/core/gantt.test.ts` | The schedule of the Gantt chart: the days, the weeks, the months, the columns, the bars and the padded schedule with one margin week around the tasks. |

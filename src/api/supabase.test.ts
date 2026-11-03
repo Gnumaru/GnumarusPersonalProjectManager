@@ -6,6 +6,7 @@ import {
   normalizeSupabaseUrl,
   supabaseColumns,
   verifySupabaseSchema,
+  type SupabaseVerificationStep,
 } from './supabase.js';
 
 const SUPABASE_URL = 'https://xyz.supabase.co';
@@ -232,6 +233,58 @@ describe('verifySupabaseSchema', () => {
     expect(await verifySupabaseSchema(client)).toEqual({ ok: true });
     const deletes = seen.filter((request) => request.method === 'DELETE');
     expect(deletes.length).toBeGreaterThan(0);
+  });
+
+  it('reports every table, the write probe and the success in order', async () => {
+    const { routes, seen } = healthyRoutes(new Map());
+    const client = clientWith(routes, seen);
+    const steps: SupabaseVerificationStep[] = [];
+
+    expect(
+      await verifySupabaseSchema(client, {
+        onStep: (step) => {
+          steps.push(step);
+        },
+      }),
+    ).toEqual({ ok: true });
+
+    expect(steps.slice(0, SUPABASE_TABLES.length)).toEqual(
+      SUPABASE_TABLES.map((table, index) => ({
+        kind: 'table',
+        table,
+        index: index + 1,
+        total: SUPABASE_TABLES.length,
+      })),
+    );
+    expect(steps[SUPABASE_TABLES.length]).toEqual({ kind: 'write' });
+    expect(steps[steps.length - 1]).toEqual({ kind: 'done' });
+  });
+
+  it('reports no success step when the database is missing a table', async () => {
+    const seen: SeenRequest[] = [];
+    const client = clientWith(
+      [
+        {
+          match: () => true,
+          respond: () =>
+            jsonResponse(
+              { code: 'PGRST205', message: "Could not find the table 'public.tasks'" },
+              404,
+            ),
+        },
+      ],
+      seen,
+    );
+    const steps: SupabaseVerificationStep[] = [];
+
+    const check = await verifySupabaseSchema(client, {
+      onStep: (step) => {
+        steps.push(step);
+      },
+    });
+
+    expect(check.ok).toBe(false);
+    expect(steps).toEqual([{ kind: 'table', table: 'tasks', index: 1, total: SUPABASE_TABLES.length }]);
   });
 
   it('asks for new credentials when they are rejected', async () => {

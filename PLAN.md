@@ -8,6 +8,18 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 47 gives the Supabase connection visible progress. Every step is
+  logged in the console with the moment of the log: connecting, reaching the
+  project, checking each table, checking the write access, opening the
+  project and the result. A prominent spinner appears as soon as **Connect**
+  is clicked and disappears only when the connection succeeds or fails, and
+  colored toasts in the bottom right corner follow the same steps (common
+  message, success, warning, error). `verifySupabaseSchema` reports its steps
+  through a typed callback, and the dialog awaits the switch to the Supabase
+  project before it hides the progress. The tables that were just verified
+  are not probed a second time when the store opens.
+- Verification: 583 unit tests pass; `npm run typecheck`, `npm run build`
+  and `npm run deploy` pass. The end to end suites are left to the user.
 - Batch 46 hardens the whole codebase for random signed ids up to 17
   characters (the 16 digits of `Number.MAX_SAFE_INTEGER` plus the minus
   sign). A shared `parseRecordId` reads ids as `bigint` and rejects
