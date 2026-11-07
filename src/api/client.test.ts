@@ -6,6 +6,7 @@ import {
   decodeTagged,
   parseMountPoints,
   parseServiceInfo,
+  quoteShellPath,
 } from './client.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -213,6 +214,151 @@ describe('ApiClient', () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ service: 'ok' }));
     const client = new ApiClient({ fetchImpl });
     await expect(client.ping()).resolves.toBe(true);
+  });
+});
+
+describe('quoteShellPath', () => {
+  it('quotes paths for the shell of the service', () => {
+    expect(quoteShellPath('/home/user/my docs/a.txt')).toBe('"/home/user/my docs/a.txt"');
+    expect(quoteShellPath('/tmp/a"b$c`d\\e.txt')).toBe('"/tmp/a\\"b\\$c\\`d\\\\e.txt"');
+    // A leading ~/ stays unquoted so the shell still expands the home.
+    expect(quoteShellPath('~/.config/app.json')).toBe('~"/.config/app.json"');
+  });
+});
+
+describe('ApiClient.fileExists', () => {
+  function shellResult(returncode: string): Response {
+    return jsonResponse({
+      command: 'test -f',
+      cwd: '',
+      returncode,
+      stdout: '',
+      stderr: '',
+      timed_out: 'b:false',
+      stdout_truncated: 'b:false',
+      stderr_truncated: 'b:false',
+    });
+  }
+
+  function requestedUrls(fetchImpl: ReturnType<typeof vi.fn>): string[] {
+    return fetchImpl.mock.calls.map((call) => String(call[0]));
+  }
+
+  it('probes with test -f instead of reading the file', async () => {
+    const fetchImpl = vi.fn(async () => shellResult('i:0'));
+    const client = new ApiClient({ fetchImpl });
+
+    expect(await client.fileExists('/home/user/a b.txt')).toBe(true);
+
+    const urls = requestedUrls(fetchImpl);
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toContain('/api/shell');
+    // No GET /api/file: a missing file must not log a 404.
+    expect(urls.some((href) => href.includes('/api/file?'))).toBe(false);
+  });
+
+  it('reports a missing file as absent', async () => {
+    const fetchImpl = vi.fn(async () => shellResult('i:1'));
+    const client = new ApiClient({ fetchImpl });
+
+    expect(await client.fileExists('/home/user/gone.txt')).toBe(false);
+  });
+
+  it('falls back to a direct read when the shell is denied', async () => {
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const href = String(url);
+      if (href.includes('/api/shell')) {
+        return jsonResponse({ error: 'unauthorized' }, 401);
+      }
+      return jsonResponse({ content: 'hello', size: 'i:5', is_binary: 'b:false' });
+    });
+    const client = new ApiClient({ fetchImpl });
+
+    expect(await client.fileExists('/home/user/a.txt')).toBe(true);
+  });
+
+  it('reports a missing file when the shell and the read agree', async () => {
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const href = String(url);
+      if (href.includes('/api/shell')) {
+        return jsonResponse({ error: 'unauthorized' }, 401);
+      }
+      return jsonResponse({ error: 'not_found' }, 404);
+    });
+    const client = new ApiClient({ fetchImpl });
+
+    expect(await client.fileExists('/home/user/gone.txt')).toBe(false);
+  });
+});
+
+describe('ApiClient.readOptionalFile', () => {
+  it('reads the file only when the probe finds it', async () => {
+    const requested: string[] = [];
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const href = String(url);
+      requested.push(href);
+      if (href.includes('/api/shell')) {
+        return jsonResponse({
+          command: 'test -f',
+          cwd: '',
+          returncode: 'i:0',
+          stdout: '',
+          stderr: '',
+          timed_out: 'b:false',
+          stdout_truncated: 'b:false',
+          stderr_truncated: 'b:false',
+        });
+      }
+      return jsonResponse({ content: 'hello', size: 'i:5', is_binary: 'b:false' });
+    });
+    const client = new ApiClient({ fetchImpl });
+
+    expect(await client.readOptionalFile('/home/user/a.txt')).toBe('hello');
+    expect(requested.filter((href) => href.includes('/api/file?'))).toHaveLength(1);
+  });
+
+  it('returns null for a missing file without reading it', async () => {
+    const requested: string[] = [];
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const href = String(url);
+      requested.push(href);
+      return jsonResponse({
+        command: 'test -f',
+        cwd: '',
+        returncode: 'i:1',
+        stdout: '',
+        stderr: '',
+        timed_out: 'b:false',
+        stdout_truncated: 'b:false',
+        stderr_truncated: 'b:false',
+      });
+    });
+    const client = new ApiClient({ fetchImpl });
+
+    expect(await client.readOptionalFile('/home/user/gone.txt')).toBeNull();
+    expect(requested.some((href) => href.includes('/api/file?'))).toBe(false);
+  });
+
+  it('returns null when the file is gone between the probe and the read', async () => {
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const href = String(url);
+      if (href.includes('/api/shell')) {
+        return jsonResponse({
+          command: 'test -f',
+          cwd: '',
+          returncode: 'i:0',
+          stdout: '',
+          stderr: '',
+          timed_out: 'b:false',
+          stdout_truncated: 'b:false',
+          stderr_truncated: 'b:false',
+        });
+      }
+      return jsonResponse({ error: 'not_found' }, 404);
+    });
+    const client = new ApiClient({ fetchImpl });
+
+    expect(await client.readOptionalFile('/home/user/gone.txt')).toBeNull();
   });
 });
 

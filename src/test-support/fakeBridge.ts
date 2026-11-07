@@ -346,6 +346,21 @@ export class FakeBridge {
       stdout = matches.length > 0 ? `${matches.join('\n')}\n` : '';
     } else if (command.startsWith('mkdir ')) {
       stdout = '';
+    } else if (command.startsWith('test -f ')) {
+      // Quiet existence probe: HTTP 200 either way, like the real service.
+      const probed = unquoteShellPath(command.slice('test -f '.length).trim(), prefix);
+      const exists = probed !== null && this.files.has(probed);
+      return json({
+        command,
+        cwd,
+        returncode: exists ? 'i:0' : 'i:1',
+        stdout,
+        stderr: '',
+        timed_out: 'b:false',
+        stdout_truncated: 'b:false',
+        stderr_truncated: 'b:false',
+        stdin_bytes: `i:${stdin.length}`,
+      });
     } else if (command.includes('"$HOME"')) {
       stdout = '/home/user';
     }
@@ -364,9 +379,37 @@ export class FakeBridge {
   }
 }
 
+/**
+ * Resolves the path of a `test -f` probe to a key of the fake file system.
+ *
+ * `~/` keys are kept literally (tests seed them that way), absolute paths
+ * are kept literally, and anything else resolves against the working
+ * directory of the command. `null` when the quoting is not understood.
+ */
+function unquoteShellPath(raw: string, prefix: string): string | null {
+  let text = raw.trim();
+  let home = '';
+  if (text.startsWith('~')) {
+    // A quoted home (`~"/..."`) keeps working: the shell still expands it.
+    home = '~';
+    text = text.slice(1);
+  }
+  let path: string;
+  if (text.startsWith('"') && text.endsWith('"') && text.length >= 2) {
+    path = text.slice(1, -1).replace(/\\(["$`\\])/gu, '$1');
+  } else if (/^[\w./-]+$/u.test(text)) {
+    path = text;
+  } else {
+    return null;
+  }
+  if (home !== '' || path.startsWith('/')) {
+    return `${home}${path}`;
+  }
+  return `${prefix}${path.replace(/^\.\//u, '')}`;
+}
+
 /** Turns a shell glob (`comment_*.txt`) into a regular expression. */
-function globToRegExp(pattern: string): RegExp {
-  const escaped = pattern
+function globToRegExp(pattern: string): RegExp {  const escaped = pattern
     .replace(/[.+^${}()|[\]\\]/gu, '\\$&')
     .replace(/\*/gu, '[^/]*')
     .replace(/\?/gu, '.');

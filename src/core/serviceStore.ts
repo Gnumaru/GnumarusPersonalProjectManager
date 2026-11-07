@@ -440,15 +440,7 @@ export class ServiceProjectStore implements ProjectStore {
   }
 
   async readAppConfig(): Promise<string | null> {
-    try {
-      const file = await this.api.readFile(this.absolute(APP_CONFIG_FILE));
-      return file.content;
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) {
-        return null;
-      }
-      throw error;
-    }
+    return this.api.readOptionalFile(this.absolute(APP_CONFIG_FILE));
   }
 
   async writeAppConfig(content: string): Promise<void> {
@@ -638,14 +630,7 @@ export class ServiceProjectStore implements ProjectStore {
 
   /** Every id used by the project, from the `ids.txt` registry file. */
   private async readTakenIds(): Promise<Set<number>> {
-    let content: string | null = null;
-    try {
-      content = (await this.api.readFile(this.absolute(IDS_FILE))).content;
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 404) {
-        throw error;
-      }
-    }
+    const content = await this.api.readOptionalFile(this.absolute(IDS_FILE));
     if (content === null) {
       return this.bootstrapIdsFile();
     }

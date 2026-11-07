@@ -1,5 +1,35 @@
 # Checklist
 
+## Batch 48 - Quiet existence probes instead of noisy 404s
+
+### Change
+
+- [x] `ApiClient.fileExists` probes with `test -f` (HTTP 200), new
+      `readOptionalFile` reads only when present, `quoteShellPath` quotes
+      safely (`src/api/client.ts`)
+- [x] Fake bridge emulates `test -f` (`src/test-support/fakeBridge.ts`)
+- [x] `loadConfig` reads quietly, `saveConfig` creates-or-overwrites
+      (`src/core/config.ts`)
+- [x] `readAppConfig` and the `ids.txt` bootstrap read quietly
+      (`src/core/serviceStore.ts`)
+- [x] Denied shell falls back to a direct read, so unexpected 401s still
+      surface instead of vanishing into defaults
+
+### Tests
+
+- [x] `src/api/client.test.ts` - quoting, probe mapping, shell-denied
+      fallback, optional read (present, missing, race, errors)
+- [x] `src/core/config.test.ts` - load (present, missing) and save
+      (create, overwrite on 409)
+- [x] `src/ui/app.test.ts` - fresh start issues no `GET /api/file`,
+      existing config reads with a single HTTP 200
+- [x] `src/core/serviceStore.test.ts` - live config round trip without
+      noisy 404s
+- [x] `npm run typecheck`, `npm test` (574 tests, 3 consecutive green runs),
+      `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 47 - Visible progress of the Supabase connection
 
 ### Change

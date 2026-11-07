@@ -12,7 +12,7 @@
  * the user chose.
  */
 
-import { ApiClient } from '../api/client.js';
+import { ApiClient, ApiError } from '../api/client.js';
 import type { ProjectKind } from './projectStore.js';
 import { supportsOpfs } from './browserStorage.js';
 import { supportsFileSystemAccess } from './fileSystemAccess.js';
@@ -214,6 +214,8 @@ export function writeMode(mode: ProjectKind, storage?: ConfigStorage | null): vo
 /**
  * Reads the configuration file, returning the defaults when it is missing.
  *
+ * A missing file is normal on the first run: existence is probed quietly
+ * and the file is only read when it is there, so no 404 reaches the console.
  * Every mode except the service keeps its configuration in the local storage
  * of the browser.
  */
@@ -226,8 +228,8 @@ export async function loadConfig(
     return loadBrowserConfig(mode, storage);
   }
   try {
-    const file = await api.readFile(CONFIG_FILE_PATH);
-    return parseConfig(file.content);
+    const content = await api.readOptionalFile(CONFIG_FILE_PATH);
+    return content === null ? DEFAULT_CONFIG : parseConfig(content);
   } catch {
     return DEFAULT_CONFIG;
   }
@@ -247,7 +249,17 @@ export async function saveConfig(
     command: 'mkdir -p -- "$HOME/.config/GnumarusProjectManager"',
     timeout: 10,
   });
-  await api.overwriteFile(CONFIG_FILE_PATH, serializeConfig(config));
+  // Create-or-overwrite: the first save works even when the file was never
+  // created, and later saves replace it.
+  try {
+    await api.createFile(CONFIG_FILE_PATH, serializeConfig(config));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 409) {
+      await api.overwriteFile(CONFIG_FILE_PATH, serializeConfig(config));
+      return;
+    }
+    throw error;
+  }
 }
 
 /** Reads the configuration of a project that lives in the browser. */

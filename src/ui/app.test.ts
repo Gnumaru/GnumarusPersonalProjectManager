@@ -3851,3 +3851,34 @@ describe('the highlight of the project dialog', () => {
     harness.app.dispose();
   });
 });
+
+describe('the quiet configuration load', () => {
+  it('starts without any GET /api/file when the config file is missing', async () => {
+    const harness = await createHarness(0);
+
+    // A missing config.json is normal on the first run: existence is probed
+    // with POST /api/shell (HTTP 200), so the console shows no 404.
+    const fileReads = harness.bridge.requests.filter(
+      (request) => request.method === 'GET' && request.path === '/api/file',
+    );
+    expect(fileReads).toHaveLength(0);
+    expect(harness.root.querySelector('.project-path')?.textContent).toBe('No folder selected');
+
+    harness.app.dispose();
+  });
+
+  it('reads the config file when it exists, still without a 404', async () => {
+    const harness = await createHarness(0, {
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+
+    // Exactly one read: the file itself, answering HTTP 200.
+    const fileReads = harness.bridge.requests.filter(
+      (request) => request.method === 'GET' && request.path === '/api/file',
+    );
+    expect(fileReads).toHaveLength(1);
+    expect(harness.root.querySelector('.project-path')?.textContent).toBe('/home/user/projects');
+
+    harness.app.dispose();
+  });
+});

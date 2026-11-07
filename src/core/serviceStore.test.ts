@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vite-plus/test';
 import { ApiClient } from '../api/client.js';
 import { ServiceProjectStore, parseIdCounts, parseServicePaths } from './serviceStore.js';
+import { APP_CONFIG_FILE } from './appConfig.js';
 import { isValidRecordId } from './ids.js';
 import { buildNote } from './note.js';
 import {
@@ -417,6 +418,19 @@ describeLive('ServiceProjectStore against the live service', () => {
     // The title of that note does not hold the term.
     const byTitle = await store.searchNotePaths('needle', 'title');
     expect(byTitle).toHaveLength(0);
+  });
+
+  it('reads and writes the application config without noisy 404s', async () => {
+    const absolute = `${testDirectory}/${APP_CONFIG_FILE}`;
+    await api.deleteFile(absolute).catch(() => undefined);
+
+    // Missing is normal: the read probes quietly and yields null.
+    expect(await store.readAppConfig()).toBeNull();
+
+    await store.writeAppConfig('view=kanban\n');
+    expect(await store.readAppConfig()).toBe('view=kanban\n');
+
+    await api.deleteFile(absolute).catch(() => undefined);
   });
 
   it('edits and deletes a note', async () => {

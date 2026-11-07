@@ -204,6 +204,10 @@ ao escolher supabase como backend do projeto, informar a url de projeto e chave 
 - além dos logs de console, deve haver um elemento gráfico bem óbvio na tela, um spinner, que será exibido imediatamente ao clicar em "connect" e será escondido tão logo a conexão seja bem sucedida ou ocorra algum erro.
 - também devem haver balões de mensagem, com cores indicando o tipo de mensagem (erro, warning, mensagem comum) no campo inferior direito informando as ações que estão acontecento (tentando conectar, verificando integridade do banco etc)
 ====
+criacao de tarefas em lote
+
+notes:
+	- 
 ====
 ====
 ====

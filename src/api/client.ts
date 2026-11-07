@@ -250,6 +250,18 @@ function extractErrorMessage(status: number, body: string): string {
   return trimmed.length > 0 ? trimmed : `Request failed with status ${status}`;
 }
 
+/**
+ * Quotes a path for the shell of the service.
+ *
+ * Double quotes with `"`, `$`, backtick and backslash escaped. A leading
+ * `~/` stays unquoted so the shell still expands the home directory.
+ */
+export function quoteShellPath(path: string): string {
+  const home = path.startsWith('~/') ? '~' : '';
+  const rest = home === '' ? path : path.slice(1);
+  return `${home}"${rest.replace(/(["$`\\])/gu, '\\$1')}"`;
+}
+
 export class ApiClient {
   readonly baseUrl: string;
   private token: string | null;
@@ -420,13 +432,55 @@ export class ApiClient {
     });
   }
 
+  /**
+   * Whether a file exists, probed with `test -f`.
+   *
+   * The probe answers HTTP 200 either way, so a missing file costs no noisy
+   * 404: missing files are normal for optional files like the configuration
+   * or the id registry.
+   */
   async fileExists(path: string): Promise<boolean> {
     try {
-      await this.readFile(path);
-      return true;
+      const result = await this.execShell({
+        command: `test -f ${quoteShellPath(path)}`,
+        timeout: 10,
+      });
+      return result.returncode === 0;
     } catch (error) {
-      if (error instanceof ApiError && (error.status === 404 || error.status === 403)) {
-        return false;
+      if (!(error instanceof ApiError) || (error.status !== 401 && error.status !== 403)) {
+        throw error;
+      }
+      // The shell itself is denied while the file endpoints may still work:
+      // fall back to a direct read. A missing file may log a 404 here, but a
+      // denied shell is already exceptional.
+      try {
+        await this.readFile(path);
+        return true;
+      } catch (nested) {
+        if (nested instanceof ApiError && (nested.status === 404 || nested.status === 403)) {
+          return false;
+        }
+        throw nested;
+      }
+    }
+  }
+
+  /**
+   * Reads a text file, `null` when it does not exist.
+   *
+   * Existence is probed first (see `fileExists`), so the read only runs when
+   * the file is there. A file gone between the probe and the read still
+   * yields `null`.
+   */
+  async readOptionalFile(path: string): Promise<string | null> {
+    if (!(await this.fileExists(path))) {
+      return null;
+    }
+    try {
+      return (await this.readFile(path)).content;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        return null;
       }
       throw error;
     }

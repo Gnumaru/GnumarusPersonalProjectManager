@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vite-plus/test';
+import { ApiClient, ApiError } from '../api/client.js';
 import {
   DEFAULT_CONFIG,
   MAX_NOTE_PAGE_SIZE,
@@ -7,8 +8,10 @@ import {
   clampNotePageSize,
   defaultMode,
   isProjectKind,
+  loadConfig,
   parseConfig,
   readMode,
+  saveConfig,
   serializeConfig,
   writeMode,
 } from './config.js';
@@ -143,5 +146,113 @@ describe('serializeConfig', () => {
       notePageSize: 25,
     };
     expect(parseConfig(serializeConfig(config))).toEqual(config);
+  });
+});
+
+describe('loadConfig', () => {
+  /** A stub of the service client recording every call. */
+  function stubApi(files: Record<string, string>): {
+    api: ApiClient;
+    calls: { method: string; path: string }[];
+  } {
+    const calls: { method: string; path: string }[] = [];
+    const api = {
+      async readOptionalFile(path: string): Promise<string | null> {
+        calls.push({ method: 'readOptionalFile', path });
+        return files[path] ?? null;
+      },
+      async readFile(path: string): Promise<{ content: string }> {
+        calls.push({ method: 'readFile', path });
+        const content = files[path];
+        if (content === undefined) {
+          throw new ApiError('File not found', 404);
+        }
+        return { content };
+      },
+    } as unknown as ApiClient;
+    return { api, calls };
+  }
+
+  it('reads the file when it exists', async () => {
+    const { api, calls } = stubApi({
+      '~/.config/GnumarusProjectManager/config.json': '{"projectDir":"/x","pageSize":10}',
+    });
+
+    const config = await loadConfig(api, 'service');
+
+    expect(config.projectDir).toBe('/x');
+    expect(calls).toEqual([
+      { method: 'readOptionalFile', path: '~/.config/GnumarusProjectManager/config.json' },
+    ]);
+  });
+
+  it('returns the defaults when the file is missing', async () => {
+    const { api, calls } = stubApi({});
+
+    expect(await loadConfig(api, 'service')).toEqual(DEFAULT_CONFIG);
+    expect(calls).toEqual([
+      { method: 'readOptionalFile', path: '~/.config/GnumarusProjectManager/config.json' },
+    ]);
+  });
+});
+
+describe('saveConfig', () => {
+  /** A stub of the service client recording every call. */
+  function stubApi(options: { createFails?: boolean } = {}): {
+    api: ApiClient;
+    calls: { method: string; path: string }[];
+    written: Map<string, string>;
+  } {
+    const calls: { method: string; path: string }[] = [];
+    const written = new Map<string, string>();
+    const api = {
+      async execShell(): Promise<{ returncode: number }> {
+        calls.push({ method: 'execShell', path: '' });
+        return { returncode: 0 };
+      },
+      async createFile(path: string, content: string): Promise<void> {
+        calls.push({ method: 'createFile', path });
+        if (options.createFails) {
+          throw new ApiError('File already exists', 409);
+        }
+        written.set(path, content);
+      },
+      async overwriteFile(path: string, content: string): Promise<void> {
+        calls.push({ method: 'overwriteFile', path });
+        written.set(path, content);
+      },
+    } as unknown as ApiClient;
+    return { api, calls, written };
+  }
+
+  it('creates the file on the first save', async () => {
+    const { api, calls, written } = stubApi();
+
+    await saveConfig(
+      api,
+      { mode: 'service', projectDir: '/x', pageSize: 10, notePageSize: 10 },
+      null,
+    );
+
+    expect(calls.map((call) => call.method)).toEqual(['execShell', 'createFile']);
+    expect(JSON.parse(written.get('~/.config/GnumarusProjectManager/config.json') ?? '')).toEqual({
+      mode: 'service',
+      projectDir: '/x',
+      pageSize: 10,
+      notePageSize: 10,
+    });
+  });
+
+  it('overwrites the file when it already exists', async () => {
+    const { api, calls, written } = stubApi({ createFails: true });
+
+    await saveConfig(
+      api,
+      { mode: 'service', projectDir: '/x', pageSize: 10, notePageSize: 10 },
+      null,
+    );
+
+    expect(calls.map((call) => call.method)).toEqual(['execShell', 'createFile', 'overwriteFile']);
+    expect(written.has('~/.config/GnumarusProjectManager/config.json')).toBe(true);
   });
 });

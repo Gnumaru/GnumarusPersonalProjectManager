@@ -1223,6 +1223,11 @@ service, so the choice survives a browser cache wipe and can be shared by
 different browsers. The browser only stores the token, which changes every time
 the service restarts, and only when the service demands one.
 
+A missing file is normal on the first run: loading probes existence with
+`test -f` (HTTP 200 either way, so no 404 reaches the console) and only
+reads when the file is there, while saving creates the file when missing
+and overwrites it otherwise.
+
 The **kind of storage** of the project (the service or the embedded project) is
 a choice of the browser, not of the machine: it is kept in the local storage,
 under the key `gnumarus-project-manager.mode`. The configuration of an embedded
