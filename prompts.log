@@ -206,7 +206,17 @@ ao escolher supabase como backend do projeto, informar a url de projeto e chave 
 ====
 crie um favicon para o app
 ====
-quando eu abro o app ele esta abrindo "vazio" independente da pasta de projeto que eu estivesse trabalhando antes. se eu seleciono uma pasta de projeto e depois recarrego a pagina ele perde a pasta de projeto atual e abre vazio. será alguma regressao da ultima alteracao?
+quando eu abro o app ele esta abrindo "vazio" independente da pasta de projeto que eu estivesse trabalhando antes. se eu seleciono uma pasta de projeto e depois recarrego a pagina ele perde a pasta de projeto atual e abre vazio. será alguma regressao da ultima alteracao? quando eu mudo de aba dá esse erro no console do chrome:
+
+index-B2gi7s4t.js:1  POST http://127.0.0.1:1423/api/file?path=%2Fsync%2FGodotProjects%2FezrasLegacy%2Fv4%2Fg%2Fgodot%2FEzrasLegacy1V3%2FDocsNew%2Fconfig.txt 409 (Conflict)
+requestJson @ index-B2gi7s4t.js:1
+createFile @ index-B2gi7s4t.js:1
+writeAppConfig @ index-B2gi7s4t.js:18
+persistGlobalConfig @ index-B2gi7s4t.js:29
+await in persistGlobalConfig
+setViewMode @ index-B2gi7s4t.js:29
+await in setViewMode
+onClick @ index-B2gi7s4t.js:29
 ====
 ====
 ====

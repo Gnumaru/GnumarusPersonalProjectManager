@@ -1225,8 +1225,9 @@ the service restarts, and only when the service demands one.
 
 A missing file is normal on the first run: loading probes existence with
 `test -f` (HTTP 200 either way, so no 404 reaches the console) and only
-reads when the file is there, while saving creates the file when missing
-and overwrites it otherwise.
+reads when the file is there, while saving overwrites and creates the file
+on the 404, so steady-state saves stay just as quiet. Paths starting with
+`~/` are probed as `"$HOME/..."`, which every shell expands.
 
 The **kind of storage** of the project (the service or the embedded project) is
 a choice of the browser, not of the machine: it is kept in the local storage,

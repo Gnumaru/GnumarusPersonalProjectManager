@@ -249,13 +249,13 @@ export async function saveConfig(
     command: 'mkdir -p -- "$HOME/.config/GnumarusProjectManager"',
     timeout: 10,
   });
-  // Create-or-overwrite: the first save works even when the file was never
-  // created, and later saves replace it.
+  // Overwrite-first: steady-state saves stay quiet, and a missing file is
+  // created on the 404 instead of logging a 409 on every save.
   try {
-    await api.createFile(CONFIG_FILE_PATH, serializeConfig(config));
+    await api.overwriteFile(CONFIG_FILE_PATH, serializeConfig(config));
   } catch (error) {
-    if (error instanceof ApiError && error.status === 409) {
-      await api.overwriteFile(CONFIG_FILE_PATH, serializeConfig(config));
+    if (error instanceof ApiError && error.status === 404) {
+      await api.createFile(CONFIG_FILE_PATH, serializeConfig(config));
       return;
     }
     throw error;

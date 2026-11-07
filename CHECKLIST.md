@@ -1,5 +1,24 @@
 # Checklist
 
+## Batch 50 - `"$HOME"` probes and overwrite-first config saves
+
+### Change
+
+- [x] `quoteShellPath` emits `"$HOME/..."` for `~/` paths (POSIX-safe)
+- [x] Fake bridge maps `$HOME` probes to `~/` keys
+- [x] `saveConfig` and `writeAppConfig` go overwrite-first, 404 creates
+- [x] Denied shell falls back to a direct read, so unexpected 401s still
+      surface instead of vanishing into defaults
+
+### Tests
+
+- [x] Quoting incl. the `~"` anti-pattern, reload keeps the folder across
+      a second start (fails on the old quoting), single overwrite per save
+- [x] `npm run typecheck`, `npm test` (577 tests, 3 consecutive green runs),
+      `npm run build`
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 49 - Favicon of the application
 
 ### Change

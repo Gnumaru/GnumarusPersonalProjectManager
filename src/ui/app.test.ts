@@ -23,6 +23,8 @@ class MemoryStorage implements TokenStorage {
 interface Harness {
   readonly app: App;
   readonly bridge: FakeBridge;
+  readonly api: ApiClient;
+  readonly storage: TokenStorage;
   readonly doc: Document;
   readonly root: HTMLElement;
   readonly dom: JSDOM;
@@ -243,7 +245,7 @@ export async function createHarness(taskCount = 25, options: HarnessOptions = {}
   const app = new App({ doc, root, api, storage, handleStorage, supabaseFetch: options.supabaseFetch });
   await app.start();
 
-  return { app, bridge, doc, root, dom, handleStorage, opfs: opfsRoot };
+  return { app, bridge, api, storage, doc, root, dom, handleStorage, opfs: opfsRoot };
 }
 
 export async function flush(times = 6): Promise<void> {
@@ -3879,6 +3881,32 @@ describe('the quiet configuration load', () => {
     expect(fileReads).toHaveLength(1);
     expect(harness.root.querySelector('.project-path')?.textContent).toBe('/home/user/projects');
 
+    harness.app.dispose();
+  });
+
+  it('keeps the project folder across a reload', async () => {
+    const harness = await createHarness(0, {
+      config: JSON.stringify({ projectDir: '/home/user/projects', pageSize: 10 }),
+    });
+    expect(harness.root.querySelector('.project-path')?.textContent).toBe('/home/user/projects');
+    harness.app.dispose();
+
+    // A reload: a new page sharing the bridge and the browser storage.
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost/' });
+    const doc = dom.window.document;
+    const root = doc.createElement('div');
+    doc.body.append(root);
+    const reloaded = new App({
+      doc,
+      root,
+      api: harness.api,
+      storage: harness.storage,
+      handleStorage: harness.handleStorage,
+    });
+    await reloaded.start();
+
+    expect(root.querySelector('.project-path')?.textContent).toBe('/home/user/projects');
+    reloaded.dispose();
     harness.app.dispose();
   });
 });

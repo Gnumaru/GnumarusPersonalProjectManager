@@ -444,11 +444,13 @@ export class ServiceProjectStore implements ProjectStore {
   }
 
   async writeAppConfig(content: string): Promise<void> {
+    // Overwrite-first: steady-state saves stay quiet, and a missing file is
+    // created on the 404 instead of logging a 409 on every save.
     try {
-      await this.api.createFile(this.absolute(APP_CONFIG_FILE), content);
+      await this.api.overwriteFile(this.absolute(APP_CONFIG_FILE), content);
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
-        await this.api.overwriteFile(this.absolute(APP_CONFIG_FILE), content);
+      if (error instanceof ApiError && error.status === 404) {
+        await this.api.createFile(this.absolute(APP_CONFIG_FILE), content);
         return;
       }
       throw error;

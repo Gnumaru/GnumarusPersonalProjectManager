@@ -198,7 +198,7 @@ describe('loadConfig', () => {
 
 describe('saveConfig', () => {
   /** A stub of the service client recording every call. */
-  function stubApi(options: { createFails?: boolean } = {}): {
+  function stubApi(options: { overwriteFails?: boolean } = {}): {
     api: ApiClient;
     calls: { method: string; path: string }[];
     written: Map<string, string>;
@@ -212,20 +212,20 @@ describe('saveConfig', () => {
       },
       async createFile(path: string, content: string): Promise<void> {
         calls.push({ method: 'createFile', path });
-        if (options.createFails) {
-          throw new ApiError('File already exists', 409);
-        }
         written.set(path, content);
       },
       async overwriteFile(path: string, content: string): Promise<void> {
         calls.push({ method: 'overwriteFile', path });
+        if (options.overwriteFails) {
+          throw new ApiError('File not found', 404);
+        }
         written.set(path, content);
       },
     } as unknown as ApiClient;
     return { api, calls, written };
   }
 
-  it('creates the file on the first save', async () => {
+  it('overwrites the file on the steady-state save', async () => {
     const { api, calls, written } = stubApi();
 
     await saveConfig(
@@ -234,7 +234,7 @@ describe('saveConfig', () => {
       null,
     );
 
-    expect(calls.map((call) => call.method)).toEqual(['execShell', 'createFile']);
+    expect(calls.map((call) => call.method)).toEqual(['execShell', 'overwriteFile']);
     expect(JSON.parse(written.get('~/.config/GnumarusProjectManager/config.json') ?? '')).toEqual({
       mode: 'service',
       projectDir: '/x',
@@ -243,8 +243,8 @@ describe('saveConfig', () => {
     });
   });
 
-  it('overwrites the file when it already exists', async () => {
-    const { api, calls, written } = stubApi({ createFails: true });
+  it('creates the file when it is missing', async () => {
+    const { api, calls, written } = stubApi({ overwriteFails: true });
 
     await saveConfig(
       api,
@@ -252,7 +252,7 @@ describe('saveConfig', () => {
       null,
     );
 
-    expect(calls.map((call) => call.method)).toEqual(['execShell', 'createFile', 'overwriteFile']);
+    expect(calls.map((call) => call.method)).toEqual(['execShell', 'overwriteFile', 'createFile']);
     expect(written.has('~/.config/GnumarusProjectManager/config.json')).toBe(true);
   });
 });

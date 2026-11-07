@@ -8,6 +8,13 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 50 fixes the `~/` probe the quiet-probe batch broke:
+  `~"..."` is not expanded by every shell, so the config probe always
+  missed and the app opened empty; probes now use `"$HOME/..."`, and both
+  config writers go overwrite-first (404 creates) so steady-state saves
+  stay quiet instead of logging a 409 on every view switch.
+- Verification: 577 unit tests pass; `npm run typecheck`, `npm run build`
+  and `npm run deploy` pass. The end to end suites are left to the user.
 - Batch 49 adds a favicon: `public/favicon.svg` with the indigo
   gradient GP mark of the brand, linked with a relative path so it works at
   the domain root and at nested paths.

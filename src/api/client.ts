@@ -254,12 +254,19 @@ function extractErrorMessage(status: number, body: string): string {
  * Quotes a path for the shell of the service.
  *
  * Double quotes with `"`, `$`, backtick and backslash escaped. A leading
- * `~/` stays unquoted so the shell still expands the home directory.
+ * `~/` becomes an unescaped `"$HOME/..."`: unlike a quoted tilde (`~"..."`,
+ * which not every shell expands), a quoted `$HOME` expands everywhere.
  */
 export function quoteShellPath(path: string): string {
-  const home = path.startsWith('~/') ? '~' : '';
-  const rest = home === '' ? path : path.slice(1);
-  return `${home}"${rest.replace(/(["$`\\])/gu, '\\$1')}"`;
+  if (path.startsWith('~/')) {
+    return `"$HOME/${escapeShellText(path.slice(2))}"`;
+  }
+  return `"${escapeShellText(path)}"`;
+}
+
+/** Escapes text for double quotes of the shell of the service. */
+function escapeShellText(text: string): string {
+  return text.replace(/(["$`\\])/gu, '\\$1');
 }
 
 export class ApiClient {

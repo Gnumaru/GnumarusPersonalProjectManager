@@ -382,30 +382,23 @@ export class FakeBridge {
 /**
  * Resolves the path of a `test -f` probe to a key of the fake file system.
  *
- * `~/` keys are kept literally (tests seed them that way), absolute paths
- * are kept literally, and anything else resolves against the working
+ * `$HOME/...` keys are kept as the `~/...` keys the tests seed, absolute
+ * paths are kept literally, and anything else resolves against the working
  * directory of the command. `null` when the quoting is not understood.
  */
 function unquoteShellPath(raw: string, prefix: string): string | null {
-  let text = raw.trim();
-  let home = '';
-  if (text.startsWith('~')) {
-    // A quoted home (`~"/..."`) keeps working: the shell still expands it.
-    home = '~';
-    text = text.slice(1);
-  }
-  let path: string;
-  if (text.startsWith('"') && text.endsWith('"') && text.length >= 2) {
-    path = text.slice(1, -1).replace(/\\(["$`\\])/gu, '$1');
-  } else if (/^[\w./-]+$/u.test(text)) {
-    path = text;
-  } else {
+  const text = raw.trim();
+  if (!text.startsWith('"') || !text.endsWith('"') || text.length < 2) {
     return null;
   }
-  if (home !== '' || path.startsWith('/')) {
-    return `${home}${path}`;
+  const unquoted = text.slice(1, -1).replace(/\\(["$`\\])/gu, '$1');
+  if (unquoted.startsWith('$HOME')) {
+    return `~${unquoted.slice('$HOME'.length)}`;
   }
-  return `${prefix}${path.replace(/^\.\//u, '')}`;
+  if (unquoted.startsWith('/')) {
+    return unquoted;
+  }
+  return `${prefix}${unquoted.replace(/^\.\//u, '')}`;
 }
 
 /** Turns a shell glob (`comment_*.txt`) into a regular expression. */

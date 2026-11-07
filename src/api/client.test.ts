@@ -221,8 +221,10 @@ describe('quoteShellPath', () => {
   it('quotes paths for the shell of the service', () => {
     expect(quoteShellPath('/home/user/my docs/a.txt')).toBe('"/home/user/my docs/a.txt"');
     expect(quoteShellPath('/tmp/a"b$c`d\\e.txt')).toBe('"/tmp/a\\"b\\$c\\`d\\\\e.txt"');
-    // A leading ~/ stays unquoted so the shell still expands the home.
-    expect(quoteShellPath('~/.config/app.json')).toBe('~"/.config/app.json"');
+    // A leading ~/ becomes "$HOME/...", which every shell expands.
+    expect(quoteShellPath('~/.config/app.json')).toBe('"$HOME/.config/app.json"');
+    // Never a quoted tilde: `~"..."` is not expanded by every shell.
+    expect(quoteShellPath('~/my docs/a.txt')).toBe('"$HOME/my docs/a.txt"');
   });
 });
 
