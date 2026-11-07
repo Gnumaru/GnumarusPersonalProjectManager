@@ -1262,7 +1262,7 @@ be entered with a double click.
 
 ## 10. Layout and responsiveness
 
-**Files:** `src/styles.css`, `src/ui/app.ts`
+**Files:** `src/styles.css`, `src/ui/app.ts`, `public/favicon.svg`, `index.html`
 
 * The window is split into a top bar, an optional banner, a toolbar, the task
   table (the only scrolling area) and the pagination bar: no vertical space is
@@ -1273,6 +1273,8 @@ be entered with a double click.
 * Both colour schemes are supported (`prefers-color-scheme`).
 * Shortcuts: `Ctrl+Shift+F` focuses the search box, `Enter` searches, `Escape`
   clears the search, `Escape` closes a dialog.
+* The favicon reuses the gradient GP mark of the brand (`public/favicon.svg`,
+  linked with a relative path so it loads at nested paths too).
 
 ---
 

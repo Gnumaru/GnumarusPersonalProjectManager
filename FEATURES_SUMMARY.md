@@ -184,6 +184,7 @@ list or as a tree.
 | **Enter enters the selected folder in the picker** | Done | `src/ui/fileDialog.ts` |
 | **The scroll of the picker is kept when an item is clicked** | Done | `src/ui/fileDialog.ts` |
 | Responsive, desktop first layout (1366x768 and above) | Done | `src/styles.css` |
+| Favicon with the gradient GP mark, working at nested paths | Done | `public/favicon.svg`, `index.html` |
 | Full 17-character ids visible in the ID and Parent columns, chips and child lists | Done | `src/styles.css` |
 | Light and dark colour schemes | Done | `src/styles.css` |
 | Keyboard shortcuts (`Ctrl+Shift+F` focuses the search, `Enter` searches, `Esc` clears) | Done | `src/ui/app.ts` |

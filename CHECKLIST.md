@@ -1,5 +1,20 @@
 # Checklist
 
+## Batch 49 - Favicon of the application
+
+### Change
+
+- [x] `public/favicon.svg` with the gradient GP mark, linked from
+      `index.html` with a relative path (works at nested paths)
+
+### Tests
+
+- [x] `src/ui/favicon.test.ts` - relative link, self-contained brand mark
+- [x] `npm run typecheck`, `npm test` (576 tests), `npm run build`
+- [x] `dist/favicon.svg` served from the build, deployed favicon checked
+- [x] `npm run deploy` -> `/var/www/html/GnumarusProjectManager`
+- [x] Compared consistency of all documentation files
+
 ## Batch 48 - Quiet existence probes instead of noisy 404s
 
 ### Change

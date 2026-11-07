@@ -204,6 +204,37 @@ ao escolher supabase como backend do projeto, informar a url de projeto e chave 
 - além dos logs de console, deve haver um elemento gráfico bem óbvio na tela, um spinner, que será exibido imediatamente ao clicar em "connect" e será escondido tão logo a conexão seja bem sucedida ou ocorra algum erro.
 - também devem haver balões de mensagem, com cores indicando o tipo de mensagem (erro, warning, mensagem comum) no campo inferior direito informando as ações que estão acontecento (tentando conectar, verificando integridade do banco etc)
 ====
+crie um favicon para o app
+====
+quando eu abro o app ele esta abrindo "vazio" independente da pasta de projeto que eu estivesse trabalhando antes. se eu seleciono uma pasta de projeto e depois recarrego a pagina ele perde a pasta de projeto atual e abre vazio. será alguma regressao da ultima alteracao?
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+/sync/GodotProjects/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/DocsNew
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+====
+
 criacao de tarefas em lote
 
 notes:

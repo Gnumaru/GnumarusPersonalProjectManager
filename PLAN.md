@@ -8,6 +8,11 @@ plain text file on the local disk, accessed exclusively through the
 
 ## Current Status
 
+- Batch 49 adds a favicon: `public/favicon.svg` with the indigo
+  gradient GP mark of the brand, linked with a relative path so it works at
+  the domain root and at nested paths.
+- Verification: 576 unit tests pass; `npm run typecheck`, `npm run build`
+  and `npm run deploy` pass. The end to end suites are left to the user.
 - Batch 48 fixes the noisy `404` on `GET /api/file?path=~%2F.config%2F.../config.json`: a missing `config.json` is normal on first run, so `loadConfig` probes existence with `POST /api/shell test -f` (HTTP 200, no console error) and only reads when present; `saveConfig` uses create-or-overwrite so the first save works; the same quiet probe backs `fileExists`, `readOptionalFile`, `readAppConfig` and the `ids.txt` bootstrap.
 - Verification: 574 unit tests pass; `npm run typecheck`, `npm run build`
   and `npm run deploy` pass. The end to end suites are left to the user.
