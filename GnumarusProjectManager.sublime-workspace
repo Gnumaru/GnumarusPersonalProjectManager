@@ -319,6 +319,41 @@
 	},
 	"buffers":
 	[
+		{
+			"contents": "",
+			"settings":
+			{
+				"buffer_size": 0,
+				"line_ending": "Unix"
+			},
+			"undo_stack":
+			[
+				[
+					4,
+					1,
+					"",
+					null,
+					"AQAAAAAAAAAAAAAAMAAAAAAAAAAAAAAA",
+					"AQAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/"
+				],
+				[
+					7,
+					1,
+					"right_delete",
+					null,
+					"AQAAAAAAAAAAAAAAAAAAAAAAAAAaAAAAL3N5bmMvc3JjL3pCcmlkZ2VkV2ViQXBwcy8",
+					"AQAAAAAAAAABAAAAGgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+				],
+				[
+					9,
+					1,
+					"cut",
+					null,
+					"AQAAAAAAAAAAAAAAAAAAAAAAAAAWAAAAR251bWFydXNQcm9qZWN0TWFuYWdlcg",
+					"AQAAAAAAAAABAAAAAAAAAAAAAAAWAAAAAAAAAAAAAAAAAPC/"
+				]
+			]
+		}
 	],
 	"build_system": "",
 	"build_system_choices":
@@ -567,10 +602,20 @@
 		"side_bar_visible": false,
 		"status_bar_visible": false
 	},
+	"expanded_folders":
+	[
+		"/sync/src/zBridgedWebApps/GnumarusProjectManager"
+	],
 	"file_history":
 	[
-		"/sync/src/zBridgedWebApps/GnumarusPaintingAndAnimationApp/prompts.log",
 		"/sync/src/zBridgedWebApps/GnumarusPaintingAndAnimationApp/AGENTS.md",
+		"/sync/src/zBridgedWebApps/GnumarusPaintingAndAnimationApp/prompts.log",
+		"/sync/src/zBridgedWebApps/GnumarusPaintingAndAnimationApp/e2e/GnumarusShell.spec.ts",
+		"/sync/src/zBridgedWebApps/GnumarusPaintingAndAnimationApp/playwright.config.ts",
+		"/tmp2/a/delete/project.json",
+		"/sync/src/zBridgedWebApps/GnumarusPaintingAndAnimationApp/src/project/GnumarusAseprite.ts",
+		"/sync/src/zBridgedWebApps/GnumarusPaintingAndAnimationApp/PLAN.md",
+		"/sync/src/zBridgedWebApps/GnumarusPaintingAndAnimationApp/FEATURES_DETAIL.md",
 		"/sync/src/zBridgedWebApps/GnumarusPaintingAndAnimationApp/.gitignore",
 		"/sync/src/AGENTS.en.md",
 		"/sync/GodotProjects/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/Docs/ZZZZNotas.txt",
@@ -690,17 +735,11 @@
 		"/C/sync/gdrive/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/stages/FireLavaMagmaVolcanoCaveLevel/Enemies/FireCrawlJumpSlimeEnemy/FireCrawlJumpSlimeEnemyController.gd",
 		"/C/sync/gdrive/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/stages/FireLavaMagmaVolcanoCaveLevel/Enemies/FireSpittingFlamingBirdEnemy/FireSpittingFlamingBirdEnemyController.gd",
 		"/C/sync/gdrive/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/stages/FireLavaMagmaVolcanoCaveLevel/Enemies/FireWitchBossEnemy/FireWitchAtk3HomingFireProjectileController.gd",
-		"/C/sync/gdrive/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/stages/FireLavaMagmaVolcanoCaveLevel/Enemies/LavaBallSpittingVolcanoEnemy/LavaBallSpittingVolcanoEnemyController.gd",
-		"/C/sync/gdrive/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/stages/FireLavaMagmaVolcanoCaveLevel/objects/CrumblingPlatform/CrumblingPlatformController.gd",
-		"/C/sync/gdrive/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/stages/FireLavaMagmaVolcanoCaveLevel/objects/FallingLavaDropHazard/FallingLavaDropHazardController.gd",
-		"/C/sync/gdrive/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/stages/FireLavaMagmaVolcanoCaveLevel/objects/FallingLavaDropHazard/FallingLavaDropHazardMaterialAcessorResource.gd",
-		"/C/sync/gdrive/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/stages/FireLavaMagmaVolcanoCaveLevel/objects/FallingLavaDropHazardSpawner/FallingLavaDropHazardSpawner.gd",
-		"/C/sync/gdrive/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/stages/FireLavaMagmaVolcanoCaveLevel/objects/FallingPlatform/FallingPlatformController.gd",
-		"/C/sync/gdrive/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/stages/FireLavaMagmaVolcanoCaveLevel/objects/FallingPlatform/HorizontalShakeMaterialAcessorResource.gd"
+		"/C/sync/gdrive/ezrasLegacy/v4/g/godot/EzrasLegacy1V3/stages/FireLavaMagmaVolcanoCaveLevel/Enemies/LavaBallSpittingVolcanoEnemy/LavaBallSpittingVolcanoEnemyController.gd"
 	],
 	"find":
 	{
-		"height": 38.0
+		"height": 28.0
 	},
 	"find_in_files":
 	{
@@ -735,12 +774,42 @@
 		{
 			"sheets":
 			[
+				{
+					"buffer": 0,
+					"selected": true,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 0,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								0,
+								0
+							]
+						],
+						"settings":
+						{
+							"auto_name": "",
+							"syntax": "Packages/Text/Plain text.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"stack_multiselect": false,
+					"type": "text"
+				}
 			]
 		}
 	],
 	"incremental_find":
 	{
-		"height": 38.0
+		"height": 28.0
 	},
 	"input":
 	{
@@ -769,6 +838,14 @@
 		]
 	},
 	"menu_visible": true,
+	"output.LSP Log Panel":
+	{
+		"height": 0.0
+	},
+	"output.diagnostics":
+	{
+		"height": 0.0
+	},
 	"output.find_results":
 	{
 		"height": 0.0,
@@ -776,11 +853,15 @@
 		[
 		]
 	},
+	"output.xdebug":
+	{
+		"height": 0.0
+	},
 	"pinned_build_system": "",
-	"project": "*.sublime-project",
+	"project": "GnumarusProjectManager.sublime-project",
 	"replace":
 	{
-		"height": 72.0
+		"height": 52.0
 	},
 	"save_all_on_build": true,
 	"select_file":
@@ -790,12 +871,36 @@
 		"selected_items":
 		[
 			[
-				"notas",
-				"EzrasLegacy1V3/Docs/ZZZZNotas.txt"
+				"agen",
+				"AGENTS.md"
+			],
+			[
+				"promp",
+				"prompts.log"
+			],
+			[
+				"romp",
+				"prompts.log"
+			],
+			[
+				"playwright.confi",
+				"playwright.config.ts"
+			],
+			[
+				"spec.ts",
+				"e2e/GnumarusShell.spec.ts"
+			],
+			[
+				"prom",
+				"prompts.log"
 			],
 			[
 				"agents",
 				"AGENTS.md"
+			],
+			[
+				"notas",
+				"EzrasLegacy1V3/Docs/ZZZZNotas.txt"
 			],
 			[
 				"maincharactercon",
@@ -1276,30 +1381,6 @@
 			[
 				"simpleproperty",
 				"EzrasLegacy1V3\\common\\scripts\\SimplePropertyResource.gd"
-			],
-			[
-				"bettermo",
-				"EzrasLegacy1V3\\common\\scripts\\MovementManagers\\BetterMoveManager2D.gd"
-			],
-			[
-				"util",
-				"EzrasLegacy1V3\\common\\scenes\\UtilsAutoload\\Utils.gd"
-			],
-			[
-				"bettermove",
-				"EzrasLegacy1V3\\common\\scripts\\MovementManagers\\BetterMoveManager2D.gd"
-			],
-			[
-				"ToolGenerateRectangleShapesFromFilledTilesTool.gd",
-				"EzrasLegacy1V3\\stages\\EgyptDesertPyramidLevel\\Enemies\\TrapRoomMidBossEnemy\\ToolGenerateRectangleShapesFromFilledTilesTool.gd"
-			],
-			[
-				"project",
-				"project.godot"
-			],
-			[
-				"egyp",
-				"EzrasLegacy1V3\\stages\\EgyptDesertPyramidLevel\\EgyptDesertPyramidLevel.txt"
 			]
 		],
 		"width": 0.0
@@ -1330,7 +1411,7 @@
 	"show_open_files": true,
 	"show_tabs": true,
 	"side_bar_visible": true,
-	"side_bar_width": 218.0,
+	"side_bar_width": 443.0,
 	"status_bar_visible": true,
 	"template_settings":
 	{
